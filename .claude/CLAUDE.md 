@@ -1,0 +1,4 @@
+要求：
+
+1. 如果有待完成的任务，则 记录到 .claude/todos/todo.md 文件里；如果这个任务完成，则从此文件里清除。
+2. 参考 .github/copilot-instructions.md 的配置说明

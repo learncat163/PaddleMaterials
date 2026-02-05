@@ -1,0 +1,6 @@
+# 需要深入调查DiT在处理padding时的attention计算，可能需要：
+
+对比PyTorch和PaddlePaddle的MultiHeadAttention实现细节
+检查DiT权重的加载是否完全正确
+考虑在采样时使用固定长度（相同num_atoms）的batch
+
