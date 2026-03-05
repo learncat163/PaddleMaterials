@@ -1,0 +1,234 @@
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Samplers for RL training.
+
+This code is adapted from:
+convert-matinvent/models/mattergen/sample.py
+
+Provides sampler classes for generating crystal structures during RL training.
+"""
+
+from typing import List, Tuple
+
+import numpy as np
+import paddle
+from pymatgen.core.structure import Lattice, Structure
+
+
+def structure_array_to_pymatgen_structures(
+    frac_coords, atom_types, lattice, num_atoms
+) -> List[Structure]:
+    """Convert structure array components to pymatgen Structure objects.
+
+    Args:
+        frac_coords: Fractional coordinates array (N_atoms, 3)
+        atom_types: Atomic numbers array (N_atoms,)
+        lattice: Lattice matrix array (N_crystals, 3, 3)
+        num_atoms: Number of atoms per crystal (N_crystals,)
+
+    Returns:
+        List of pymatgen Structure objects
+    """
+    structures = []
+    start_idx = 0
+    batch_size = len(num_atoms)
+
+    for i in range(batch_size):
+        n_atoms = num_atoms[i]
+        end_idx = start_idx + n_atoms
+
+        # Extract data for this crystal
+        crystal_frac_coords = frac_coords[start_idx:end_idx]
+        crystal_atom_types = atom_types[start_idx:end_idx].astype(int)
+        crystal_lattice = lattice[i]
+
+        # Create pymatgen Structure
+        structure = Structure(
+            lattice=Lattice(crystal_lattice),
+            species=crystal_atom_types,
+            coords=crystal_frac_coords,
+            coords_are_cartesian=False,
+        )
+
+        structures.append(structure)
+        start_idx = end_idx
+
+    return structures
+
+
+class BaseSampler:
+    """Base class for RL samplers."""
+
+    def __init__(
+        self,
+        batch_size: int = 16,
+        num_batches: int = 4,
+        num_inference_steps: int = 1000,
+    ):
+        """Initialize sampler.
+
+        Args:
+            batch_size: Number of samples per batch
+            num_batches: Number of batches to generate
+            num_inference_steps: Number of denoising steps
+        """
+        self.batch_size = batch_size
+        self.num_batches = num_batches
+        self.num_inference_steps = num_inference_steps
+
+    def generate(self, model, **kwargs):
+        """Generate samples using the model.
+
+        Args:
+            model: Diffusion model (MatterGen or DiffCSP)
+            **kwargs: Additional generation parameters
+
+        Returns:
+            Tuple of (data_list, structure_list)
+        """
+        raise NotImplementedError
+
+
+class MatterGenSampler(BaseSampler):
+    """Sampler for MatterGen models."""
+
+    def __init__(
+        self,
+        batch_size: int = 16,
+        num_batches: int = 4,
+        num_inference_steps: int = 1000,
+    ):
+        super().__init__(batch_size, num_batches, num_inference_steps)
+
+    def generate(self, model, **kwargs) -> Tuple[List, List[Structure]]:
+        """Generate crystal structures using MatterGen model.
+
+        Args:
+            model: MatterGen model
+            **kwargs: Additional parameters (num_atoms, conditions, etc.)
+
+        Returns:
+            Tuple of (data_list, structure_list)
+        """
+        all_data = []
+        all_structures = []
+
+        for batch_idx in range(self.num_batches):
+            # Prepare batch data
+            # For generation, we need to specify num_atoms distribution
+            # Use default num_atoms if not provided
+            if "num_atoms" in kwargs:
+                num_atoms = kwargs["num_atoms"]
+                if isinstance(num_atoms, int):
+                    num_atoms = [num_atoms] * self.batch_size
+                num_atoms = paddle.to_tensor(num_atoms, dtype='int64')
+            else:
+                # Default: generate structures with random number of atoms
+                # This is a simplified approach
+                num_atoms = paddle.randint(
+                    low=1, high=50, shape=[self.batch_size]
+                )
+
+            batch_data = {
+                "structure_array": {
+                    "num_atoms": num_atoms,
+                }
+            }
+
+            # Generate samples
+            with paddle.no_grad():
+                output = model.sample(
+                    batch_data,
+                    num_inference_steps=self.num_inference_steps,
+                )
+
+            # Convert output to data list and structures
+            structure_array = output["structure_array"]
+            structures = structure_array_to_pymatgen_structures(
+                frac_coords=structure_array["frac_coords"].numpy(),
+                atom_types=structure_array["atom_types"].numpy(),
+                lattice=structure_array["lattice"].numpy(),
+                num_atoms=structure_array["num_atoms"].numpy(),
+            )
+
+            all_data.extend([{"structure_array": structure_array}])
+            all_structures.extend(structures)
+
+        return all_data, all_structures
+
+
+class DiffCSPSampler(BaseSampler):
+    """Sampler for DiffCSP models."""
+
+    def __init__(
+        self,
+        batch_size: int = 16,
+        num_batches: int = 4,
+        num_inference_steps: int = 1000,
+    ):
+        super().__init__(batch_size, num_batches, num_inference_steps)
+
+    def generate(self, model, **kwargs) -> Tuple[List, List[Structure]]:
+        """Generate crystal structures using DiffCSP model.
+
+        Args:
+            model: DiffCSP model
+            **kwargs: Additional parameters
+
+        Returns:
+            Tuple of (data_list, structure_list)
+        """
+        all_data = []
+        all_structures = []
+
+        for batch_idx in range(self.num_batches):
+            # Prepare batch data
+            if "num_atoms" in kwargs:
+                num_atoms = kwargs["num_atoms"]
+                if isinstance(num_atoms, int):
+                    num_atoms = [num_atoms] * self.batch_size
+                num_atoms = paddle.to_tensor(num_atoms, dtype='int64')
+            else:
+                num_atoms = paddle.randint(
+                    low=1, high=50, shape=[self.batch_size]
+                )
+
+            batch_data = {
+                "structure_array": {
+                    "num_atoms": num_atoms,
+                }
+            }
+
+            # Generate samples
+            with paddle.no_grad():
+                output = model.sample(
+                    batch_data,
+                    num_inference_steps=self.num_inference_steps,
+                )
+
+            # Convert output to data list and structures
+            structure_array = output["structure_array"]
+            structures = structure_array_to_pymatgen_structures(
+                frac_coords=structure_array["frac_coords"].numpy(),
+                atom_types=structure_array["atom_types"].numpy(),
+                lattice=structure_array["lattice"].numpy(),
+                num_atoms=structure_array["num_atoms"].numpy(),
+            )
+
+            all_data.extend([{"structure_array": structure_array}])
+            all_structures.extend(structures)
+
+        return all_data, all_structures

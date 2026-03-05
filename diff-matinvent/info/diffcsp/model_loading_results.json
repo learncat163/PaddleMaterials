@@ -1,0 +1,8 @@
+{
+  "test": "model_loading",
+  "device": "gpu:0",
+  "model_name": "diffcsp_mp20",
+  "status": "SUCCESS",
+  "total_parameters": 15446528,
+  "trainable_parameters": 15446528
+}

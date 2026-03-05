@@ -1,0 +1,20 @@
+{
+  "test": "backward_pass",
+  "num_epochs": 2,
+  "epochs": [
+    {
+      "epoch": 0,
+      "loss_mean": 9.039281649165787e-05,
+      "loss_std": 1.3866477327023607e-05
+    },
+    {
+      "epoch": 1,
+      "loss_mean": 0.00010780935772345402,
+      "loss_std": 9.027131638444528e-06
+    }
+  ],
+  "loss_consistency": {
+    "mean_diff": 1.7416541231796154e-05,
+    "trend": "increasing"
+  }
+}

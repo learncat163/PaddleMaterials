@@ -1,0 +1,53 @@
+{
+  "test": "forward_pass",
+  "target_precision": "1e-6",
+  "device": "gpu:0",
+  "num_runs": 10,
+  "batch_size": 4,
+  "input_type": "FIXED",
+  "runs": [
+    {
+      "run": 0,
+      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+    },
+    {
+      "run": 1,
+      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+    },
+    {
+      "run": 2,
+      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+    },
+    {
+      "run": 3,
+      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+    },
+    {
+      "run": 4,
+      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+    },
+    {
+      "run": 5,
+      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+    },
+    {
+      "run": 6,
+      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+    },
+    {
+      "run": 7,
+      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+    },
+    {
+      "run": 8,
+      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+    },
+    {
+      "run": 9,
+      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+    }
+  ],
+  "consistency": {
+    "error": "No valid runs"
+  }
+}

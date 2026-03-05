@@ -1,0 +1,37 @@
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+
+#     http://www.apache.org/licenses/LICENSE-2.0
+
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Reinforcement learning module for material generation.
+
+This code is adapted from:
+convert-matinvent/pipeline/base.py
+convert-matinvent/pipeline/mat_invent.py
+"""
+
+from ppmat.rl.base import ReinL
+from ppmat.rl.datasets import RLDataset, collate_fn, create_rl_dataloader
+from ppmat.rl.mat_invent import MatInvent
+from ppmat.rl.samplers import BaseSampler, DiffCSPSampler, MatterGenSampler
+
+__all__ = [
+    "ReinL",
+    "MatInvent",
+    "BaseSampler",
+    "MatterGenSampler",
+    "DiffCSPSampler",
+    "RLDataset",
+    "collate_fn",
+    "create_rl_dataloader",
+]

@@ -195,9 +195,12 @@ def radius_graph_pbc_ocp(
     if pbc is not None:
         pbc = paddle.atleast_2d(pbc)
         for i in range(3):
-            if not paddle.any(x=pbc[:, i]).item():
+            # Use contiguous() to work around PaddlePaddle bug where
+            # paddle.all() returns False for non-contiguous bool tensors
+            col = pbc[:, i].contiguous()
+            if not paddle.any(x=col).item():
                 pbc_[i] = False
-            elif paddle.all(x=pbc[:, i]).item():
+            elif paddle.all(x=col).item():
                 pbc_[i] = True
             else:
                 raise RuntimeError(
@@ -388,13 +391,17 @@ def radius_graph_pbc(
     the effect of these errors in 32-bit should be negligible in practice.
     """
     assert topk_per_pair is None, "non None values of topk_per_pair is not supported"
+    # Create PBC tensor with proper batch size to avoid the paddle.all() bug
+    # where paddle.all([True]) returns False instead of True
+    batch_size = len(num_atoms)
+    pbc_tensor = paddle.to_tensor(
+        data=[[True, True, True]] * batch_size, dtype="bool"
+    ).to(cart_coords.place)
     edge_index, unit_cell, num_neighbors_image, _, _ = radius_graph_pbc_ocp(
         pos=cart_coords,
         cell=lattice,
         natoms=num_atoms,
-        pbc=paddle.to_tensor(data=[True, True, True], dtype="float32")
-        .to("bool")
-        .to(cart_coords.place),
+        pbc=pbc_tensor,
         radius=radius,
         max_num_neighbors_threshold=max_num_neighbors_threshold,
         max_cell_images_per_dim=max_cell_images_per_dim,
@@ -2507,6 +2514,221 @@ class MatterGen(paddle.nn.Layer):
             start_idx += num_atoms[i]
 
         return {"result": result}
+
+    def add_noise(self, batch, timestep: int):
+        """Add noise to batch for reinforcement learning fine-tuning.
+
+        This code is adapted from:
+        convert-matinvent/models/mattergen/pl_module.py
+
+        Args:
+            batch: Input batch data structure
+            timestep: Diffusion timestep (0 to num_train_timesteps-1)
+
+        Returns:
+            Tuple of (noisy_batch, clean_batch, timesteps)
+            - noisy_batch: Dictionary with noisy frac_coords, lattice, atom_types
+            - clean_batch: Original clean batch
+            - t: Normalized timestep tensor
+        """
+        structure_array = batch["structure_array"]
+        num_atoms = structure_array["num_atoms"]
+        batch_size = num_atoms.shape[0]
+        batch_idx = paddle.repeat_interleave(
+            paddle.arange(batch_size), repeats=num_atoms
+        )
+
+        # Normalize timestep to [0, max_t] range
+        # Similar to convert-matinvent: time_list from max_t to 1/N
+        N = self.num_train_timesteps
+        max_t = self.max_t if hasattr(self, 'max_t') else 1.0
+        time_list = paddle.linspace(max_t, 1.0 / N, N)
+        t = paddle.full([batch_size], time_list[timestep])
+
+        # Pre-corruption: normalize frac_coords to [0, 1)
+        frac_coords = structure_array["frac_coords"] % 1.0
+
+        # Add noise to coordinates
+        rand_x = paddle.randn(shape=frac_coords.shape, dtype=frac_coords.dtype)
+        input_frac_coords = self.coord_scheduler.add_noise(
+            frac_coords, rand_x, timesteps=t, batch_idx=batch_idx, num_atoms=num_atoms
+        )
+
+        # Add noise to lattice
+        if "lattice" in structure_array.keys():
+            lattices = structure_array["lattice"]
+        else:
+            lattices = lattice_params_to_matrix_paddle(
+                structure_array["lengths"], structure_array["angles"]
+            )
+        rand_l = paddle.randn(shape=lattices.shape, dtype=lattices.dtype)
+        rand_l = make_noise_symmetric_preserve_variance(rand_l)
+        input_lattice = self.lattice_scheduler.add_noise(
+            lattices, rand_l, timesteps=t, num_atoms=num_atoms
+        )
+
+        # Add noise to atom types
+        atom_type = structure_array["atom_types"]
+        atom_type_zero_based = atom_type - 1
+        input_atom_type_zero_based = self.atom_scheduler.add_noise(
+            atom_type_zero_based, timesteps=t, batch_idx=batch_idx
+        )
+        input_atom_type = input_atom_type_zero_based + 1
+
+        # Create noisy batch structure
+        noisy_batch = {
+            "structure_array": {
+                "frac_coords": input_frac_coords,
+                "lattice": input_lattice,
+                "atom_types": input_atom_type,
+                "num_atoms": num_atoms,
+            },
+            "batch_idx": batch_idx,
+        }
+
+        # Return tuple format expected by calc_sample_loss
+        return noisy_batch, batch, t
+
+    def calc_sample_loss(self, noised_input):
+        """Calculate sample loss for reinforcement learning fine-tuning.
+
+        This code is adapted from:
+        convert-matinvent/models/mattergen/pl_module.py
+        convert-matinvent/models/mattergen/loss.py
+
+        Args:
+            noised_input: Tuple of (noisy_batch, clean_batch, timesteps)
+                - noisy_batch: Dictionary with noisy frac_coords, lattice, atom_types
+                - clean_batch: Original clean batch
+                - t: Normalized timestep tensor
+
+        Returns:
+            Tuple of (loss, prediction_dict)
+            - loss: Per-sample loss tensor of shape (batch_size,)
+            - prediction_dict: Dictionary with 'pos', 'cell', 'atomic_numbers' keys
+        """
+        noisy_batch, clean_batch, t = noised_input
+
+        # Prepare input for model forward pass
+        # The model expects a batch dict with 'structure_array' key
+        model_input = {"structure_array": noisy_batch["structure_array"]}
+
+        # Run model forward pass to get predictions
+        # The model returns: eps_pos, lattice_update, atom_type_logits
+        eps_pos, lattice_update, atom_type_logits = self.decoder(
+            z=self.noise_level_encoding(t),
+            frac_coords=noisy_batch["structure_array"]["frac_coords"],
+            atom_types=noisy_batch["structure_array"]["atom_types"],
+            num_atoms=noisy_batch["structure_array"]["num_atoms"],
+            batch=noisy_batch["batch_idx"],
+            lattice=noisy_batch["structure_array"]["lattice"],
+        )
+
+        # Get clean targets
+        clean_structure = clean_batch["structure_array"]
+        clean_frac_coords = clean_structure["frac_coords"] % 1.0
+        clean_lattice = clean_structure["lattice"] if "lattice" in clean_structure else lattice_params_to_matrix_paddle(
+            clean_structure["lengths"], clean_structure["angles"]
+        )
+        clean_atom_types = clean_structure["atom_types"]
+
+        # Calculate coordinate loss (MSE between predicted and clean)
+        coord_loss = paddle.pow(eps_pos, 2).mean(axis=1)
+
+        # Calculate lattice loss (MSE between predicted and clean)
+        lattice_diff = clean_lattice - noisy_batch["structure_array"]["lattice"]
+        lattice_loss = paddle.pow(lattice_update - lattice_diff, 2).mean(axis=(1, 2))
+
+        # Calculate atom type loss
+        # For atom types, we use cross-entropy or MSE depending on the scheduler
+        atom_type_loss = paddle.pow(atom_type_logits, 2).mean(axis=1)
+
+        # Combine losses with weights
+        # Use same weights as in training
+        coord_weight = getattr(self, "coord_loss_weight", 0.1)
+        lattice_weight = getattr(self, "lattice_loss_weight", 1.0)
+        atom_weight = getattr(self, "atom_loss_weight", 1.0)
+
+        # Aggregate per-atom losses to per-sample losses using scatter
+        batch_idx = noisy_batch["batch_idx"]
+        coord_loss_per_sample = scatter(coord_loss, batch_idx, dim=0, reduce="mean")
+        atom_loss_per_sample = scatter(atom_type_loss, batch_idx, dim=0, reduce="mean")
+
+        # Total weighted loss per sample
+        total_loss = (
+            coord_weight * coord_loss_per_sample +
+            lattice_weight * lattice_loss +
+            atom_weight * atom_loss_per_sample
+        )
+
+        # Create prediction dict for KL calculation
+        prediction_dict = {
+            "pos": eps_pos,
+            "cell": lattice_update,
+            "atomic_numbers": atom_type_logits,
+        }
+
+        return total_loss, prediction_dict
+
+    def calc_kl_reg(self, agent_pred, prior_pred, batch):
+        """Calculate KL divergence regularization for reinforcement learning.
+
+        This code is adapted from:
+        convert-matinvent/models/mattergen/pl_module.py
+        convert-matinvent/pipeline/mat_invent.py
+
+        Uses paddle.scatter to replace torch_scatter.
+
+        Args:
+            agent_pred: Prediction dict from agent model with keys 'pos', 'cell', 'atomic_numbers'
+            prior_pred: Prediction dict from prior (frozen) model with same keys
+            batch: Input batch data
+
+        Returns:
+            KL divergence loss per sample (tensor of shape batch_size)
+        """
+        # Extract predictions from agent and prior
+        pred_x, pred_l, pred_t = (
+            agent_pred["pos"],
+            agent_pred["cell"],
+            agent_pred["atomic_numbers"],
+        )
+        pred_x_p, pred_l_p, pred_t_p = (
+            prior_pred["pos"].detach(),
+            prior_pred["cell"].detach(),
+            prior_pred["atomic_numbers"].detach(),
+        )
+
+        # Get batch index for aggregation
+        # batch can be either a dict with 'batch_idx' or 'structure_array' with batch info
+        if "batch_idx" in batch:
+            batch_idx = batch["batch_idx"]
+        elif "structure_array" in batch:
+            structure_array = batch["structure_array"]
+            num_atoms = structure_array["num_atoms"]
+            batch_size = num_atoms.shape[0]
+            batch_idx = paddle.repeat_interleave(
+                paddle.arange(batch_size), repeats=num_atoms
+            )
+        else:
+            raise ValueError("Cannot find batch index in batch input")
+
+        # Compute KL divergence for lattice (per sample)
+        # Mean squared difference between agent and prior lattice predictions
+        kl_term0 = paddle.pow(pred_l - pred_l_p, 2).mean(axis=(1, 2))
+
+        # Compute KL divergence for positions (per atom, then aggregate to per sample)
+        x_ap = paddle.pow(pred_x - pred_x_p, 2).mean(axis=1)
+        kl_term1 = scatter(x_ap, batch_idx, dim=0, reduce="mean")
+
+        # Compute KL divergence for atom types (per atom, then aggregate to per sample)
+        t_ap = paddle.pow(pred_t - pred_t_p, 2).mean(axis=1)
+        kl_term2 = scatter(t_ap, batch_idx, dim=0, reduce="mean")
+
+        # Total KL divergence is sum of all three terms
+        kl_term = kl_term0 + kl_term1 + kl_term2
+
+        return kl_term
 
 
 class MatterGenWithCondition(paddle.nn.Layer):

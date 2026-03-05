@@ -1,0 +1,16 @@
+{
+  "timestamp": "2026-03-05T15:34:56.753946",
+  "device": "gpu:0",
+  "random_seed": 42,
+  "framework": "PaddlePaddle",
+  "framework_version": "3.3.0",
+  "model_name": "diffcsp_mp20",
+  "model_loading": {
+    "status": "SUCCESS",
+    "total_parameters": 15446528
+  },
+  "backward_pass": {
+    "trend": "decreasing",
+    "mean_diff": 0.16098010540008523
+  }
+}

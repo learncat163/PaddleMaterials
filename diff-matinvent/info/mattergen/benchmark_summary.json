@@ -1,0 +1,12 @@
+{
+  "timestamp": "2026-03-05T17:30:50.215371",
+  "device": "gpu:0",
+  "framework": "PaddlePaddle",
+  "framework_version": "3.3.0",
+  "forward": {
+    "consistency_std": 2.9816870751943667e-10
+  },
+  "backward": {
+    "trend": "increasing"
+  }
+}

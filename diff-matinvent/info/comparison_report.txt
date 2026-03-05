@@ -1,0 +1,16 @@
+MATTERGEN & DIFFCSP BENCHMARK COMPARISON REPORT
+================================================================================
+Generated: 2026-03-05 15:37:15
+
+MATTERGEN (PaddlePaddle):
+  Model: mattergen_mp20
+  Parameters: 44,562,043
+  Status: SUCCESS
+
+DIFFCSP (PaddlePaddle):
+  Model: diffcsp_mp20
+  Parameters: 15,446,528
+  Status: SUCCESS
+
+Both models loaded successfully and can perform training.
+For full precision testing, structure_array format needs to be implemented.

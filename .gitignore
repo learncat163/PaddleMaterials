@@ -180,3 +180,12 @@ electronic_structure/configs/qm9_data_split.json
 electronic_structure/configs/qm9.json
 electronic_structure/configs/crystal_data_split.json
 electronic_structure/configs/crystal.json
+
+/structure_generation/output/
+/structure_generation/outputs/
+/test-for-weight/
+/test-validate-weight/
+/chemeleon2/**
+/convert-matinvent/
+/raw-matinvent/**
+/.claude/
