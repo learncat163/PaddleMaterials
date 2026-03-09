@@ -1,0 +1,37 @@
+{
+  "metadata": {
+    "pytorch_export_timestamp": "2026-03-06T16:40:20.155410",
+    "paddle_run_timestamp": "2026-03-06T16:41:05.204156",
+    "t_idx": 0,
+    "t_value": 1.0,
+    "batch_size": 4,
+    "total_atoms": 32,
+    "target_precision": "1e-6",
+    "device": "gpu:0"
+  },
+  "paddle_outputs": {
+    "pos_mean": -0.017565391957759857,
+    "pos_std": 0.006109962705522776,
+    "cell_mean": -0.0837828516960144,
+    "cell_std": 0.8589158654212952
+  },
+  "pytorch_outputs": {
+    "pos_mean": -0.011179943091822983,
+    "pos_std": 0.006942695545157233,
+    "cell_mean": -0.07181540193657081,
+    "cell_std": 0.8697589546015115
+  },
+  "elementwise": {
+    "pos_max_diff": 0.03234542394056916,
+    "pos_mean_diff": 0.008962853342988334,
+    "cell_max_diff": 0.07326393574476242,
+    "cell_mean_diff": 0.025644816251264677
+  },
+  "pass_criteria": {
+    "pos_max_diff_threshold": 1e-06,
+    "cell_max_diff_threshold": 1e-06,
+    "pos_pass": false,
+    "cell_pass": false,
+    "overall": false
+  }
+}

@@ -1,0 +1,172 @@
+{
+  "metadata": {
+    "timestamp": "2026-03-09T11:04:11.702808",
+    "pytorch_outputs": "/home/cao/code/github/PaddleMaterials/tmp/first_layer_output.json",
+    "paddle_converted_ckpt": "/home/cao/code/github/PaddleMaterials/tmp/diffcsp_matinvent_converted.pdparams",
+    "exported_data": "/home/cao/code/github/PaddleMaterials/diff-matinvent/info/diffcsp/exported_noisy_inputs.json"
+  },
+  "pytorch_metadata": {
+    "timestamp": "2026-03-09T10:59:56.619573",
+    "model": "PyTorch DiffCSP CSPNet (MatInvent)",
+    "batch_size": 16,
+    "total_atoms": 210,
+    "num_atoms_list": [
+      8,
+      12,
+      16,
+      10,
+      14,
+      18,
+      20,
+      24,
+      6,
+      10,
+      12,
+      14,
+      16,
+      8,
+      10,
+      12
+    ],
+    "t_value": 1000,
+    "source_data": "exported_noisy_inputs.json"
+  },
+  "pytorch_stats": {
+    "pred_l": {
+      "shape": [
+        16,
+        3,
+        3
+      ],
+      "mean": -0.007248866546433419,
+      "std": 0.9388045607971791,
+      "min": -2.489244222640991,
+      "max": 2.4393818378448486
+    },
+    "pred_x": {
+      "shape": [
+        210,
+        3
+      ],
+      "mean": 0.0023456112422522097,
+      "std": 0.011536477671900799,
+      "min": -0.03152037411928177,
+      "max": 0.028638258576393127
+    }
+  },
+  "paddle_stats": {
+    "pred_l": {
+      "shape": [
+        16,
+        3,
+        3
+      ],
+      "mean": -0.007248865440487862,
+      "std": 0.938804566860199,
+      "min": -2.4892444610595703,
+      "max": 2.439382314682007
+    },
+    "pred_x": {
+      "shape": [
+        210,
+        3
+      ],
+      "mean": 0.00234561157412827,
+      "std": 0.011536474339663982,
+      "min": -0.03152036294341087,
+      "max": 0.02863822877407074
+    }
+  },
+  "comparison": {
+    "pred_l": {
+      "name": "pred_l",
+      "shape": [
+        16,
+        3,
+        3
+      ],
+      "total_elements": 144,
+      "abs_diff": {
+        "max": 5.960464477539062e-07,
+        "mean": 9.133428749110963e-08,
+        "std": 1.1033659730396993e-07,
+        "median": 5.960464477539063e-08
+      },
+      "rel_diff": {
+        "max": 1.266257229272331e-06,
+        "mean": 1.6877062176449035e-07,
+        "median": 1.1893550764406409e-07
+      },
+      "percentiles": {
+        "p50": 5.960464477539063e-08,
+        "p90": 2.384185791015625e-07,
+        "p95": 3.397464752197259e-07,
+        "p99": 4.76837158203125e-07,
+        "p99.9": 5.789995193481478e-07
+      },
+      "thresholds": {
+        "lt_1e_4": 144,
+        "lt_1e_5": 144,
+        "lt_1e_6": 144,
+        "lt_1e_7": 94,
+        "lt_1e_8": 33
+      },
+      "thresholds_pct": {
+        "lt_1e_4": 100.0,
+        "lt_1e_5": 100.0,
+        "lt_1e_6": 100.0,
+        "lt_1e_7": 65.27777777777777,
+        "lt_1e_8": 22.916666666666668
+      },
+      "pass_1e_4": true,
+      "pass_1e_6": true
+    },
+    "pred_x": {
+      "name": "pred_x",
+      "shape": [
+        210,
+        3
+      ],
+      "total_elements": 630,
+      "abs_diff": {
+        "max": 1.341104507446289e-07,
+        "mean": 3.5598049945538007e-08,
+        "std": 2.6577311777695638e-08,
+        "median": 2.9802322387695312e-08
+      },
+      "rel_diff": {
+        "max": 0.00112338930782652,
+        "mean": 1.2257000174133346e-05,
+        "median": 3.626915196369085e-06
+      },
+      "percentiles": {
+        "p50": 2.9802322387695312e-08,
+        "p90": 7.450580596923828e-08,
+        "p95": 8.940696716308594e-08,
+        "p99": 1.0893680155277276e-07,
+        "p99.9": 1.341104507446289e-07
+      },
+      "thresholds": {
+        "lt_1e_4": 630,
+        "lt_1e_5": 630,
+        "lt_1e_6": 630,
+        "lt_1e_7": 616,
+        "lt_1e_8": 95
+      },
+      "thresholds_pct": {
+        "lt_1e_4": 100.0,
+        "lt_1e_5": 100.0,
+        "lt_1e_6": 100.0,
+        "lt_1e_7": 97.77777777777777,
+        "lt_1e_8": 15.079365079365079
+      },
+      "pass_1e_4": true,
+      "pass_1e_6": true
+    },
+    "summary": {
+      "overall_pass_1e_4": true,
+      "overall_pass_1e_6": true,
+      "max_diff_all": 5.960464477539062e-07
+    }
+  }
+}

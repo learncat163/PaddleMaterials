@@ -1,0 +1,3250 @@
+{
+  "timestamp": "2026-03-09T11:20:29.666708",
+  "pytorch_checkpoint": "/home/cao/.cache/huggingface/hub/models--microsoft--mattergen/snapshots/ea430eab64b80855029c2941b9fda15f245a771a/checkpoints/mp_20_base/checkpoints/last.ckpt",
+  "converted": [
+    {
+      "key": "model.fc_atom.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        101
+      ],
+      "paddle_shape": [
+        101
+      ]
+    },
+    {
+      "key": "model.fc_atom.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        101,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        101
+      ]
+    },
+    {
+      "key": "model.gemnet.angle_edge_emb.0.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.angle_edge_emb.0.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        515
+      ],
+      "paddle_shape": [
+        515,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.angle_edge_emb.2.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.angle_edge_emb.2.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.atom_emb.embeddings.weight",
+      "transform": "copy",
+      "pytorch_shape": [
+        101,
+        512
+      ],
+      "paddle_shape": [
+        101,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.atom_latent_emb.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.atom_latent_emb.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        1024
+      ],
+      "paddle_shape": [
+        1024,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.cbf_basis3.radial_basis.rbf.offset",
+      "transform": "copy",
+      "pytorch_shape": [
+        128
+      ],
+      "paddle_shape": [
+        128
+      ]
+    },
+    {
+      "key": "model.gemnet.edge_emb.dense.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        1152
+      ],
+      "paddle_shape": [
+        1152,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.atom_update.dense_rbf.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.atom_update.layers.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.atom_update.layers.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.atom_update.layers.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.atom_update.layers.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.atom_update.layers.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.atom_update.layers.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.atom_update.layers.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.atom_update.scale_sum.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.concat_layer.dense.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        1536
+      ],
+      "paddle_shape": [
+        1536,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.dense_ca.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.layers_after_skip.0.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.layers_after_skip.0.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.layers_after_skip.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.layers_after_skip.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.layers_before_skip.0.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.layers_before_skip.0.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.residual_m.0.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.residual_m.0.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.trip_interaction.dense_ba.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.trip_interaction.down_projection.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        64,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        64
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.trip_interaction.mlp_cbf.weight",
+      "transform": "copy",
+      "pytorch_shape": [
+        64,
+        16,
+        64
+      ],
+      "paddle_shape": [
+        64,
+        16,
+        64
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.trip_interaction.mlp_rbf.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.trip_interaction.scale_cbf_sum.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.trip_interaction.scale_rbf.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.trip_interaction.up_projection_ac.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        64
+      ],
+      "paddle_shape": [
+        64,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.0.trip_interaction.up_projection_ca.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        64
+      ],
+      "paddle_shape": [
+        64,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.atom_update.dense_rbf.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.atom_update.layers.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.atom_update.layers.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.atom_update.layers.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.atom_update.layers.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.atom_update.layers.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.atom_update.layers.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.atom_update.layers.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.atom_update.scale_sum.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.concat_layer.dense.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        1536
+      ],
+      "paddle_shape": [
+        1536,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.dense_ca.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.layers_after_skip.0.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.layers_after_skip.0.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.layers_after_skip.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.layers_after_skip.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.layers_before_skip.0.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.layers_before_skip.0.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.residual_m.0.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.residual_m.0.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.trip_interaction.dense_ba.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.trip_interaction.down_projection.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        64,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        64
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.trip_interaction.mlp_cbf.weight",
+      "transform": "copy",
+      "pytorch_shape": [
+        64,
+        16,
+        64
+      ],
+      "paddle_shape": [
+        64,
+        16,
+        64
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.trip_interaction.mlp_rbf.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.trip_interaction.scale_cbf_sum.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.trip_interaction.scale_rbf.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.trip_interaction.up_projection_ac.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        64
+      ],
+      "paddle_shape": [
+        64,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.1.trip_interaction.up_projection_ca.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        64
+      ],
+      "paddle_shape": [
+        64,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.atom_update.dense_rbf.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.atom_update.layers.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.atom_update.layers.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.atom_update.layers.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.atom_update.layers.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.atom_update.layers.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.atom_update.layers.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.atom_update.layers.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.atom_update.scale_sum.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.concat_layer.dense.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        1536
+      ],
+      "paddle_shape": [
+        1536,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.dense_ca.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.layers_after_skip.0.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.layers_after_skip.0.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.layers_after_skip.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.layers_after_skip.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.layers_before_skip.0.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.layers_before_skip.0.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.residual_m.0.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.residual_m.0.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.trip_interaction.dense_ba.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.trip_interaction.down_projection.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        64,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        64
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.trip_interaction.mlp_cbf.weight",
+      "transform": "copy",
+      "pytorch_shape": [
+        64,
+        16,
+        64
+      ],
+      "paddle_shape": [
+        64,
+        16,
+        64
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.trip_interaction.mlp_rbf.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.trip_interaction.scale_cbf_sum.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.trip_interaction.scale_rbf.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.trip_interaction.up_projection_ac.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        64
+      ],
+      "paddle_shape": [
+        64,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.2.trip_interaction.up_projection_ca.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        64
+      ],
+      "paddle_shape": [
+        64,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.atom_update.dense_rbf.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.atom_update.layers.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.atom_update.layers.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.atom_update.layers.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.atom_update.layers.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.atom_update.layers.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.atom_update.layers.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.atom_update.layers.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.atom_update.scale_sum.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.concat_layer.dense.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        1536
+      ],
+      "paddle_shape": [
+        1536,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.dense_ca.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.layers_after_skip.0.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.layers_after_skip.0.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.layers_after_skip.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.layers_after_skip.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.layers_before_skip.0.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.layers_before_skip.0.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.residual_m.0.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.residual_m.0.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.trip_interaction.dense_ba.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.trip_interaction.down_projection.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        64,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        64
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.trip_interaction.mlp_cbf.weight",
+      "transform": "copy",
+      "pytorch_shape": [
+        64,
+        16,
+        64
+      ],
+      "paddle_shape": [
+        64,
+        16,
+        64
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.trip_interaction.mlp_rbf.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.trip_interaction.scale_cbf_sum.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.trip_interaction.scale_rbf.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.trip_interaction.up_projection_ac.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        64
+      ],
+      "paddle_shape": [
+        64,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.int_blocks.3.trip_interaction.up_projection_ca.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        64
+      ],
+      "paddle_shape": [
+        64,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.0.dense_rbf_F.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.0.mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.0.mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.0.out_forces.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        1,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        1
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.1.dense_rbf_F.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.1.mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.1.mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.1.out_forces.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        1,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        1
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.2.dense_rbf_F.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.2.mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.2.mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.2.out_forces.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        1,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        1
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.3.dense_rbf_F.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.3.mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.3.mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.3.out_forces.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        1,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        1
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.4.dense_rbf_F.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.4.mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.4.mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.lattice_out_blocks.4.out_forces.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        1,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        1
+      ]
+    },
+    {
+      "key": "model.gemnet.mlp_cbf3.weight",
+      "transform": "copy",
+      "pytorch_shape": [
+        7,
+        128,
+        16
+      ],
+      "paddle_shape": [
+        7,
+        128,
+        16
+      ]
+    },
+    {
+      "key": "model.gemnet.mlp_rbf3.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        16,
+        128
+      ],
+      "paddle_shape": [
+        128,
+        16
+      ]
+    },
+    {
+      "key": "model.gemnet.mlp_rbf_h.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        16,
+        128
+      ],
+      "paddle_shape": [
+        128,
+        16
+      ]
+    },
+    {
+      "key": "model.gemnet.mlp_rbf_lattice.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        16,
+        128
+      ],
+      "paddle_shape": [
+        128,
+        16
+      ]
+    },
+    {
+      "key": "model.gemnet.mlp_rbf_out.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        16,
+        128
+      ],
+      "paddle_shape": [
+        128,
+        16
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.dense_rbf.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.dense_rbf_F.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.layers.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.layers.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.layers.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.layers.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.layers.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.layers.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.layers.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.out_energy.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        1,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        1
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.out_forces.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        1,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        1
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.scale_rbf_F.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.scale_sum.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.seq_energy.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.seq_energy.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.seq_energy.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.seq_energy.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.seq_energy.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.seq_energy.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.seq_energy.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.seq_forces.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.seq_forces.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.seq_forces.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.seq_forces.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.seq_forces.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.seq_forces.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.0.seq_forces.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.dense_rbf.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.dense_rbf_F.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.layers.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.layers.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.layers.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.layers.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.layers.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.layers.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.layers.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.out_energy.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        1,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        1
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.out_forces.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        1,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        1
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.scale_rbf_F.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.scale_sum.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.seq_energy.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.seq_energy.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.seq_energy.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.seq_energy.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.seq_energy.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.seq_energy.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.seq_energy.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.seq_forces.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.seq_forces.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.seq_forces.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.seq_forces.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.seq_forces.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.seq_forces.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.1.seq_forces.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.dense_rbf.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.dense_rbf_F.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.layers.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.layers.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.layers.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.layers.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.layers.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.layers.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.layers.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.out_energy.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        1,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        1
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.out_forces.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        1,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        1
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.scale_rbf_F.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.scale_sum.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.seq_energy.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.seq_energy.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.seq_energy.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.seq_energy.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.seq_energy.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.seq_energy.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.seq_energy.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.seq_forces.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.seq_forces.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.seq_forces.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.seq_forces.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.seq_forces.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.seq_forces.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.2.seq_forces.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.dense_rbf.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.dense_rbf_F.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.layers.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.layers.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.layers.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.layers.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.layers.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.layers.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.layers.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.out_energy.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        1,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        1
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.out_forces.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        1,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        1
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.scale_rbf_F.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.scale_sum.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.seq_energy.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.seq_energy.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.seq_energy.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.seq_energy.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.seq_energy.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.seq_energy.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.seq_energy.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.seq_forces.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.seq_forces.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.seq_forces.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.seq_forces.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.seq_forces.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.seq_forces.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.3.seq_forces.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.dense_rbf.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.dense_rbf_F.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        16
+      ],
+      "paddle_shape": [
+        16,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.layers.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.layers.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.layers.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.layers.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.layers.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.layers.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.layers.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.out_energy.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        1,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        1
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.out_forces.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        1,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        1
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.scale_rbf_F.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.scale_sum.scale_factor",
+      "transform": "copy",
+      "pytorch_shape": [],
+      "paddle_shape": []
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.seq_energy.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.seq_energy.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.seq_energy.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.seq_energy.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.seq_energy.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.seq_energy.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.seq_energy.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.seq_forces.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.seq_forces.1.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.seq_forces.1.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.seq_forces.2.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.seq_forces.2.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.seq_forces.3.dense_mlp.0.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.out_blocks.4.seq_forces.3.dense_mlp.1.linear.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "model.gemnet.radial_basis.rbf.offset",
+      "transform": "copy",
+      "pytorch_shape": [
+        128
+      ],
+      "paddle_shape": [
+        128
+      ]
+    },
+    {
+      "key": "model.noise_level_encoding.div_term",
+      "transform": "copy",
+      "pytorch_shape": [
+        256
+      ],
+      "paddle_shape": [
+        256
+      ]
+    }
+  ],
+  "skipped": [],
+  "errors": [],
+  "summary": {
+    "converted": 281,
+    "skipped": 0,
+    "errors": 0,
+    "total_output": 281
+  }
+}

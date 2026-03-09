@@ -189,3 +189,4 @@ electronic_structure/configs/crystal.json
 /convert-matinvent/
 /raw-matinvent/**
 /.claude/
+*.pdparams

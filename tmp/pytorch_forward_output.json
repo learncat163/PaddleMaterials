@@ -1,0 +1,5 @@
+{
+  "test_input": {
+    "batch_size": 4,
+    "total_atoms": 57,
+    "atom_types": 

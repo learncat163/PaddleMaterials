@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "timestamp": "2026-03-09T10:40:22.820803",
+    "converted_weights": "/home/cao/code/github/PaddleMaterials/tmp/diffcsp_matinvent_converted.pdparams",
+    "exported_data": "/home/cao/code/github/PaddleMaterials/diff-matinvent/info/diffcsp/exported_noisy_inputs.json"
+  },
+  "test_input": {
+    "batch_size": 16,
+    "total_atoms": 210,
+    "t_value": 1000
+  },
+  "paddle_outputs": {
+    "pred_l_mean": -0.007248858455568552,
+    "pred_l_std": 0.938804566860199,
+    "pred_x_mean": 0.00234561157412827,
+    "pred_x_std": 0.011536474339663982,
+    "pred_l_shape": [
+      16,
+      3,
+      3
+    ],
+    "pred_x_shape": [
+      210,
+      3
+    ]
+  },
+  "pytorch_outputs": {
+    "pred_l_mean": -0.007248849284628199,
+    "pred_l_std": 0.9388046232338892,
+    "pred_x_mean": 0.0023456133777342205,
+    "pred_x_std": 0.011536480258752795
+  },
+  "comparison": {
+    "pred_l_max_diff": 4.76837158203125e-07,
+    "pred_l_mean_diff": 8.095068753593498e-08,
+    "pred_x_max_diff": 1.043081283569336e-07,
+    "pred_x_mean_diff": 2.7900132986288222e-08,
+    "pred_l_pass": true,
+    "pred_x_pass": true,
+    "overall_pass": true
+  }
+}

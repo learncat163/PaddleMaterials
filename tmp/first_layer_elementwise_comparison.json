@@ -1,0 +1,96 @@
+{
+  "metadata": {
+    "timestamp": "2026-03-09T11:01:20.059742",
+    "pytorch_first_layer": "/home/cao/code/github/PaddleMaterials/tmp/first_layer_output.json",
+    "paddle_converted_ckpt": "/home/cao/code/github/PaddleMaterials/tmp/diffcsp_matinvent_converted.pdparams",
+    "exported_data": "/home/cao/code/github/PaddleMaterials/diff-matinvent/info/diffcsp/exported_noisy_inputs.json"
+  },
+  "pytorch_metadata": {
+    "timestamp": "2026-03-09T10:59:56.619573",
+    "model": "PyTorch DiffCSP CSPNet (MatInvent)",
+    "batch_size": 16,
+    "total_atoms": 210,
+    "num_atoms_list": [
+      8,
+      12,
+      16,
+      10,
+      14,
+      18,
+      20,
+      24,
+      6,
+      10,
+      12,
+      14,
+      16,
+      8,
+      10,
+      12
+    ],
+    "t_value": 1000,
+    "source_data": "exported_noisy_inputs.json"
+  },
+  "pytorch_stats": {
+    "shape": [
+      210,
+      512
+    ],
+    "mean": 0.0017500104072913321,
+    "std": 2.8582844257096176,
+    "min": -13.167941093444824,
+    "max": 16.260395050048828
+  },
+  "paddle_stats": {
+    "shape": [
+      210,
+      512
+    ],
+    "mean": 0.0017500091344118118,
+    "std": 2.8582844734191895,
+    "min": -13.167941093444824,
+    "max": 16.260395050048828
+  },
+  "elementwise_comparison": {
+    "shape": [
+      210,
+      512
+    ],
+    "total_elements": 107520,
+    "abs_diff": {
+      "max": 0.0,
+      "mean": 0.0,
+      "std": 0.0,
+      "median": 0.0
+    },
+    "rel_diff": {
+      "max": 0.0,
+      "mean": 0.0,
+      "std": 0.0,
+      "median": 0.0
+    },
+    "percentiles": {
+      "p50": 0.0,
+      "p90": 0.0,
+      "p95": 0.0,
+      "p99": 0.0,
+      "p99.9": 0.0
+    },
+    "thresholds": {
+      "lt_1e_4": 107520,
+      "lt_1e_5": 107520,
+      "lt_1e_6": 107520,
+      "lt_1e_7": 107520,
+      "lt_1e_8": 107520
+    },
+    "thresholds_pct": {
+      "lt_1e_4": 100.0,
+      "lt_1e_5": 100.0,
+      "lt_1e_6": 100.0,
+      "lt_1e_7": 100.0,
+      "lt_1e_8": 100.0
+    },
+    "pass_1e_4": true,
+    "pass_1e_6": true
+  }
+}

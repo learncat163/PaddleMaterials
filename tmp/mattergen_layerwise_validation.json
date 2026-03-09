@@ -1,0 +1,82 @@
+{
+  "metadata": {
+    "timestamp": "2026-03-09T11:28:27.293597",
+    "converted_weights": "/home/cao/code/github/PaddleMaterials/tmp/mattergen_mp20_converted.pdparams"
+  },
+  "test_input": {
+    "batch_size": 4,
+    "total_atoms": 57
+  },
+  "first_layer": {
+    "name": "atom_emb",
+    "shape": [
+      57,
+      512
+    ],
+    "size": 29184,
+    "mean": -0.008670362643897533,
+    "std": 0.9798096418380737,
+    "min": -1.8781296014785767,
+    "max": 1.8789187669754028,
+    "has_nan": false,
+    "has_inf": false
+  },
+  "final_layer": {
+    "decoder_output": {
+      "keys": [
+        "frac_coords",
+        "lattice",
+        "atom_types"
+      ]
+    },
+    "decoder_frac_coords": {
+      "name": "decoder.frac_coords",
+      "shape": [
+        57,
+        3
+      ],
+      "size": 171,
+      "mean": 0.00034807962947525084,
+      "std": 0.7790562510490417,
+      "min": -3.153320789337158,
+      "max": 3.1895391941070557,
+      "has_nan": false,
+      "has_inf": false
+    },
+    "decoder_lattice": {
+      "name": "decoder.lattice",
+      "shape": [
+        4,
+        3,
+        3
+      ],
+      "size": 36,
+      "mean": 0.36845195293426514,
+      "std": 1.132361650466919,
+      "min": -1.7209280729293823,
+      "max": 2.5092742443084717,
+      "has_nan": false,
+      "has_inf": false
+    },
+    "decoder_atom_types": {
+      "name": "decoder.atom_types",
+      "shape": [
+        57,
+        101
+      ],
+      "size": 5757,
+      "mean": -5.224658489227295,
+      "std": 7.912477493286133,
+      "min": -35.413780212402344,
+      "max": 18.7066650390625,
+      "has_nan": false,
+      "has_inf": false
+    },
+    "loss_dict": {
+      "loss": 3.7569706439971924,
+      "loss_coord": 18.840042114257812,
+      "loss_lattice": 0.5993374586105347,
+      "loss_atom_type": 1.2736289501190186
+    }
+  }
+}

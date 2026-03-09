@@ -1,0 +1,2485 @@
+{
+  "metadata": {
+    "timestamp": "2026-03-09T10:33:17.002322",
+    "pytorch_checkpoint": "/home/cao/.cache/huggingface/hub/models--jwchen25--MatInvent/snapshots/b192d079a52d16403fcbbb26b73078d23f9e86c2/diffcsp_mp20/last.ckpt",
+    "paddle_config": "structure_generation/configs/diffcsp/diffcsp_mp20.yaml",
+    "pytorch_total_layers": 78,
+    "paddle_total_layers": 91
+  },
+  "summary": {
+    "total_pytorch_layers": 78,
+    "matched": 67,
+    "transposed": 28,
+    "copied": 39,
+    "skipped": 10,
+    "pytorch_only": 11,
+    "paddle_only": 24,
+    "mismatch": 0
+  },
+  "mappings": [
+    {
+      "pytorch_key": "beta_scheduler.alphas",
+      "paddle_key": "",
+      "pytorch_shape": [
+        1001
+      ],
+      "paddle_shape": [],
+      "transform": "skip",
+      "status": "pytorch_only"
+    },
+    {
+      "pytorch_key": "beta_scheduler.alphas_cumprod",
+      "paddle_key": "",
+      "pytorch_shape": [
+        1001
+      ],
+      "paddle_shape": [],
+      "transform": "skip",
+      "status": "pytorch_only"
+    },
+    {
+      "pytorch_key": "beta_scheduler.betas",
+      "paddle_key": "",
+      "pytorch_shape": [
+        1001
+      ],
+      "paddle_shape": [],
+      "transform": "skip",
+      "status": "pytorch_only"
+    },
+    {
+      "pytorch_key": "beta_scheduler.sigmas",
+      "paddle_key": "",
+      "pytorch_shape": [
+        1001
+      ],
+      "paddle_shape": [],
+      "transform": "skip",
+      "status": "pytorch_only"
+    },
+    {
+      "pytorch_key": "decoder.atom_latent_emb.bias",
+      "paddle_key": "decoder.atom_latent_emb.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.atom_latent_emb.weight",
+      "paddle_key": "decoder.atom_latent_emb.weight",
+      "pytorch_shape": [
+        512,
+        768
+      ],
+      "paddle_shape": [
+        768,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.coord_out.weight",
+      "paddle_key": "decoder.coord_out.weight",
+      "pytorch_shape": [
+        3,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        3
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_0.edge_mlp.0.bias",
+      "paddle_key": "decoder.csp_layer_0.edge_mlp.0.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_0.edge_mlp.0.weight",
+      "paddle_key": "decoder.csp_layer_0.edge_mlp.0.weight",
+      "pytorch_shape": [
+        512,
+        1801
+      ],
+      "paddle_shape": [
+        1801,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_0.edge_mlp.2.bias",
+      "paddle_key": "decoder.csp_layer_0.edge_mlp.2.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_0.edge_mlp.2.weight",
+      "paddle_key": "decoder.csp_layer_0.edge_mlp.2.weight",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_0.layer_norm.bias",
+      "paddle_key": "decoder.csp_layer_0.layer_norm.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_0.layer_norm.weight",
+      "paddle_key": "decoder.csp_layer_0.layer_norm.weight",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_0.node_mlp.0.bias",
+      "paddle_key": "decoder.csp_layer_0.node_mlp.0.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_0.node_mlp.0.weight",
+      "paddle_key": "decoder.csp_layer_0.node_mlp.0.weight",
+      "pytorch_shape": [
+        512,
+        1024
+      ],
+      "paddle_shape": [
+        1024,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_0.node_mlp.2.bias",
+      "paddle_key": "decoder.csp_layer_0.node_mlp.2.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_0.node_mlp.2.weight",
+      "paddle_key": "decoder.csp_layer_0.node_mlp.2.weight",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_1.edge_mlp.0.bias",
+      "paddle_key": "decoder.csp_layer_1.edge_mlp.0.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_1.edge_mlp.0.weight",
+      "paddle_key": "decoder.csp_layer_1.edge_mlp.0.weight",
+      "pytorch_shape": [
+        512,
+        1801
+      ],
+      "paddle_shape": [
+        1801,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_1.edge_mlp.2.bias",
+      "paddle_key": "decoder.csp_layer_1.edge_mlp.2.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_1.edge_mlp.2.weight",
+      "paddle_key": "decoder.csp_layer_1.edge_mlp.2.weight",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_1.layer_norm.bias",
+      "paddle_key": "decoder.csp_layer_1.layer_norm.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_1.layer_norm.weight",
+      "paddle_key": "decoder.csp_layer_1.layer_norm.weight",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_1.node_mlp.0.bias",
+      "paddle_key": "decoder.csp_layer_1.node_mlp.0.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_1.node_mlp.0.weight",
+      "paddle_key": "decoder.csp_layer_1.node_mlp.0.weight",
+      "pytorch_shape": [
+        512,
+        1024
+      ],
+      "paddle_shape": [
+        1024,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_1.node_mlp.2.bias",
+      "paddle_key": "decoder.csp_layer_1.node_mlp.2.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_1.node_mlp.2.weight",
+      "paddle_key": "decoder.csp_layer_1.node_mlp.2.weight",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_2.edge_mlp.0.bias",
+      "paddle_key": "decoder.csp_layer_2.edge_mlp.0.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_2.edge_mlp.0.weight",
+      "paddle_key": "decoder.csp_layer_2.edge_mlp.0.weight",
+      "pytorch_shape": [
+        512,
+        1801
+      ],
+      "paddle_shape": [
+        1801,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_2.edge_mlp.2.bias",
+      "paddle_key": "decoder.csp_layer_2.edge_mlp.2.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_2.edge_mlp.2.weight",
+      "paddle_key": "decoder.csp_layer_2.edge_mlp.2.weight",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_2.layer_norm.bias",
+      "paddle_key": "decoder.csp_layer_2.layer_norm.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_2.layer_norm.weight",
+      "paddle_key": "decoder.csp_layer_2.layer_norm.weight",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_2.node_mlp.0.bias",
+      "paddle_key": "decoder.csp_layer_2.node_mlp.0.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_2.node_mlp.0.weight",
+      "paddle_key": "decoder.csp_layer_2.node_mlp.0.weight",
+      "pytorch_shape": [
+        512,
+        1024
+      ],
+      "paddle_shape": [
+        1024,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_2.node_mlp.2.bias",
+      "paddle_key": "decoder.csp_layer_2.node_mlp.2.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_2.node_mlp.2.weight",
+      "paddle_key": "decoder.csp_layer_2.node_mlp.2.weight",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_3.edge_mlp.0.bias",
+      "paddle_key": "decoder.csp_layer_3.edge_mlp.0.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_3.edge_mlp.0.weight",
+      "paddle_key": "decoder.csp_layer_3.edge_mlp.0.weight",
+      "pytorch_shape": [
+        512,
+        1801
+      ],
+      "paddle_shape": [
+        1801,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_3.edge_mlp.2.bias",
+      "paddle_key": "decoder.csp_layer_3.edge_mlp.2.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_3.edge_mlp.2.weight",
+      "paddle_key": "decoder.csp_layer_3.edge_mlp.2.weight",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_3.layer_norm.bias",
+      "paddle_key": "decoder.csp_layer_3.layer_norm.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_3.layer_norm.weight",
+      "paddle_key": "decoder.csp_layer_3.layer_norm.weight",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_3.node_mlp.0.bias",
+      "paddle_key": "decoder.csp_layer_3.node_mlp.0.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_3.node_mlp.0.weight",
+      "paddle_key": "decoder.csp_layer_3.node_mlp.0.weight",
+      "pytorch_shape": [
+        512,
+        1024
+      ],
+      "paddle_shape": [
+        1024,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_3.node_mlp.2.bias",
+      "paddle_key": "decoder.csp_layer_3.node_mlp.2.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_3.node_mlp.2.weight",
+      "paddle_key": "decoder.csp_layer_3.node_mlp.2.weight",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_4.edge_mlp.0.bias",
+      "paddle_key": "decoder.csp_layer_4.edge_mlp.0.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_4.edge_mlp.0.weight",
+      "paddle_key": "decoder.csp_layer_4.edge_mlp.0.weight",
+      "pytorch_shape": [
+        512,
+        1801
+      ],
+      "paddle_shape": [
+        1801,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_4.edge_mlp.2.bias",
+      "paddle_key": "decoder.csp_layer_4.edge_mlp.2.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_4.edge_mlp.2.weight",
+      "paddle_key": "decoder.csp_layer_4.edge_mlp.2.weight",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_4.layer_norm.bias",
+      "paddle_key": "decoder.csp_layer_4.layer_norm.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_4.layer_norm.weight",
+      "paddle_key": "decoder.csp_layer_4.layer_norm.weight",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_4.node_mlp.0.bias",
+      "paddle_key": "decoder.csp_layer_4.node_mlp.0.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_4.node_mlp.0.weight",
+      "paddle_key": "decoder.csp_layer_4.node_mlp.0.weight",
+      "pytorch_shape": [
+        512,
+        1024
+      ],
+      "paddle_shape": [
+        1024,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_4.node_mlp.2.bias",
+      "paddle_key": "decoder.csp_layer_4.node_mlp.2.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_4.node_mlp.2.weight",
+      "paddle_key": "decoder.csp_layer_4.node_mlp.2.weight",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_5.edge_mlp.0.bias",
+      "paddle_key": "decoder.csp_layer_5.edge_mlp.0.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_5.edge_mlp.0.weight",
+      "paddle_key": "decoder.csp_layer_5.edge_mlp.0.weight",
+      "pytorch_shape": [
+        512,
+        1801
+      ],
+      "paddle_shape": [
+        1801,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_5.edge_mlp.2.bias",
+      "paddle_key": "decoder.csp_layer_5.edge_mlp.2.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_5.edge_mlp.2.weight",
+      "paddle_key": "decoder.csp_layer_5.edge_mlp.2.weight",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_5.layer_norm.bias",
+      "paddle_key": "decoder.csp_layer_5.layer_norm.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_5.layer_norm.weight",
+      "paddle_key": "decoder.csp_layer_5.layer_norm.weight",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_5.node_mlp.0.bias",
+      "paddle_key": "decoder.csp_layer_5.node_mlp.0.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_5.node_mlp.0.weight",
+      "paddle_key": "decoder.csp_layer_5.node_mlp.0.weight",
+      "pytorch_shape": [
+        512,
+        1024
+      ],
+      "paddle_shape": [
+        1024,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_5.node_mlp.2.bias",
+      "paddle_key": "decoder.csp_layer_5.node_mlp.2.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.csp_layer_5.node_mlp.2.weight",
+      "paddle_key": "decoder.csp_layer_5.node_mlp.2.weight",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.final_layer_norm.bias",
+      "paddle_key": "decoder.final_layer_norm.bias",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.final_layer_norm.weight",
+      "paddle_key": "decoder.final_layer_norm.weight",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "copy",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.lattice_out.weight",
+      "paddle_key": "decoder.lattice_out.weight",
+      "pytorch_shape": [
+        9,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        9
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.node_embedding.bias",
+      "paddle_key": "",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [],
+      "transform": "skip",
+      "status": "pytorch_only"
+    },
+    {
+      "pytorch_key": "decoder.node_embedding.weight",
+      "paddle_key": "decoder.node_embedding.weight",
+      "pytorch_shape": [
+        512,
+        100
+      ],
+      "paddle_shape": [
+        100,
+        512
+      ],
+      "transform": "transpose",
+      "status": "matched"
+    },
+    {
+      "pytorch_key": "decoder.type_out.bias",
+      "paddle_key": "",
+      "pytorch_shape": [
+        100
+      ],
+      "paddle_shape": [],
+      "transform": "skip",
+      "status": "pytorch_only"
+    },
+    {
+      "pytorch_key": "decoder.type_out.weight",
+      "paddle_key": "",
+      "pytorch_shape": [
+        100,
+        512
+      ],
+      "paddle_shape": [],
+      "transform": "skip",
+      "status": "pytorch_only"
+    },
+    {
+      "pytorch_key": "sigma_scheduler.sigmas",
+      "paddle_key": "",
+      "pytorch_shape": [
+        1001
+      ],
+      "paddle_shape": [],
+      "transform": "skip",
+      "status": "pytorch_only"
+    },
+    {
+      "pytorch_key": "sigma_scheduler.sigmas_norm",
+      "paddle_key": "",
+      "pytorch_shape": [
+        1001
+      ],
+      "paddle_shape": [],
+      "transform": "skip",
+      "status": "pytorch_only"
+    },
+    {
+      "pytorch_key": "type_sigma_scheduler.sigmas",
+      "paddle_key": "",
+      "pytorch_shape": [
+        1001
+      ],
+      "paddle_shape": [],
+      "transform": "skip",
+      "status": "pytorch_only"
+    },
+    {
+      "pytorch_key": "type_sigma_scheduler.sigmas_norm",
+      "paddle_key": "",
+      "pytorch_shape": [
+        1001
+      ],
+      "paddle_shape": [],
+      "transform": "skip",
+      "status": "pytorch_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_0.prop_mlp.0.bias",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_0.prop_mlp.0.weight",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_0.prop_mlp.2.bias",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_0.prop_mlp.2.weight",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_1.prop_mlp.0.bias",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_1.prop_mlp.0.weight",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_1.prop_mlp.2.bias",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_1.prop_mlp.2.weight",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_2.prop_mlp.0.bias",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_2.prop_mlp.0.weight",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_2.prop_mlp.2.bias",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_2.prop_mlp.2.weight",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_3.prop_mlp.0.bias",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_3.prop_mlp.0.weight",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_3.prop_mlp.2.bias",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_3.prop_mlp.2.weight",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_4.prop_mlp.0.bias",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_4.prop_mlp.0.weight",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_4.prop_mlp.2.bias",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_4.prop_mlp.2.weight",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_5.prop_mlp.0.bias",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_5.prop_mlp.0.weight",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_5.prop_mlp.2.bias",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    },
+    {
+      "pytorch_key": "",
+      "paddle_key": "decoder.csp_layer_5.prop_mlp.2.weight",
+      "pytorch_shape": [],
+      "paddle_shape": [
+        512,
+        512
+      ],
+      "transform": "skip",
+      "status": "paddle_only"
+    }
+  ],
+  "layer_groups": {
+    "pytorch_only": [
+      {
+        "pytorch_key": "beta_scheduler.alphas",
+        "paddle_key": "",
+        "pytorch_shape": [
+          1001
+        ],
+        "paddle_shape": [],
+        "transform": "skip",
+        "status": "pytorch_only"
+      },
+      {
+        "pytorch_key": "beta_scheduler.alphas_cumprod",
+        "paddle_key": "",
+        "pytorch_shape": [
+          1001
+        ],
+        "paddle_shape": [],
+        "transform": "skip",
+        "status": "pytorch_only"
+      },
+      {
+        "pytorch_key": "beta_scheduler.betas",
+        "paddle_key": "",
+        "pytorch_shape": [
+          1001
+        ],
+        "paddle_shape": [],
+        "transform": "skip",
+        "status": "pytorch_only"
+      },
+      {
+        "pytorch_key": "beta_scheduler.sigmas",
+        "paddle_key": "",
+        "pytorch_shape": [
+          1001
+        ],
+        "paddle_shape": [],
+        "transform": "skip",
+        "status": "pytorch_only"
+      },
+      {
+        "pytorch_key": "decoder.node_embedding.bias",
+        "paddle_key": "",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [],
+        "transform": "skip",
+        "status": "pytorch_only"
+      },
+      {
+        "pytorch_key": "decoder.type_out.bias",
+        "paddle_key": "",
+        "pytorch_shape": [
+          100
+        ],
+        "paddle_shape": [],
+        "transform": "skip",
+        "status": "pytorch_only"
+      },
+      {
+        "pytorch_key": "decoder.type_out.weight",
+        "paddle_key": "",
+        "pytorch_shape": [
+          100,
+          512
+        ],
+        "paddle_shape": [],
+        "transform": "skip",
+        "status": "pytorch_only"
+      },
+      {
+        "pytorch_key": "sigma_scheduler.sigmas",
+        "paddle_key": "",
+        "pytorch_shape": [
+          1001
+        ],
+        "paddle_shape": [],
+        "transform": "skip",
+        "status": "pytorch_only"
+      },
+      {
+        "pytorch_key": "sigma_scheduler.sigmas_norm",
+        "paddle_key": "",
+        "pytorch_shape": [
+          1001
+        ],
+        "paddle_shape": [],
+        "transform": "skip",
+        "status": "pytorch_only"
+      },
+      {
+        "pytorch_key": "type_sigma_scheduler.sigmas",
+        "paddle_key": "",
+        "pytorch_shape": [
+          1001
+        ],
+        "paddle_shape": [],
+        "transform": "skip",
+        "status": "pytorch_only"
+      },
+      {
+        "pytorch_key": "type_sigma_scheduler.sigmas_norm",
+        "paddle_key": "",
+        "pytorch_shape": [
+          1001
+        ],
+        "paddle_shape": [],
+        "transform": "skip",
+        "status": "pytorch_only"
+      }
+    ],
+    "atom_latent_emb": [
+      {
+        "pytorch_key": "decoder.atom_latent_emb.bias",
+        "paddle_key": "decoder.atom_latent_emb.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.atom_latent_emb.weight",
+        "paddle_key": "decoder.atom_latent_emb.weight",
+        "pytorch_shape": [
+          512,
+          768
+        ],
+        "paddle_shape": [
+          768,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      }
+    ],
+    "coord_out": [
+      {
+        "pytorch_key": "decoder.coord_out.weight",
+        "paddle_key": "decoder.coord_out.weight",
+        "pytorch_shape": [
+          3,
+          512
+        ],
+        "paddle_shape": [
+          512,
+          3
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      }
+    ],
+    "csp_layer": [
+      {
+        "pytorch_key": "decoder.csp_layer_0.edge_mlp.0.bias",
+        "paddle_key": "decoder.csp_layer_0.edge_mlp.0.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_0.edge_mlp.0.weight",
+        "paddle_key": "decoder.csp_layer_0.edge_mlp.0.weight",
+        "pytorch_shape": [
+          512,
+          1801
+        ],
+        "paddle_shape": [
+          1801,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_0.edge_mlp.2.bias",
+        "paddle_key": "decoder.csp_layer_0.edge_mlp.2.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_0.edge_mlp.2.weight",
+        "paddle_key": "decoder.csp_layer_0.edge_mlp.2.weight",
+        "pytorch_shape": [
+          512,
+          512
+        ],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_0.layer_norm.bias",
+        "paddle_key": "decoder.csp_layer_0.layer_norm.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_0.layer_norm.weight",
+        "paddle_key": "decoder.csp_layer_0.layer_norm.weight",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_0.node_mlp.0.bias",
+        "paddle_key": "decoder.csp_layer_0.node_mlp.0.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_0.node_mlp.0.weight",
+        "paddle_key": "decoder.csp_layer_0.node_mlp.0.weight",
+        "pytorch_shape": [
+          512,
+          1024
+        ],
+        "paddle_shape": [
+          1024,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_0.node_mlp.2.bias",
+        "paddle_key": "decoder.csp_layer_0.node_mlp.2.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_0.node_mlp.2.weight",
+        "paddle_key": "decoder.csp_layer_0.node_mlp.2.weight",
+        "pytorch_shape": [
+          512,
+          512
+        ],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_1.edge_mlp.0.bias",
+        "paddle_key": "decoder.csp_layer_1.edge_mlp.0.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_1.edge_mlp.0.weight",
+        "paddle_key": "decoder.csp_layer_1.edge_mlp.0.weight",
+        "pytorch_shape": [
+          512,
+          1801
+        ],
+        "paddle_shape": [
+          1801,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_1.edge_mlp.2.bias",
+        "paddle_key": "decoder.csp_layer_1.edge_mlp.2.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_1.edge_mlp.2.weight",
+        "paddle_key": "decoder.csp_layer_1.edge_mlp.2.weight",
+        "pytorch_shape": [
+          512,
+          512
+        ],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_1.layer_norm.bias",
+        "paddle_key": "decoder.csp_layer_1.layer_norm.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_1.layer_norm.weight",
+        "paddle_key": "decoder.csp_layer_1.layer_norm.weight",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_1.node_mlp.0.bias",
+        "paddle_key": "decoder.csp_layer_1.node_mlp.0.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_1.node_mlp.0.weight",
+        "paddle_key": "decoder.csp_layer_1.node_mlp.0.weight",
+        "pytorch_shape": [
+          512,
+          1024
+        ],
+        "paddle_shape": [
+          1024,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_1.node_mlp.2.bias",
+        "paddle_key": "decoder.csp_layer_1.node_mlp.2.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_1.node_mlp.2.weight",
+        "paddle_key": "decoder.csp_layer_1.node_mlp.2.weight",
+        "pytorch_shape": [
+          512,
+          512
+        ],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_2.edge_mlp.0.bias",
+        "paddle_key": "decoder.csp_layer_2.edge_mlp.0.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_2.edge_mlp.0.weight",
+        "paddle_key": "decoder.csp_layer_2.edge_mlp.0.weight",
+        "pytorch_shape": [
+          512,
+          1801
+        ],
+        "paddle_shape": [
+          1801,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_2.edge_mlp.2.bias",
+        "paddle_key": "decoder.csp_layer_2.edge_mlp.2.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_2.edge_mlp.2.weight",
+        "paddle_key": "decoder.csp_layer_2.edge_mlp.2.weight",
+        "pytorch_shape": [
+          512,
+          512
+        ],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_2.layer_norm.bias",
+        "paddle_key": "decoder.csp_layer_2.layer_norm.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_2.layer_norm.weight",
+        "paddle_key": "decoder.csp_layer_2.layer_norm.weight",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_2.node_mlp.0.bias",
+        "paddle_key": "decoder.csp_layer_2.node_mlp.0.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_2.node_mlp.0.weight",
+        "paddle_key": "decoder.csp_layer_2.node_mlp.0.weight",
+        "pytorch_shape": [
+          512,
+          1024
+        ],
+        "paddle_shape": [
+          1024,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_2.node_mlp.2.bias",
+        "paddle_key": "decoder.csp_layer_2.node_mlp.2.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_2.node_mlp.2.weight",
+        "paddle_key": "decoder.csp_layer_2.node_mlp.2.weight",
+        "pytorch_shape": [
+          512,
+          512
+        ],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_3.edge_mlp.0.bias",
+        "paddle_key": "decoder.csp_layer_3.edge_mlp.0.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_3.edge_mlp.0.weight",
+        "paddle_key": "decoder.csp_layer_3.edge_mlp.0.weight",
+        "pytorch_shape": [
+          512,
+          1801
+        ],
+        "paddle_shape": [
+          1801,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_3.edge_mlp.2.bias",
+        "paddle_key": "decoder.csp_layer_3.edge_mlp.2.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_3.edge_mlp.2.weight",
+        "paddle_key": "decoder.csp_layer_3.edge_mlp.2.weight",
+        "pytorch_shape": [
+          512,
+          512
+        ],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_3.layer_norm.bias",
+        "paddle_key": "decoder.csp_layer_3.layer_norm.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_3.layer_norm.weight",
+        "paddle_key": "decoder.csp_layer_3.layer_norm.weight",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_3.node_mlp.0.bias",
+        "paddle_key": "decoder.csp_layer_3.node_mlp.0.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_3.node_mlp.0.weight",
+        "paddle_key": "decoder.csp_layer_3.node_mlp.0.weight",
+        "pytorch_shape": [
+          512,
+          1024
+        ],
+        "paddle_shape": [
+          1024,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_3.node_mlp.2.bias",
+        "paddle_key": "decoder.csp_layer_3.node_mlp.2.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_3.node_mlp.2.weight",
+        "paddle_key": "decoder.csp_layer_3.node_mlp.2.weight",
+        "pytorch_shape": [
+          512,
+          512
+        ],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_4.edge_mlp.0.bias",
+        "paddle_key": "decoder.csp_layer_4.edge_mlp.0.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_4.edge_mlp.0.weight",
+        "paddle_key": "decoder.csp_layer_4.edge_mlp.0.weight",
+        "pytorch_shape": [
+          512,
+          1801
+        ],
+        "paddle_shape": [
+          1801,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_4.edge_mlp.2.bias",
+        "paddle_key": "decoder.csp_layer_4.edge_mlp.2.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_4.edge_mlp.2.weight",
+        "paddle_key": "decoder.csp_layer_4.edge_mlp.2.weight",
+        "pytorch_shape": [
+          512,
+          512
+        ],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_4.layer_norm.bias",
+        "paddle_key": "decoder.csp_layer_4.layer_norm.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_4.layer_norm.weight",
+        "paddle_key": "decoder.csp_layer_4.layer_norm.weight",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_4.node_mlp.0.bias",
+        "paddle_key": "decoder.csp_layer_4.node_mlp.0.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_4.node_mlp.0.weight",
+        "paddle_key": "decoder.csp_layer_4.node_mlp.0.weight",
+        "pytorch_shape": [
+          512,
+          1024
+        ],
+        "paddle_shape": [
+          1024,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_4.node_mlp.2.bias",
+        "paddle_key": "decoder.csp_layer_4.node_mlp.2.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_4.node_mlp.2.weight",
+        "paddle_key": "decoder.csp_layer_4.node_mlp.2.weight",
+        "pytorch_shape": [
+          512,
+          512
+        ],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_5.edge_mlp.0.bias",
+        "paddle_key": "decoder.csp_layer_5.edge_mlp.0.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_5.edge_mlp.0.weight",
+        "paddle_key": "decoder.csp_layer_5.edge_mlp.0.weight",
+        "pytorch_shape": [
+          512,
+          1801
+        ],
+        "paddle_shape": [
+          1801,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_5.edge_mlp.2.bias",
+        "paddle_key": "decoder.csp_layer_5.edge_mlp.2.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_5.edge_mlp.2.weight",
+        "paddle_key": "decoder.csp_layer_5.edge_mlp.2.weight",
+        "pytorch_shape": [
+          512,
+          512
+        ],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_5.layer_norm.bias",
+        "paddle_key": "decoder.csp_layer_5.layer_norm.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_5.layer_norm.weight",
+        "paddle_key": "decoder.csp_layer_5.layer_norm.weight",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_5.node_mlp.0.bias",
+        "paddle_key": "decoder.csp_layer_5.node_mlp.0.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_5.node_mlp.0.weight",
+        "paddle_key": "decoder.csp_layer_5.node_mlp.0.weight",
+        "pytorch_shape": [
+          512,
+          1024
+        ],
+        "paddle_shape": [
+          1024,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_5.node_mlp.2.bias",
+        "paddle_key": "decoder.csp_layer_5.node_mlp.2.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.csp_layer_5.node_mlp.2.weight",
+        "paddle_key": "decoder.csp_layer_5.node_mlp.2.weight",
+        "pytorch_shape": [
+          512,
+          512
+        ],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      }
+    ],
+    "layer_norm": [
+      {
+        "pytorch_key": "decoder.final_layer_norm.bias",
+        "paddle_key": "decoder.final_layer_norm.bias",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      },
+      {
+        "pytorch_key": "decoder.final_layer_norm.weight",
+        "paddle_key": "decoder.final_layer_norm.weight",
+        "pytorch_shape": [
+          512
+        ],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "copy",
+        "status": "matched"
+      }
+    ],
+    "lattice_out": [
+      {
+        "pytorch_key": "decoder.lattice_out.weight",
+        "paddle_key": "decoder.lattice_out.weight",
+        "pytorch_shape": [
+          9,
+          512
+        ],
+        "paddle_shape": [
+          512,
+          9
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      }
+    ],
+    "node_embedding": [
+      {
+        "pytorch_key": "decoder.node_embedding.weight",
+        "paddle_key": "decoder.node_embedding.weight",
+        "pytorch_shape": [
+          512,
+          100
+        ],
+        "paddle_shape": [
+          100,
+          512
+        ],
+        "transform": "transpose",
+        "status": "matched"
+      }
+    ],
+    "paddle_only": [
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_0.prop_mlp.0.bias",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_0.prop_mlp.0.weight",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_0.prop_mlp.2.bias",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_0.prop_mlp.2.weight",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_1.prop_mlp.0.bias",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_1.prop_mlp.0.weight",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_1.prop_mlp.2.bias",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_1.prop_mlp.2.weight",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_2.prop_mlp.0.bias",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_2.prop_mlp.0.weight",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_2.prop_mlp.2.bias",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_2.prop_mlp.2.weight",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_3.prop_mlp.0.bias",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_3.prop_mlp.0.weight",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_3.prop_mlp.2.bias",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_3.prop_mlp.2.weight",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_4.prop_mlp.0.bias",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_4.prop_mlp.0.weight",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_4.prop_mlp.2.bias",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_4.prop_mlp.2.weight",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_5.prop_mlp.0.bias",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_5.prop_mlp.0.weight",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_5.prop_mlp.2.bias",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      },
+      {
+        "pytorch_key": "",
+        "paddle_key": "decoder.csp_layer_5.prop_mlp.2.weight",
+        "pytorch_shape": [],
+        "paddle_shape": [
+          512,
+          512
+        ],
+        "transform": "skip",
+        "status": "paddle_only"
+      }
+    ]
+  }
+}

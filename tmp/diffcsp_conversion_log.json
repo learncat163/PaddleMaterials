@@ -1,0 +1,975 @@
+{
+  "timestamp": "2026-03-09T10:38:32.010571",
+  "pytorch_checkpoint": "/home/cao/.cache/huggingface/hub/models--jwchen25--MatInvent/snapshots/b192d079a52d16403fcbbb26b73078d23f9e86c2/diffcsp_mp20/last.ckpt",
+  "paddle_config": "structure_generation/configs/diffcsp/diffcsp_mp20.yaml",
+  "converted": [
+    {
+      "key": "atom_latent_emb.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "atom_latent_emb.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        768
+      ],
+      "paddle_shape": [
+        768,
+        512
+      ]
+    },
+    {
+      "key": "coord_out.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        3,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        3
+      ]
+    },
+    {
+      "key": "csp_layer_0.edge_mlp.0.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_0.edge_mlp.0.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        1801
+      ],
+      "paddle_shape": [
+        1801,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_0.edge_mlp.2.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_0.edge_mlp.2.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_0.layer_norm.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_0.layer_norm.weight",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_0.node_mlp.0.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_0.node_mlp.0.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        1024
+      ],
+      "paddle_shape": [
+        1024,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_0.node_mlp.2.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_0.node_mlp.2.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_1.edge_mlp.0.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_1.edge_mlp.0.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        1801
+      ],
+      "paddle_shape": [
+        1801,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_1.edge_mlp.2.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_1.edge_mlp.2.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_1.layer_norm.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_1.layer_norm.weight",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_1.node_mlp.0.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_1.node_mlp.0.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        1024
+      ],
+      "paddle_shape": [
+        1024,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_1.node_mlp.2.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_1.node_mlp.2.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_2.edge_mlp.0.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_2.edge_mlp.0.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        1801
+      ],
+      "paddle_shape": [
+        1801,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_2.edge_mlp.2.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_2.edge_mlp.2.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_2.layer_norm.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_2.layer_norm.weight",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_2.node_mlp.0.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_2.node_mlp.0.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        1024
+      ],
+      "paddle_shape": [
+        1024,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_2.node_mlp.2.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_2.node_mlp.2.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_3.edge_mlp.0.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_3.edge_mlp.0.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        1801
+      ],
+      "paddle_shape": [
+        1801,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_3.edge_mlp.2.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_3.edge_mlp.2.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_3.layer_norm.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_3.layer_norm.weight",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_3.node_mlp.0.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_3.node_mlp.0.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        1024
+      ],
+      "paddle_shape": [
+        1024,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_3.node_mlp.2.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_3.node_mlp.2.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_4.edge_mlp.0.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_4.edge_mlp.0.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        1801
+      ],
+      "paddle_shape": [
+        1801,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_4.edge_mlp.2.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_4.edge_mlp.2.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_4.layer_norm.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_4.layer_norm.weight",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_4.node_mlp.0.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_4.node_mlp.0.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        1024
+      ],
+      "paddle_shape": [
+        1024,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_4.node_mlp.2.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_4.node_mlp.2.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_5.edge_mlp.0.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_5.edge_mlp.0.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        1801
+      ],
+      "paddle_shape": [
+        1801,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_5.edge_mlp.2.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_5.edge_mlp.2.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_5.layer_norm.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_5.layer_norm.weight",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_5.node_mlp.0.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_5.node_mlp.0.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        1024
+      ],
+      "paddle_shape": [
+        1024,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_5.node_mlp.2.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_5.node_mlp.2.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "final_layer_norm.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "final_layer_norm.weight",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "lattice_out.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        9,
+        512
+      ],
+      "paddle_shape": [
+        512,
+        9
+      ]
+    },
+    {
+      "key": "node_embedding.bias",
+      "transform": "copy",
+      "pytorch_shape": [
+        512
+      ],
+      "paddle_shape": [
+        512
+      ]
+    },
+    {
+      "key": "node_embedding.weight",
+      "transform": "transpose",
+      "pytorch_shape": [
+        512,
+        100
+      ],
+      "paddle_shape": [
+        100,
+        512
+      ]
+    }
+  ],
+  "skipped": [
+    {
+      "key": "beta_scheduler.alphas",
+      "reason": "scheduler parameter (not needed in Paddle)"
+    },
+    {
+      "key": "beta_scheduler.alphas_cumprod",
+      "reason": "scheduler parameter (not needed in Paddle)"
+    },
+    {
+      "key": "beta_scheduler.betas",
+      "reason": "scheduler parameter (not needed in Paddle)"
+    },
+    {
+      "key": "beta_scheduler.sigmas",
+      "reason": "scheduler parameter (not needed in Paddle)"
+    },
+    {
+      "key": "decoder.type_out.bias",
+      "reason": "Paddle pred_type=False, skipping decoder.type_out.bias"
+    },
+    {
+      "key": "decoder.type_out.weight",
+      "reason": "Paddle pred_type=False, skipping decoder.type_out.weight"
+    },
+    {
+      "key": "sigma_scheduler.sigmas",
+      "reason": "scheduler parameter (not needed in Paddle)"
+    },
+    {
+      "key": "sigma_scheduler.sigmas_norm",
+      "reason": "scheduler parameter (not needed in Paddle)"
+    },
+    {
+      "key": "type_sigma_scheduler.sigmas",
+      "reason": "scheduler parameter (not needed in Paddle)"
+    },
+    {
+      "key": "type_sigma_scheduler.sigmas_norm",
+      "reason": "scheduler parameter (not needed in Paddle)"
+    }
+  ],
+  "copied_from_paddle": [
+    {
+      "key": "csp_layer_0.prop_mlp.0.bias",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_0.prop_mlp.0.weight",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_0.prop_mlp.2.bias",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_0.prop_mlp.2.weight",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_1.prop_mlp.0.bias",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_1.prop_mlp.0.weight",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_1.prop_mlp.2.bias",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_1.prop_mlp.2.weight",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_2.prop_mlp.0.bias",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_2.prop_mlp.0.weight",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_2.prop_mlp.2.bias",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_2.prop_mlp.2.weight",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_3.prop_mlp.0.bias",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_3.prop_mlp.0.weight",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_3.prop_mlp.2.bias",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_3.prop_mlp.2.weight",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_4.prop_mlp.0.bias",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_4.prop_mlp.0.weight",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_4.prop_mlp.2.bias",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_4.prop_mlp.2.weight",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_5.prop_mlp.0.bias",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_5.prop_mlp.0.weight",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512,
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_5.prop_mlp.2.bias",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512
+      ]
+    },
+    {
+      "key": "csp_layer_5.prop_mlp.2.weight",
+      "reason": "Paddle-specific layer (prop_mlp)",
+      "shape": [
+        512,
+        512
+      ]
+    }
+  ],
+  "errors": [],
+  "summary": {
+    "converted": 68,
+    "skipped": 10,
+    "copied_from_paddle": 24,
+    "errors": 0,
+    "total_output": 92
+  }
+}

@@ -1,0 +1,119 @@
+{
+  "test": "sampling",
+  "batch_size": 4,
+  "num_batches": 2,
+  "num_inference_steps": 10,
+  "samples": [
+    {
+      "num_atoms": 10,
+      "cell_volume": 155.24224853515625,
+      "properties": {
+        "pos_mean": 0.5183501243591309,
+        "pos_std": 0.29109570384025574,
+        "cell_mean": 1.689786434173584,
+        "cell_std": 2.934150457382202
+      },
+      "composition": "H5 Na1 Mg1 Al1 Ca1 Sc1",
+      "sample_id": 0,
+      "batch_id": 0
+    },
+    {
+      "num_atoms": 7,
+      "cell_volume": 124.1626205444336,
+      "properties": {
+        "pos_mean": 0.40424227714538574,
+        "pos_std": 0.23743724822998047,
+        "cell_mean": 1.7222577333450317,
+        "cell_std": 2.472304582595825
+      },
+      "composition": "H2 O3 F1 Si1",
+      "sample_id": 1,
+      "batch_id": 0
+    },
+    {
+      "num_atoms": 16,
+      "cell_volume": 185.04225158691406,
+      "properties": {
+        "pos_mean": 0.5235971808433533,
+        "pos_std": 0.2901540696620941,
+        "cell_mean": 1.7214813232421875,
+        "cell_std": 3.2814033031463623
+      },
+      "composition": "H10 Li3 N1 O1 Ag1",
+      "sample_id": 2,
+      "batch_id": 0
+    },
+    {
+      "num_atoms": 18,
+      "cell_volume": 502.6014099121094,
+      "properties": {
+        "pos_mean": 0.4889928102493286,
+        "pos_std": 0.2890804409980774,
+        "cell_mean": 2.190873146057129,
+        "cell_std": 4.595283508300781
+      },
+      "composition": "H2 S9 Cl4 K1 Te1 Pb1",
+      "sample_id": 3,
+      "batch_id": 0
+    },
+    {
+      "num_atoms": 8,
+      "cell_volume": 116.9775619506836,
+      "properties": {
+        "pos_mean": 0.4173358976840973,
+        "pos_std": 0.2928963005542755,
+        "cell_mean": 1.5829081535339355,
+        "cell_std": 2.630455732345581
+      },
+      "composition": "H4 C1 N1 O1 Cl1",
+      "sample_id": 4,
+      "batch_id": 1
+    },
+    {
+      "num_atoms": 4,
+      "cell_volume": 76.06012725830078,
+      "properties": {
+        "pos_mean": 0.4628734588623047,
+        "pos_std": 0.30487918853759766,
+        "cell_mean": 2.196868896484375,
+        "cell_std": 1.6985875368118286
+      },
+      "composition": "Li2 Mg2",
+      "sample_id": 5,
+      "batch_id": 1
+    },
+    {
+      "num_atoms": 19,
+      "cell_volume": 228.39207458496094,
+      "properties": {
+        "pos_mean": 0.5185019373893738,
+        "pos_std": 0.2763926088809967,
+        "cell_mean": 1.8182339668273926,
+        "cell_std": 3.402972459793091
+      },
+      "composition": "H9 N3 O6 K1",
+      "sample_id": 6,
+      "batch_id": 1
+    },
+    {
+      "num_atoms": 5,
+      "cell_volume": 90.44406127929688,
+      "properties": {
+        "pos_mean": 0.5688493251800537,
+        "pos_std": 0.3069053888320923,
+        "cell_mean": 1.2814171314239502,
+        "cell_std": 2.596945285797119
+      },
+      "composition": "N2 Sr2 Os1",
+      "sample_id": 7,
+      "batch_id": 1
+    }
+  ],
+  "statistics": {
+    "num_samples": 8,
+    "num_atoms_mean": 10.875,
+    "num_atoms_std": 5.577577879330776,
+    "volume_mean": 184.86529445648193,
+    "volume_std": 128.82928061258218
+  }
+}

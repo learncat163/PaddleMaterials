@@ -1,0 +1,14 @@
+{
+  "pytorch_outputs": {
+    "pos_mean": -0.011179942637681961,
+    "cell_mean": -0.07181542366743088
+  },
+  "paddle_with_fixed_noise": {
+    "pos_mean": -0.017440341413021088,
+    "lattice_mean": 0.36223509907722473
+  },
+  "difference": {
+    "pos_mean_diff": 0.006260398775339127,
+    "pos_mean_relative": 55.996698536166654
+  }
+}

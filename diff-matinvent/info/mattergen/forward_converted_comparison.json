@@ -1,0 +1,42 @@
+{
+  "metadata": {
+    "script": "benchmark_mattergen_converted.py",
+    "timestamp": "2026-03-06T17:12:37.210785",
+    "pytorch_export_timestamp": "2026-03-06T16:40:20.155410",
+    "batch_size": 4,
+    "total_atoms": 32,
+    "t_value": 1.0,
+    "target_precision": "1e-6",
+    "architecture": "mattergen_mp20 with PyTorch-converted weights"
+  },
+  "paddle_outputs": {
+    "pos_mean": -0.011179947294294834,
+    "pos_std": 0.0069426968693733215,
+    "cell_mean": -0.07181546092033386,
+    "cell_std": 0.8697589635848999,
+    "atom_mean": -1.7709157466888428
+  },
+  "pytorch_outputs": {
+    "pos_mean": -0.011179943091822983,
+    "pos_std": 0.006942695545157233,
+    "cell_mean": -0.07181540193657081,
+    "cell_std": 0.8697589546015115,
+    "atom_mean": -1.7709156514262425
+  },
+  "elementwise": {
+    "pos_max_diff": 4.1443854570388794e-08,
+    "pos_mean_diff": 1.4197818624476591e-08,
+    "cell_max_diff": 4.76837158203125e-07,
+    "cell_mean_diff": 1.471489667892456e-07,
+    "atom_max_diff": 4.76837158203125e-06,
+    "atom_mean_diff": 4.934591914315035e-07
+  },
+  "pass_criteria": {
+    "threshold_strict": 1e-06,
+    "threshold_loose": 1e-05,
+    "pos_pass_strict": true,
+    "cell_pass_strict": true,
+    "atom_pass_strict": false,
+    "overall_pass_loose": true
+  }
+}

@@ -1,53 +1,216 @@
 {
   "test": "forward_pass",
-  "target_precision": "1e-6",
+  "target_precision": "1e-4",
   "device": "gpu:0",
   "num_runs": 10,
   "batch_size": 4,
+  "fixed_timestep": 0,
   "input_type": "FIXED",
   "runs": [
     {
       "run": 0,
-      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+      "timestep": 0,
+      "t_value": 1.0,
+      "outputs": {
+        "pos_mean": -0.017440341413021088,
+        "pos_std": 0.005228034220635891,
+        "pos_max": -0.006436716765165329,
+        "pos_min": -0.03184537962079048,
+        "cell_mean": 0.36223509907722473,
+        "cell_std": 0.532810628414154,
+        "atomic_numbers_mean": -1.9075065851211548
+      },
+      "noisy_inputs": {
+        "pos_mean": 0.5037347078323364,
+        "pos_std": 0.3093251585960388,
+        "cell_mean": 1.377425193786621,
+        "cell_std": 2.3332531452178955
+      }
     },
     {
       "run": 1,
-      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+      "timestep": 0,
+      "t_value": 1.0,
+      "outputs": {
+        "pos_mean": -0.01744033955037594,
+        "pos_std": 0.005228033754974604,
+        "pos_max": -0.006436715833842754,
+        "pos_min": -0.031845368444919586,
+        "cell_mean": 0.36223509907722473,
+        "cell_std": 0.5328106880187988,
+        "atomic_numbers_mean": -1.9075065851211548
+      },
+      "noisy_inputs": {
+        "pos_mean": 0.5037347078323364,
+        "pos_std": 0.3093251585960388,
+        "cell_mean": 1.377425193786621,
+        "cell_std": 2.3332531452178955
+      }
     },
     {
       "run": 2,
-      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+      "timestep": 0,
+      "t_value": 1.0,
+      "outputs": {
+        "pos_mean": -0.017440341413021088,
+        "pos_std": 0.005228032823652029,
+        "pos_max": -0.006436717230826616,
+        "pos_min": -0.03184537589550018,
+        "cell_mean": 0.36223509907722473,
+        "cell_std": 0.532810628414154,
+        "atomic_numbers_mean": -1.9075065851211548
+      },
+      "noisy_inputs": {
+        "pos_mean": 0.5037347078323364,
+        "pos_std": 0.3093251585960388,
+        "cell_mean": 1.377425193786621,
+        "cell_std": 2.3332531452178955
+      }
     },
     {
       "run": 3,
-      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+      "timestep": 0,
+      "t_value": 1.0,
+      "outputs": {
+        "pos_mean": -0.01744033768773079,
+        "pos_std": 0.005228032823652029,
+        "pos_max": -0.006436730735003948,
+        "pos_min": -0.03184536471962929,
+        "cell_mean": 0.3622351288795471,
+        "cell_std": 0.5328106880187988,
+        "atomic_numbers_mean": -1.9075065851211548
+      },
+      "noisy_inputs": {
+        "pos_mean": 0.5037347078323364,
+        "pos_std": 0.3093251585960388,
+        "cell_mean": 1.377425193786621,
+        "cell_std": 2.3332531452178955
+      }
     },
     {
       "run": 4,
-      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+      "timestep": 0,
+      "t_value": 1.0,
+      "outputs": {
+        "pos_mean": -0.017440341413021088,
+        "pos_std": 0.005228033289313316,
+        "pos_max": -0.006436719559133053,
+        "pos_min": -0.031845372170209885,
+        "cell_mean": 0.3622351288795471,
+        "cell_std": 0.5328106880187988,
+        "atomic_numbers_mean": -1.9075065851211548
+      },
+      "noisy_inputs": {
+        "pos_mean": 0.5037347078323364,
+        "pos_std": 0.3093251585960388,
+        "cell_mean": 1.377425193786621,
+        "cell_std": 2.3332531452178955
+      }
     },
     {
       "run": 5,
-      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+      "timestep": 0,
+      "t_value": 1.0,
+      "outputs": {
+        "pos_mean": -0.01744033955037594,
+        "pos_std": 0.005228033754974604,
+        "pos_max": -0.0064367190934717655,
+        "pos_min": -0.031845368444919586,
+        "cell_mean": 0.36223509907722473,
+        "cell_std": 0.5328106880187988,
+        "atomic_numbers_mean": -1.9075065851211548
+      },
+      "noisy_inputs": {
+        "pos_mean": 0.5037347078323364,
+        "pos_std": 0.3093251585960388,
+        "cell_mean": 1.377425193786621,
+        "cell_std": 2.3332531452178955
+      }
     },
     {
       "run": 6,
-      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+      "timestep": 0,
+      "t_value": 1.0,
+      "outputs": {
+        "pos_mean": -0.017440341413021088,
+        "pos_std": 0.005228032823652029,
+        "pos_max": -0.006436733528971672,
+        "pos_min": -0.031845372170209885,
+        "cell_mean": 0.36223506927490234,
+        "cell_std": 0.532810628414154,
+        "atomic_numbers_mean": -1.9075065851211548
+      },
+      "noisy_inputs": {
+        "pos_mean": 0.5037347078323364,
+        "pos_std": 0.3093251585960388,
+        "cell_mean": 1.377425193786621,
+        "cell_std": 2.3332531452178955
+      }
     },
     {
       "run": 7,
-      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+      "timestep": 0,
+      "t_value": 1.0,
+      "outputs": {
+        "pos_mean": -0.01744033955037594,
+        "pos_std": 0.005228034220635891,
+        "pos_max": -0.0064367130398750305,
+        "pos_min": -0.03184537589550018,
+        "cell_mean": 0.3622351288795471,
+        "cell_std": 0.532810628414154,
+        "atomic_numbers_mean": -1.9075065851211548
+      },
+      "noisy_inputs": {
+        "pos_mean": 0.5037347078323364,
+        "pos_std": 0.3093251585960388,
+        "cell_mean": 1.377425193786621,
+        "cell_std": 2.3332531452178955
+      }
     },
     {
       "run": 8,
-      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+      "timestep": 0,
+      "t_value": 1.0,
+      "outputs": {
+        "pos_mean": -0.01744033768773079,
+        "pos_std": 0.005228032823652029,
+        "pos_max": -0.006436723284423351,
+        "pos_min": -0.031845368444919586,
+        "cell_mean": 0.36223506927490234,
+        "cell_std": 0.532810628414154,
+        "atomic_numbers_mean": -1.9075065851211548
+      },
+      "noisy_inputs": {
+        "pos_mean": 0.5037347078323364,
+        "pos_std": 0.3093251585960388,
+        "cell_mean": 1.377425193786621,
+        "cell_std": 2.3332531452178955
+      }
     },
     {
       "run": 9,
-      "error": "Different structures in the batch have different PBC configurations. This is not currently supported."
+      "timestep": 0,
+      "t_value": 1.0,
+      "outputs": {
+        "pos_mean": -0.01744033955037594,
+        "pos_std": 0.005228033754974604,
+        "pos_max": -0.00643672002479434,
+        "pos_min": -0.03184536471962929,
+        "cell_mean": 0.36223509907722473,
+        "cell_std": 0.5328106880187988,
+        "atomic_numbers_mean": -1.9075065851211548
+      },
+      "noisy_inputs": {
+        "pos_mean": 0.5037347078323364,
+        "pos_std": 0.3093251585960388,
+        "cell_mean": 1.377425193786621,
+        "cell_std": 2.3332531452178955
+      }
     }
   ],
   "consistency": {
-    "error": "No valid runs"
+    "pos_mean_std": 1.3938759963117323e-09,
+    "pos_mean_range": 3.725290298461914e-09,
+    "max_diff": 3.725290298461914e-09
   }
 }

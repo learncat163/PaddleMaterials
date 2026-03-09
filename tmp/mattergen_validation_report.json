@@ -1,0 +1,32 @@
+{
+  "metadata": {
+    "timestamp": "2026-03-09T11:25:32.870698",
+    "converted_weights": "/home/cao/code/github/PaddleMaterials/tmp/mattergen_mp20_converted.pdparams"
+  },
+  "test_input": {
+    "batch_size": 4,
+    "total_atoms": 57
+  },
+  "output_stats": {
+    "loss": {
+      "value": 4.092329978942871,
+      "is_nan": false,
+      "is_inf": false
+    },
+    "loss_coord": {
+      "value": 14.837681770324707,
+      "is_nan": false,
+      "is_inf": false
+    },
+    "loss_lattice": {
+      "value": 1.1825326681137085,
+      "is_nan": false,
+      "is_inf": false
+    },
+    "loss_atom_type": {
+      "value": 1.426029086112976,
+      "is_nan": false,
+      "is_inf": false
+    }
+  }
+}

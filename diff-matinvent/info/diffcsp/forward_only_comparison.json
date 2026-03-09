@@ -1,0 +1,46 @@
+{
+  "metadata": {
+    "pytorch_export_timestamp": "2026-03-06T16:40:38.603823",
+    "paddle_run_timestamp": "2026-03-06T16:41:22.006756",
+    "t_idx": 0,
+    "t_value": 1000,
+    "batch_size": 16,
+    "total_atoms": 210,
+    "target_precision": "1e-4",
+    "device": "gpu:0",
+    "architecture_diff": {
+      "pytorch": "smooth=True (Linear 100\u2192512), input=atom_type_probs float one-hot",
+      "paddle": "smooth=False (Embedding 100\u00d7512), input=atom_types-1 int",
+      "impact": "node embedding \u8d77\u70b9\u4e0d\u540c\uff0c\u5bfc\u81f4\u4e24\u8fb9 pred_l/pred_x \u6709\u989d\u5916\u504f\u5dee\uff0c\u975e bug"
+    }
+  },
+  "time_emb_check": {
+    "max_diff_pytorch_vs_rebuilt": 8.42362642288208e-05,
+    "pass": false
+  },
+  "paddle_outputs": {
+    "pred_l_mean": -0.008680454455316067,
+    "pred_l_std": 0.936738908290863,
+    "pred_x_mean": 0.001091928337700665,
+    "pred_x_std": 0.007998696528375149
+  },
+  "pytorch_outputs": {
+    "pred_l_mean": -0.007248849284628199,
+    "pred_l_std": 0.9388046232338892,
+    "pred_x_mean": 0.0023456133777342205,
+    "pred_x_std": 0.011536480258752795
+  },
+  "elementwise": {
+    "pred_l_max_diff": 0.053533315658569336,
+    "pred_l_mean_diff": 0.00821712948446576,
+    "pred_x_max_diff": 0.07177873142063618,
+    "pred_x_mean_diff": 0.0097638575869265
+  },
+  "pass_criteria": {
+    "threshold": 0.0001,
+    "pred_l_pass": false,
+    "pred_x_pass": false,
+    "note": "\u5dee\u5f02\u4e3b\u8981\u7531 smooth/pred_type \u67b6\u6784\u4e0d\u540c\u5bfc\u81f4\uff0c\u975e\u6570\u503c\u5b9e\u73b0\u9519\u8bef",
+    "overall": false
+  }
+}

@@ -1,0 +1,206 @@
+{
+  "test": "sampling",
+  "batch_size": 16,
+  "num_inference_steps": 10,
+  "samples": [
+    {
+      "num_atoms": 10,
+      "cell_volume": 229.52203369140625,
+      "properties": {
+        "pos_mean": 0.48963531851768494,
+        "pos_std": 0.30087873339653015,
+        "lattice_mean": -0.44923409819602966,
+        "lattice_std": 4.007402420043945
+      },
+      "composition": "P1 Sc1 Te1 Pm1 Hf1 Re2 Bi1 Fr1 Np1",
+      "sample_id": 0
+    },
+    {
+      "num_atoms": 8,
+      "cell_volume": 276.0794372558594,
+      "properties": {
+        "pos_mean": 0.45467478036880493,
+        "pos_std": 0.29158875346183777,
+        "lattice_mean": -1.704257607460022,
+        "lattice_std": 3.8881795406341553
+      },
+      "composition": "Cl1 Ar1 Ti1 Sn1 Te1 Pr1 Nd1 Tb1",
+      "sample_id": 1
+    },
+    {
+      "num_atoms": 7,
+      "cell_volume": 166.2162322998047,
+      "properties": {
+        "pos_mean": 0.5265076756477356,
+        "pos_std": 0.2908232510089874,
+        "lattice_mean": 0.49321448802948,
+        "lattice_std": 3.7200710773468018
+      },
+      "composition": "Be2 Cr1 Pd1 Ba1 Nd1 At1",
+      "sample_id": 2
+    },
+    {
+      "num_atoms": 15,
+      "cell_volume": 406.0779724121094,
+      "properties": {
+        "pos_mean": 0.49740225076675415,
+        "pos_std": 0.29451921582221985,
+        "lattice_mean": 2.6064531803131104,
+        "lattice_std": 5.393904685974121
+      },
+      "composition": "Be1 P1 S1 Ga1 As1 Kr1 Ag1 Xe1 Ce1 Sm1 Dy1 Tm1 Ta1 Rn1 Ra1",
+      "sample_id": 3
+    },
+    {
+      "num_atoms": 9,
+      "cell_volume": 277.041259765625,
+      "properties": {
+        "pos_mean": 0.49116307497024536,
+        "pos_std": 0.30456385016441345,
+        "lattice_mean": 0.7552123069763184,
+        "lattice_std": 4.211206912994385
+      },
+      "composition": "K1 Ca1 Ni1 Nb1 Pr1 Pm1 Os1 Tl1 Pu1",
+      "sample_id": 4
+    },
+    {
+      "num_atoms": 11,
+      "cell_volume": 258.004150390625,
+      "properties": {
+        "pos_mean": 0.44297540187835693,
+        "pos_std": 0.3067924380302429,
+        "lattice_mean": -1.3070225715637207,
+        "lattice_std": 4.077354431152344
+      },
+      "composition": "N1 O1 F1 Cr1 Te1 Nd1 Hf2 Ta1 Tl2",
+      "sample_id": 5
+    },
+    {
+      "num_atoms": 4,
+      "cell_volume": 155.90408325195312,
+      "properties": {
+        "pos_mean": 0.47115159034729004,
+        "pos_std": 0.26861029863357544,
+        "lattice_mean": 0.21648111939430237,
+        "lattice_std": 3.6047935485839844
+      },
+      "composition": "Te1 Tm1 Pb1 U1",
+      "sample_id": 6
+    },
+    {
+      "num_atoms": 14,
+      "cell_volume": 448.1106262207031,
+      "properties": {
+        "pos_mean": 0.544106125831604,
+        "pos_std": 0.28400492668151855,
+        "lattice_mean": 0.8306887149810791,
+        "lattice_std": 5.188228130340576
+      },
+      "composition": "C1 N1 Al2 K1 Co1 Rb1 Nb1 Pd1 Sn1 Cs1 Nd1 Yb1 Bi1",
+      "sample_id": 7
+    },
+    {
+      "num_atoms": 20,
+      "cell_volume": 404.8275451660156,
+      "properties": {
+        "pos_mean": 0.5613512992858887,
+        "pos_std": 0.28695544600486755,
+        "lattice_mean": 1.5422694683074951,
+        "lattice_std": 4.6199188232421875
+      },
+      "composition": "Li1 B1 C1 N1 Mg1 Sc1 V1 Co1 Ge1 Se1 Kr1 Ru1 Tm1 Lu2 Hf1 Au1 Pa1 U1 Np1",
+      "sample_id": 8
+    },
+    {
+      "num_atoms": 9,
+      "cell_volume": 257.86968994140625,
+      "properties": {
+        "pos_mean": 0.47182807326316833,
+        "pos_std": 0.27519726753234863,
+        "lattice_mean": 0.0844259262084961,
+        "lattice_std": 4.458938121795654
+      },
+      "composition": "Cl1 Ti1 Cu1 Sr2 I1 Pm1 Yb1 W1",
+      "sample_id": 9
+    },
+    {
+      "num_atoms": 15,
+      "cell_volume": 386.5550842285156,
+      "properties": {
+        "pos_mean": 0.4796501100063324,
+        "pos_std": 0.2923976182937622,
+        "lattice_mean": 2.1263983249664307,
+        "lattice_std": 4.88792085647583
+      },
+      "composition": "C1 Mg2 Si1 Cl1 Cr1 Cu1 As1 Se1 Kr1 Ag1 Cs1 Yb1 Fr1 U1",
+      "sample_id": 10
+    },
+    {
+      "num_atoms": 9,
+      "cell_volume": 294.8878173828125,
+      "properties": {
+        "pos_mean": 0.5082314014434814,
+        "pos_std": 0.29326605796813965,
+        "lattice_mean": 0.8867140412330627,
+        "lattice_std": 4.064653396606445
+      },
+      "composition": "Ne1 Al1 V1 In1 Pr2 Sm1 Gd1 Ac1",
+      "sample_id": 11
+    },
+    {
+      "num_atoms": 19,
+      "cell_volume": 452.29742431640625,
+      "properties": {
+        "pos_mean": 0.5057851672172546,
+        "pos_std": 0.2540431022644043,
+        "lattice_mean": -1.419348120689392,
+        "lattice_std": 5.607285022735596
+      },
+      "composition": "Li1 N1 O1 Ne1 Si1 S1 Cl1 Ar1 Cr1 Fe1 Ga1 I1 La1 Eu1 Tb1 Tm1 Yb1 At1 Fr1",
+      "sample_id": 12
+    },
+    {
+      "num_atoms": 17,
+      "cell_volume": 495.49566650390625,
+      "properties": {
+        "pos_mean": 0.5040792226791382,
+        "pos_std": 0.31246939301490784,
+        "lattice_mean": -2.299535036087036,
+        "lattice_std": 5.517232418060303
+      },
+      "composition": "Al1 Mn1 Co1 Zn1 Se1 Kr1 Sr1 Zr1 Ag1 Cs1 Ba1 Sm2 Hf1 Ta1 Pt1 U1",
+      "sample_id": 13
+    },
+    {
+      "num_atoms": 8,
+      "cell_volume": 215.17657470703125,
+      "properties": {
+        "pos_mean": 0.44352903962135315,
+        "pos_std": 0.31013667583465576,
+        "lattice_mean": 0.4321276545524597,
+        "lattice_std": 5.686849594116211
+      },
+      "composition": "P1 S1 V1 Br1 Ce1 Tb1 Ra1 Pa1",
+      "sample_id": 14
+    },
+    {
+      "num_atoms": 19,
+      "cell_volume": 474.18487548828125,
+      "properties": {
+        "pos_mean": 0.5319194793701172,
+        "pos_std": 0.28275901079177856,
+        "lattice_mean": 1.1760165691375732,
+        "lattice_std": 6.069716930389404
+      },
+      "composition": "He2 C2 Mg1 V1 Sr1 Nb1 In1 La1 Pr1 Tm1 Lu1 Ta1 Hg1 Pb2 Fr1 Ac1",
+      "sample_id": 15
+    }
+  ],
+  "statistics": {
+    "num_samples": 16,
+    "num_atoms_mean": 12.125,
+    "num_atoms_std": 4.7549316504025585,
+    "volume_mean": 324.8906545639038,
+    "volume_std": 108.68490593951945
+  }
+}

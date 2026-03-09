@@ -1,0 +1,483 @@
+{
+  "metadata": {
+    "timestamp": "2026-03-09T10:50:41.264445",
+    "converted_weights": "/home/cao/code/github/PaddleMaterials/tmp/diffcsp_matinvent_converted.pdparams"
+  },
+  "test_input": {
+    "batch_size": 16,
+    "total_atoms": 210,
+    "t_value": 1000
+  },
+  "layer_outputs": {
+    "node_embedding": {
+      "shape": [
+        210,
+        512
+      ],
+      "mean": 0.0017500091344118118,
+      "std": 2.8582844734191895
+    },
+    "atom_latent_emb": {
+      "shape": [
+        210,
+        512
+      ],
+      "mean": -0.1263183355331421,
+      "std": 28.769790649414062
+    },
+    "csp_layer_0_edge_mlp": {
+      "shape": [
+        3100,
+        512
+      ],
+      "mean": 1.9672131538391113,
+      "std": 11.083117485046387
+    },
+    "csp_layer_0_node_mlp": {
+      "shape": [
+        210,
+        512
+      ],
+      "mean": 11.422948837280273,
+      "std": 55.85712814331055
+    },
+    "csp_layer_0": {
+      "shape": [
+        210,
+        512
+      ],
+      "mean": 11.296629905700684,
+      "std": 64.11528015136719
+    },
+    "csp_layer_1_edge_mlp": {
+      "shape": [
+        3100,
+        512
+      ],
+      "mean": 2.378763198852539,
+      "std": 8.377423286437988
+    },
+    "csp_layer_1_node_mlp": {
+      "shape": [
+        210,
+        512
+      ],
+      "mean": 6.554499626159668,
+      "std": 62.83209228515625
+    },
+    "csp_layer_1": {
+      "shape": [
+        210,
+        512
+      ],
+      "mean": 17.85112953186035,
+      "std": 112.34676361083984
+    },
+    "csp_layer_2_edge_mlp": {
+      "shape": [
+        3100,
+        512
+      ],
+      "mean": 0.7579727172851562,
+      "std": 4.300293445587158
+    },
+    "csp_layer_2_node_mlp": {
+      "shape": [
+        210,
+        512
+      ],
+      "mean": 3.311676263809204,
+      "std": 24.61328887939453
+    },
+    "csp_layer_2": {
+      "shape": [
+        210,
+        512
+      ],
+      "mean": 21.162803649902344,
+      "std": 132.21670532226562
+    },
+    "csp_layer_3_edge_mlp": {
+      "shape": [
+        3100,
+        512
+      ],
+      "mean": 0.8109300136566162,
+      "std": 4.324809551239014
+    },
+    "csp_layer_3_node_mlp": {
+      "shape": [
+        210,
+        512
+      ],
+      "mean": 8.415828704833984,
+      "std": 43.50580978393555
+    },
+    "csp_layer_3": {
+      "shape": [
+        210,
+        512
+      ],
+      "mean": 29.578636169433594,
+      "std": 170.3651123046875
+    },
+    "csp_layer_4_edge_mlp": {
+      "shape": [
+        3100,
+        512
+      ],
+      "mean": 0.27328401803970337,
+      "std": 1.793378472328186
+    },
+    "csp_layer_4_node_mlp": {
+      "shape": [
+        210,
+        512
+      ],
+      "mean": 6.725756645202637,
+      "std": 23.045312881469727
+    },
+    "csp_layer_4": {
+      "shape": [
+        210,
+        512
+      ],
+      "mean": 36.30439376831055,
+      "std": 190.42929077148438
+    },
+    "csp_layer_5_edge_mlp": {
+      "shape": [
+        3100,
+        512
+      ],
+      "mean": 0.30655065178871155,
+      "std": 2.0030786991119385
+    },
+    "csp_layer_5_node_mlp": {
+      "shape": [
+        210,
+        512
+      ],
+      "mean": 5.582252025604248,
+      "std": 68.04784393310547
+    },
+    "csp_layer_5": {
+      "shape": [
+        210,
+        512
+      ],
+      "mean": 41.88664245605469,
+      "std": 254.34658813476562
+    },
+    "coord_out": {
+      "shape": [
+        210,
+        3
+      ],
+      "mean": 0.002345611806958914,
+      "std": 0.011536475270986557
+    },
+    "lattice_out": {
+      "shape": [
+        16,
+        9
+      ],
+      "mean": 0.3307640850543976,
+      "std": 0.4673622250556946
+    }
+  },
+  "comparison": {
+    "layers": {
+      "atom_latent_emb": {
+        "shape": [
+          210,
+          512
+        ],
+        "dtype": "float32",
+        "mean": -0.1263183355331421,
+        "std": 28.769790649414062,
+        "min": -143.38641357421875,
+        "max": 176.12208557128906,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "coord_out": {
+        "shape": [
+          210,
+          3
+        ],
+        "dtype": "float32",
+        "mean": 0.002345611806958914,
+        "std": 0.011536475270986557,
+        "min": -0.031520359218120575,
+        "max": 0.028638213872909546,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "csp_layer_0": {
+        "shape": [
+          210,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 11.296629905700684,
+        "std": 64.11528015136719,
+        "min": -143.38641357421875,
+        "max": 862.865478515625,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "csp_layer_0_edge_mlp": {
+        "shape": [
+          3100,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 1.9672131538391113,
+        "std": 11.083117485046387,
+        "min": -0.27846455574035645,
+        "max": 160.91969299316406,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "csp_layer_0_node_mlp": {
+        "shape": [
+          210,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 11.422948837280273,
+        "std": 55.85712814331055,
+        "min": -0.2784632742404938,
+        "max": 834.0281982421875,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "csp_layer_1": {
+        "shape": [
+          210,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 17.85112953186035,
+        "std": 112.34676361083984,
+        "min": -143.38641357421875,
+        "max": 2158.491455078125,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "csp_layer_1_edge_mlp": {
+        "shape": [
+          3100,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 2.378763198852539,
+        "std": 8.377423286437988,
+        "min": -0.27846455574035645,
+        "max": 78.19440460205078,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "csp_layer_1_node_mlp": {
+        "shape": [
+          210,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 6.554499626159668,
+        "std": 62.83209228515625,
+        "min": -0.27843624353408813,
+        "max": 1329.9974365234375,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "csp_layer_2": {
+        "shape": [
+          210,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 21.162803649902344,
+        "std": 132.21670532226562,
+        "min": -143.3864288330078,
+        "max": 2597.733642578125,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "csp_layer_2_edge_mlp": {
+        "shape": [
+          3100,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 0.7579727172851562,
+        "std": 4.300293445587158,
+        "min": -0.27846455574035645,
+        "max": 62.00187301635742,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "csp_layer_2_node_mlp": {
+        "shape": [
+          210,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 3.311676263809204,
+        "std": 24.61328887939453,
+        "min": -0.27846449613571167,
+        "max": 487.3251647949219,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "csp_layer_3": {
+        "shape": [
+          210,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 29.578636169433594,
+        "std": 170.3651123046875,
+        "min": -143.3865509033203,
+        "max": 3477.1884765625,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "csp_layer_3_edge_mlp": {
+        "shape": [
+          3100,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 0.8109300136566162,
+        "std": 4.324809551239014,
+        "min": -0.27846455574035645,
+        "max": 55.948795318603516,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "csp_layer_3_node_mlp": {
+        "shape": [
+          210,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 8.415828704833984,
+        "std": 43.50580978393555,
+        "min": -0.2784641683101654,
+        "max": 915.6657104492188,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "csp_layer_4": {
+        "shape": [
+          210,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 36.30439376831055,
+        "std": 190.42929077148438,
+        "min": -143.5264129638672,
+        "max": 3963.51708984375,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "csp_layer_4_edge_mlp": {
+        "shape": [
+          3100,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 0.27328401803970337,
+        "std": 1.793378472328186,
+        "min": -0.27846455574035645,
+        "max": 38.727081298828125,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "csp_layer_4_node_mlp": {
+        "shape": [
+          210,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 6.725756645202637,
+        "std": 23.045312881469727,
+        "min": -0.27846455574035645,
+        "max": 561.4273071289062,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "csp_layer_5": {
+        "shape": [
+          210,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 41.88664245605469,
+        "std": 254.34658813476562,
+        "min": -143.5269317626953,
+        "max": 5386.78857421875,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "csp_layer_5_edge_mlp": {
+        "shape": [
+          3100,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 0.30655065178871155,
+        "std": 2.0030786991119385,
+        "min": -0.27846455574035645,
+        "max": 33.7846565246582,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "csp_layer_5_node_mlp": {
+        "shape": [
+          210,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 5.582252025604248,
+        "std": 68.04784393310547,
+        "min": -0.27846455574035645,
+        "max": 1508.0660400390625,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "lattice_out": {
+        "shape": [
+          16,
+          9
+        ],
+        "dtype": "float32",
+        "mean": 0.3307640850543976,
+        "std": 0.4673622250556946,
+        "min": -0.006907053291797638,
+        "max": 1.0022320747375488,
+        "has_nan": false,
+        "has_inf": false
+      },
+      "node_embedding": {
+        "shape": [
+          210,
+          512
+        ],
+        "dtype": "float32",
+        "mean": 0.0017500091344118118,
+        "std": 2.8582844734191895,
+        "min": -13.167941093444824,
+        "max": 16.260395050048828,
+        "has_nan": false,
+        "has_inf": false
+      }
+    },
+    "summary": {
+      "total_layers": 22,
+      "layers_with_stats": 22
+    }
+  }
+}

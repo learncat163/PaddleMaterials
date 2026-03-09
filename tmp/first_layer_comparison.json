@@ -1,0 +1,69 @@
+{
+  "metadata": {
+    "timestamp": "2026-03-09T11:00:00.144748",
+    "pytorch_first_layer": "/home/cao/code/github/PaddleMaterials/tmp/first_layer_output.json",
+    "paddle_layerwise": "/home/cao/code/github/PaddleMaterials/tmp/diffcsp_layerwise_validation.json"
+  },
+  "pytorch_metadata": {
+    "timestamp": "2026-03-09T10:59:56.619573",
+    "model": "PyTorch DiffCSP CSPNet (MatInvent)",
+    "batch_size": 16,
+    "total_atoms": 210,
+    "num_atoms_list": [
+      8,
+      12,
+      16,
+      10,
+      14,
+      18,
+      20,
+      24,
+      6,
+      10,
+      12,
+      14,
+      16,
+      8,
+      10,
+      12
+    ],
+    "t_value": 1000,
+    "source_data": "exported_noisy_inputs.json"
+  },
+  "paddle_metadata": {
+    "test_input": {
+      "batch_size": 16,
+      "total_atoms": 210,
+      "t_value": 1000
+    }
+  },
+  "comparison": {
+    "pytorch": {
+      "shape": [
+        210,
+        512
+      ],
+      "mean": 0.0017500104072913321,
+      "std": 2.8582844257096176,
+      "min": -13.167941093444824,
+      "max": 16.260395050048828,
+      "has_nan": false,
+      "has_inf": false
+    },
+    "paddle": {
+      "shape": [
+        210,
+        512
+      ],
+      "mean": 0.0017500091344118118,
+      "std": 2.8582844734191895
+    },
+    "comparison": {
+      "mean_diff": 1.2728795203195004e-09,
+      "std_diff": 4.7709571848741916e-08,
+      "shape_match": true,
+      "mean_diff_pct": 7.273512440290073e-05,
+      "std_diff_pct": 1.6691680944236473e-06
+    }
+  }
+}

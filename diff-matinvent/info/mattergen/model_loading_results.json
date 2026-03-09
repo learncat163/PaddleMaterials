@@ -1,8 +1,0 @@
-{
-  "test": "model_loading",
-  "device": "gpu:0",
-  "model_name": "mattergen_mp20",
-  "status": "SUCCESS",
-  "total_parameters": 44562043,
-  "trainable_parameters": 44562021
-}

@@ -1,0 +1,37 @@
+{
+  "metadata": {
+    "script": "benchmark_diffcsp_converted.py",
+    "timestamp": "2026-03-06T17:04:44.809177",
+    "pytorch_export_timestamp": "2026-03-06T16:40:38.603823",
+    "t_idx": 0,
+    "t_value": 1000,
+    "batch_size": 16,
+    "total_atoms": 210,
+    "target_precision": "1e-4",
+    "architecture": "smooth=True, pred_type=False (converted from PyTorch)"
+  },
+  "paddle_outputs": {
+    "pred_l_mean": -0.007248868700116873,
+    "pred_l_std": 0.938804566860199,
+    "pred_x_mean": 0.0023456113412976265,
+    "pred_x_std": 0.011536474339663982
+  },
+  "pytorch_outputs": {
+    "pred_l_mean": -0.007248849284628199,
+    "pred_l_std": 0.9388046232338892,
+    "pred_x_mean": 0.0023456133777342205,
+    "pred_x_std": 0.011536480258752795
+  },
+  "elementwise": {
+    "pred_l_max_diff": 4.76837158203125e-07,
+    "pred_l_mean_diff": 8.345685071415372e-08,
+    "pred_x_max_diff": 1.043081283569336e-07,
+    "pred_x_mean_diff": 2.808048434200741e-08
+  },
+  "pass_criteria": {
+    "threshold": 0.0001,
+    "pred_l_pass": true,
+    "pred_x_pass": true,
+    "overall_pass": true
+  }
+}

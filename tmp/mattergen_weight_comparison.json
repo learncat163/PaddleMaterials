@@ -1,0 +1,2891 @@
+{
+  "total_keys": 281,
+  "compared_keys": 281,
+  "missing_in_paddle": [],
+  "layers": {
+    "fc_atom.bias": {
+      "name": "fc_atom.bias",
+      "num_weights": 1,
+      "weights": {
+        "fc_atom.bias": {
+          "shape": [
+            101
+          ],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        }
+      },
+      "max_diff": 0.0,
+      "mean_diff": 0.0
+    },
+    "fc_atom.weight": {
+      "name": "fc_atom.weight",
+      "num_weights": 1,
+      "weights": {
+        "fc_atom.weight": {
+          "shape": [
+            101,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        }
+      },
+      "max_diff": 0.0,
+      "mean_diff": 0.0
+    },
+    "gemnet.angle_edge_emb": {
+      "name": "gemnet.angle_edge_emb",
+      "num_weights": 4,
+      "weights": {
+        "gemnet.angle_edge_emb.0.weight": {
+          "shape": [
+            512,
+            515
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.angle_edge_emb.0.bias": {
+          "shape": [
+            512
+          ],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.angle_edge_emb.2.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.angle_edge_emb.2.bias": {
+          "shape": [
+            512
+          ],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        }
+      },
+      "max_diff": 0.0,
+      "mean_diff": 0.0
+    },
+    "gemnet.atom_emb": {
+      "name": "gemnet.atom_emb",
+      "num_weights": 1,
+      "weights": {
+        "gemnet.atom_emb.embeddings.weight": {
+          "shape": [
+            101,
+            512
+          ],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        }
+      },
+      "max_diff": 0.0,
+      "mean_diff": 0.0
+    },
+    "gemnet.atom_latent_emb": {
+      "name": "gemnet.atom_latent_emb",
+      "num_weights": 2,
+      "weights": {
+        "gemnet.atom_latent_emb.weight": {
+          "shape": [
+            512,
+            1024
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.atom_latent_emb.bias": {
+          "shape": [
+            512
+          ],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        }
+      },
+      "max_diff": 0.0,
+      "mean_diff": 0.0
+    },
+    "gemnet.cbf_basis3": {
+      "name": "gemnet.cbf_basis3",
+      "num_weights": 1,
+      "weights": {
+        "gemnet.cbf_basis3.radial_basis.rbf.offset": {
+          "shape": [
+            128
+          ],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        }
+      },
+      "max_diff": 0.0,
+      "mean_diff": 0.0
+    },
+    "gemnet.edge_emb": {
+      "name": "gemnet.edge_emb",
+      "num_weights": 1,
+      "weights": {
+        "gemnet.edge_emb.dense.linear.weight": {
+          "shape": [
+            512,
+            1152
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        }
+      },
+      "max_diff": 0.0,
+      "mean_diff": 0.0
+    },
+    "gemnet.int_blocks": {
+      "name": "gemnet.int_blocks",
+      "num_weights": 108,
+      "weights": {
+        "gemnet.int_blocks.0.dense_ca.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.trip_interaction.dense_ba.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.trip_interaction.mlp_rbf.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.trip_interaction.scale_rbf.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.trip_interaction.mlp_cbf.weight": {
+          "shape": [
+            64,
+            16,
+            64
+          ],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.trip_interaction.scale_cbf_sum.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.trip_interaction.down_projection.linear.weight": {
+          "shape": [
+            64,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.trip_interaction.up_projection_ca.linear.weight": {
+          "shape": [
+            512,
+            64
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.trip_interaction.up_projection_ac.linear.weight": {
+          "shape": [
+            512,
+            64
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.layers_before_skip.0.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.layers_before_skip.0.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.layers_after_skip.0.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.layers_after_skip.0.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.layers_after_skip.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.layers_after_skip.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.atom_update.dense_rbf.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.atom_update.scale_sum.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.atom_update.layers.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.atom_update.layers.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.atom_update.layers.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.atom_update.layers.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.atom_update.layers.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.atom_update.layers.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.atom_update.layers.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.concat_layer.dense.linear.weight": {
+          "shape": [
+            512,
+            1536
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.residual_m.0.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.0.residual_m.0.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.dense_ca.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.trip_interaction.dense_ba.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.trip_interaction.mlp_rbf.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.trip_interaction.scale_rbf.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.trip_interaction.mlp_cbf.weight": {
+          "shape": [
+            64,
+            16,
+            64
+          ],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.trip_interaction.scale_cbf_sum.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.trip_interaction.down_projection.linear.weight": {
+          "shape": [
+            64,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.trip_interaction.up_projection_ca.linear.weight": {
+          "shape": [
+            512,
+            64
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.trip_interaction.up_projection_ac.linear.weight": {
+          "shape": [
+            512,
+            64
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.layers_before_skip.0.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.layers_before_skip.0.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.layers_after_skip.0.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.layers_after_skip.0.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.layers_after_skip.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.layers_after_skip.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.atom_update.dense_rbf.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.atom_update.scale_sum.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.atom_update.layers.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.atom_update.layers.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.atom_update.layers.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.atom_update.layers.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.atom_update.layers.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.atom_update.layers.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.atom_update.layers.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.concat_layer.dense.linear.weight": {
+          "shape": [
+            512,
+            1536
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.residual_m.0.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.1.residual_m.0.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.dense_ca.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.trip_interaction.dense_ba.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.trip_interaction.mlp_rbf.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.trip_interaction.scale_rbf.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.trip_interaction.mlp_cbf.weight": {
+          "shape": [
+            64,
+            16,
+            64
+          ],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.trip_interaction.scale_cbf_sum.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.trip_interaction.down_projection.linear.weight": {
+          "shape": [
+            64,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.trip_interaction.up_projection_ca.linear.weight": {
+          "shape": [
+            512,
+            64
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.trip_interaction.up_projection_ac.linear.weight": {
+          "shape": [
+            512,
+            64
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.layers_before_skip.0.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.layers_before_skip.0.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.layers_after_skip.0.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.layers_after_skip.0.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.layers_after_skip.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.layers_after_skip.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.atom_update.dense_rbf.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.atom_update.scale_sum.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.atom_update.layers.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.atom_update.layers.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.atom_update.layers.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.atom_update.layers.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.atom_update.layers.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.atom_update.layers.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.atom_update.layers.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.concat_layer.dense.linear.weight": {
+          "shape": [
+            512,
+            1536
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.residual_m.0.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.2.residual_m.0.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.dense_ca.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.trip_interaction.dense_ba.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.trip_interaction.mlp_rbf.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.trip_interaction.scale_rbf.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.trip_interaction.mlp_cbf.weight": {
+          "shape": [
+            64,
+            16,
+            64
+          ],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.trip_interaction.scale_cbf_sum.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.trip_interaction.down_projection.linear.weight": {
+          "shape": [
+            64,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.trip_interaction.up_projection_ca.linear.weight": {
+          "shape": [
+            512,
+            64
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.trip_interaction.up_projection_ac.linear.weight": {
+          "shape": [
+            512,
+            64
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.layers_before_skip.0.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.layers_before_skip.0.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.layers_after_skip.0.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.layers_after_skip.0.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.layers_after_skip.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.layers_after_skip.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.atom_update.dense_rbf.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.atom_update.scale_sum.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.atom_update.layers.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.atom_update.layers.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.atom_update.layers.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.atom_update.layers.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.atom_update.layers.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.atom_update.layers.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.atom_update.layers.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.concat_layer.dense.linear.weight": {
+          "shape": [
+            512,
+            1536
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.residual_m.0.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.int_blocks.3.residual_m.0.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        }
+      },
+      "max_diff": 0.0,
+      "mean_diff": 0.0
+    },
+    "gemnet.lattice_out_blocks": {
+      "name": "gemnet.lattice_out_blocks",
+      "num_weights": 20,
+      "weights": {
+        "gemnet.lattice_out_blocks.0.mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.0.mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.0.dense_rbf_F.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.0.out_forces.linear.weight": {
+          "shape": [
+            1,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.1.mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.1.mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.1.dense_rbf_F.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.1.out_forces.linear.weight": {
+          "shape": [
+            1,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.2.mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.2.mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.2.dense_rbf_F.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.2.out_forces.linear.weight": {
+          "shape": [
+            1,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.3.mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.3.mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.3.dense_rbf_F.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.3.out_forces.linear.weight": {
+          "shape": [
+            1,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.4.mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.4.mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.4.dense_rbf_F.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.lattice_out_blocks.4.out_forces.linear.weight": {
+          "shape": [
+            1,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        }
+      },
+      "max_diff": 0.0,
+      "mean_diff": 0.0
+    },
+    "gemnet.mlp_cbf3": {
+      "name": "gemnet.mlp_cbf3",
+      "num_weights": 1,
+      "weights": {
+        "gemnet.mlp_cbf3.weight": {
+          "shape": [
+            7,
+            128,
+            16
+          ],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        }
+      },
+      "max_diff": 0.0,
+      "mean_diff": 0.0
+    },
+    "gemnet.mlp_rbf3": {
+      "name": "gemnet.mlp_rbf3",
+      "num_weights": 1,
+      "weights": {
+        "gemnet.mlp_rbf3.linear.weight": {
+          "shape": [
+            16,
+            128
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        }
+      },
+      "max_diff": 0.0,
+      "mean_diff": 0.0
+    },
+    "gemnet.mlp_rbf_h": {
+      "name": "gemnet.mlp_rbf_h",
+      "num_weights": 1,
+      "weights": {
+        "gemnet.mlp_rbf_h.linear.weight": {
+          "shape": [
+            16,
+            128
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        }
+      },
+      "max_diff": 0.0,
+      "mean_diff": 0.0
+    },
+    "gemnet.mlp_rbf_lattice": {
+      "name": "gemnet.mlp_rbf_lattice",
+      "num_weights": 1,
+      "weights": {
+        "gemnet.mlp_rbf_lattice.linear.weight": {
+          "shape": [
+            16,
+            128
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        }
+      },
+      "max_diff": 0.0,
+      "mean_diff": 0.0
+    },
+    "gemnet.mlp_rbf_out": {
+      "name": "gemnet.mlp_rbf_out",
+      "num_weights": 1,
+      "weights": {
+        "gemnet.mlp_rbf_out.linear.weight": {
+          "shape": [
+            16,
+            128
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        }
+      },
+      "max_diff": 0.0,
+      "mean_diff": 0.0
+    },
+    "gemnet.out_blocks": {
+      "name": "gemnet.out_blocks",
+      "num_weights": 135,
+      "weights": {
+        "gemnet.out_blocks.0.dense_rbf.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.scale_sum.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.layers.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.layers.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.layers.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.layers.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.layers.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.layers.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.layers.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.seq_energy.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.seq_energy.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.seq_energy.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.seq_energy.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.seq_energy.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.seq_energy.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.seq_energy.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.out_energy.linear.weight": {
+          "shape": [
+            1,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.scale_rbf_F.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.seq_forces.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.seq_forces.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.seq_forces.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.seq_forces.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.seq_forces.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.seq_forces.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.seq_forces.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.out_forces.linear.weight": {
+          "shape": [
+            1,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.0.dense_rbf_F.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.dense_rbf.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.scale_sum.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.layers.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.layers.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.layers.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.layers.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.layers.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.layers.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.layers.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.seq_energy.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.seq_energy.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.seq_energy.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.seq_energy.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.seq_energy.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.seq_energy.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.seq_energy.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.out_energy.linear.weight": {
+          "shape": [
+            1,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.scale_rbf_F.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.seq_forces.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.seq_forces.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.seq_forces.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.seq_forces.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.seq_forces.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.seq_forces.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.seq_forces.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.out_forces.linear.weight": {
+          "shape": [
+            1,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.1.dense_rbf_F.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.dense_rbf.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.scale_sum.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.layers.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.layers.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.layers.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.layers.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.layers.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.layers.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.layers.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.seq_energy.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.seq_energy.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.seq_energy.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.seq_energy.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.seq_energy.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.seq_energy.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.seq_energy.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.out_energy.linear.weight": {
+          "shape": [
+            1,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.scale_rbf_F.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.seq_forces.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.seq_forces.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.seq_forces.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.seq_forces.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.seq_forces.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.seq_forces.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.seq_forces.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.out_forces.linear.weight": {
+          "shape": [
+            1,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.2.dense_rbf_F.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.dense_rbf.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.scale_sum.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.layers.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.layers.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.layers.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.layers.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.layers.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.layers.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.layers.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.seq_energy.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.seq_energy.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.seq_energy.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.seq_energy.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.seq_energy.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.seq_energy.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.seq_energy.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.out_energy.linear.weight": {
+          "shape": [
+            1,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.scale_rbf_F.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.seq_forces.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.seq_forces.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.seq_forces.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.seq_forces.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.seq_forces.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.seq_forces.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.seq_forces.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.out_forces.linear.weight": {
+          "shape": [
+            1,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.3.dense_rbf_F.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.dense_rbf.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.scale_sum.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.layers.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.layers.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.layers.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.layers.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.layers.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.layers.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.layers.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.seq_energy.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.seq_energy.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.seq_energy.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.seq_energy.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.seq_energy.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.seq_energy.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.seq_energy.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.out_energy.linear.weight": {
+          "shape": [
+            1,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.scale_rbf_F.scale_factor": {
+          "shape": [],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.seq_forces.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.seq_forces.1.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.seq_forces.1.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.seq_forces.2.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.seq_forces.2.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.seq_forces.3.dense_mlp.0.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.seq_forces.3.dense_mlp.1.linear.weight": {
+          "shape": [
+            512,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.out_forces.linear.weight": {
+          "shape": [
+            1,
+            512
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        },
+        "gemnet.out_blocks.4.dense_rbf_F.linear.weight": {
+          "shape": [
+            512,
+            16
+          ],
+          "transposed": true,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        }
+      },
+      "max_diff": 0.0,
+      "mean_diff": 0.0
+    },
+    "gemnet.radial_basis": {
+      "name": "gemnet.radial_basis",
+      "num_weights": 1,
+      "weights": {
+        "gemnet.radial_basis.rbf.offset": {
+          "shape": [
+            128
+          ],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        }
+      },
+      "max_diff": 0.0,
+      "mean_diff": 0.0
+    },
+    "noise_level_encoding.div_term": {
+      "name": "noise_level_encoding.div_term",
+      "num_weights": 1,
+      "weights": {
+        "noise_level_encoding.div_term": {
+          "shape": [
+            256
+          ],
+          "transposed": false,
+          "max_abs_diff": 0.0,
+          "mean_abs_diff": 0.0,
+          "max_rel_diff": 0.0
+        }
+      },
+      "max_diff": 0.0,
+      "mean_diff": 0.0
+    }
+  },
+  "summary": {
+    "max_abs_diff": 0.0,
+    "max_rel_diff": 0.0,
+    "mean_abs_diff": 0.0,
+    "layers_with_issues": []
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "pytorch": {
+    "num_samples": 16,
+    "valid_samples": 16,
+    "validity_rate": 1.0,
+    "num_atoms_mean": 11.25,
+    "num_atoms_std": 5.814851674806504,
+    "volume_mean": 215.1198616402848,
+    "volume_std": 105.70339189200237
+  },
+  "paddle": {
+    "num_samples": 16,
+    "num_atoms_mean": 12.125,
+    "num_atoms_std": 4.7549316504025585,
+    "volume_mean": 324.8906545639038,
+    "volume_std": 108.68490593951945
+  },
+  "difference": {
+    "num_atoms_mean_diff": 0.875,
+    "volume_mean_diff": 109.77079292361901
+  }
+}
