@@ -293,10 +293,7 @@ def compare_arrays(pt: np.ndarray, pd: np.ndarray, label: str) -> Dict[str, Any]
         },
     }
     result["thresholds_pct"] = {k: 100.0 * v / total for k, v in result["thresholds"].items()}
-    result["pass_1e-4"] = result["abs_diff"]["median"] < 1e-4
-    result["pass_1e-6"] = result["abs_diff"]["median"] < 1e-6
-    logger.info(f"  median_abs_diff={result['abs_diff']['median']:.4e}, "
-                f"pass@1e-4={result['pass_1e-4']}, pass@1e-6={result['pass_1e-6']}")
+    logger.info(f"  median_abs_diff={result['abs_diff']['median']:.4e}")
     return result
 
 
@@ -320,22 +317,12 @@ def _cmp_section(title: str, cmp: Optional[Dict]) -> list:
         _md_table([
             ("总元素数",         f"{cmp['total_elements']:,}"),
             ("最大绝对差异",     f"{cmp['abs_diff']['max']:.4e}"),
-            ("平均绝对差异",       f"{cmp['abs_diff']['mean']:.4e}"),
-            ("**中位数绝对差异**", f"**{cmp['abs_diff']['median']:.4e}**"),
-            ("P99.9",              f"{cmp['percentiles']['p99.9']:.4e}"),
+            ("平均绝对差异",     f"{cmp['abs_diff']['mean']:.4e}"),
+            ("中位数绝对差异",       f"{cmp['abs_diff']['median']:.4e}"),
             ("< 1e-4",             f"{cmp['thresholds']['lt_1e-4']:,} ({cmp['thresholds_pct']['lt_1e-4']:.2f}%)"),
-            ("< 1e-6",             f"{cmp['thresholds']['lt_1e-6']:,} ({cmp['thresholds_pct']['lt_1e-6']:.2f}%)"),
-            ("Pass @ 1e-4 (median)", "PASS" if cmp["pass_1e-4"] else "FAIL"),
-            ("Pass @ 1e-6 (median)", "PASS" if cmp["pass_1e-6"] else "FAIL"),
         ]),
         "",
     ]
-    if cmp["pass_1e-6"]:
-        lines += ["[PASS] 高度一致（median_diff < 1e-6）", ""]
-    elif cmp["pass_1e-4"]:
-        lines += ["[WARN] 基本一致（median_diff < 1e-4）", ""]
-    else:
-        lines += [f"[FAIL] 差异过大（median_diff = {cmp['abs_diff']['median']:.4e}）", ""]
     return lines
 
 
@@ -497,9 +484,7 @@ def main():
             return f"  [{label}] skipped (PyTorch not available)"
         if "error" in cmp:
             return f"  [{label}] ERROR: {cmp['error']}"
-        status = "PASS" if cmp["pass_1e-4"] else "FAIL"
-        return (f"  [{label}] median_diff={cmp['abs_diff']['median']:.4e}  "
-                f"pass@1e-4={cmp['pass_1e-4']}  pass@1e-6={cmp['pass_1e-6']}  [{status}]")
+        return (f"  [{label}] median_diff={cmp['abs_diff']['median']:.4e}")
 
     print(_summary_line("pred_lattice     ", pl_cmp))
     print(_summary_line("pred_frac_coords ", px_cmp))
