@@ -39,8 +39,9 @@ class ReplayBuffer:
         buffer_size: int = 100,
         sample_size: int = 8,
         reward_cutoff: float = 0.0,
+        capacity: int = None,
     ) -> None:
-        self.buffer_size = buffer_size
+        self.buffer_size = capacity if capacity is not None else buffer_size
         self.sample_size = sample_size
         self.reward_cutoff = reward_cutoff
         # Stores the top N highest reward crystal generated so far

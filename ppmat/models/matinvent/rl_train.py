@@ -28,9 +28,9 @@ from omegaconf import OmegaConf
 # Add parent directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "../.."))
 
-from ppmat.rl.mat_invent import MatInvent
-from ppmat.rl.models.mattergen_suite import MatterGenSuite
-from ppmat.rl.models.diffcsp_suite import DiffCSPSuite
+from ppmat.models.matinvent.rl.mat_invent import MatInvent
+from ppmat.models.matinvent.rl.models.mattergen_suite import MatterGenSuite
+from ppmat.models.matinvent.rl.models.diffcsp_suite import DiffCSPSuite
 from ppmat.models.matinvent.rewards.reward import Reward
 
 
@@ -90,7 +90,6 @@ def load_config(config_path: str) -> OmegaConf:
 
 def build_model_suite(cfg, model_name: str, device: str):
     """Build model suite based on configuration."""
-    # #ISPL-TODO: Implement model suite building
     if model_name == "mattergen":
         return MatterGenSuite(
             model_name=model_name,
@@ -113,7 +112,6 @@ def build_model_suite(cfg, model_name: str, device: str):
 
 def build_reward(cfg, output_dir: str):
     """Build reward function based on configuration."""
-    # #ISPL-TODO: Implement reward building with calculators
     reward_cfg = cfg.RL.reward_cfg
     return Reward(
         root_dir=os.path.join(output_dir, "rewards"),

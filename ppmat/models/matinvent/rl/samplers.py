@@ -155,17 +155,35 @@ class MatterGenSampler(BaseSampler):
                     num_inference_steps=self.num_inference_steps,
                 )
 
-            # Convert output to data list and structures
-            structure_array = output["structure_array"]
-            structures = structure_array_to_pymatgen_structures(
-                frac_coords=structure_array["frac_coords"].numpy(),
-                atom_types=structure_array["atom_types"].numpy(),
-                lattice=structure_array["lattice"].numpy(),
-                num_atoms=structure_array["num_atoms"].numpy(),
-            )
+            # MatterGen.sample() returns {"result": [{num_atoms, atom_types, frac_coords, lattice}, ...]}
+            # (raw-matinvent/models/mattergen/sample.py MatterGenSampler)
+            results = output["result"]
+            for r in results:
+                na = r["num_atoms"]
+                frac = np.array(r["frac_coords"], dtype=np.float32)
+                at = np.array(r["atom_types"], dtype=np.int32)
+                lat = np.array(r["lattice"], dtype=np.float32)
 
-            all_data.extend([{"structure_array": structure_array}])
-            all_structures.extend(structures)
+                structure_data = {
+                    "structure_array": {
+                        "num_atoms": paddle.to_tensor([na], dtype='int64'),
+                        "frac_coords": paddle.to_tensor(frac),
+                        "atom_types": paddle.to_tensor(at),
+                        "lattice": paddle.to_tensor(lat).unsqueeze(0),
+                    }
+                }
+                try:
+                    pmg_struct = structure_array_to_pymatgen_structures(
+                        frac_coords=frac,
+                        atom_types=at,
+                        lattice=lat[np.newaxis],
+                        num_atoms=[na],
+                    )[0]
+                except Exception:
+                    pmg_struct = None
+
+                all_data.append(structure_data)
+                all_structures.append(pmg_struct)
 
         return all_data, all_structures
 

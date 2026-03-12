@@ -20,10 +20,10 @@ convert-matinvent/pipeline/base.py
 convert-matinvent/pipeline/mat_invent.py
 """
 
-from ppmat.rl.base import ReinL
-from ppmat.rl.datasets import RLDataset, collate_fn, create_rl_dataloader
-from ppmat.rl.mat_invent import MatInvent
-from ppmat.rl.samplers import BaseSampler, DiffCSPSampler, MatterGenSampler
+from ppmat.models.matinvent.rl.base import ReinL
+from ppmat.models.matinvent.rl.datasets import RLDataset, collate_fn, create_rl_dataloader
+from ppmat.models.matinvent.rl.mat_invent import MatInvent
+from ppmat.models.matinvent.rl.samplers import BaseSampler, DiffCSPSampler, MatterGenSampler
 
 __all__ = [
     "ReinL",

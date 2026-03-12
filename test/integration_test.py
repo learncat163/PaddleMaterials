@@ -111,13 +111,13 @@ class TestModuleImports(unittest.TestCase):
 
     def test_import_rl_module(self):
         """Test RL module can be imported."""
-        from ppmat.rl import ReinL, MatInvent
+        from ppmat.models.matinvent.rl import ReinL, MatInvent
         self.assertIsNotNone(ReinL)
         self.assertIsNotNone(MatInvent)
 
     def test_import_rl_models(self):
         """Test RL model suites can be imported."""
-        from ppmat.rl.models import ModelSuite, MatterGenSuite, DiffCSPSuite
+        from ppmat.models.matinvent.rl.models import ModelSuite, MatterGenSuite, DiffCSPSuite
         self.assertIsNotNone(ModelSuite)
         self.assertIsNotNone(MatterGenSuite)
         self.assertIsNotNone(DiffCSPSuite)
@@ -204,7 +204,7 @@ class TestBasicFunctionality(unittest.TestCase):
 
     def test_device_selection(self):
         """Test device selection function."""
-        from ppmat.rl.base import get_device
+        from ppmat.models.matinvent.rl.base import get_device
 
         # Test default device selection
         device = get_device()
@@ -253,7 +253,7 @@ class TestModelSaveLoad(unittest.TestCase):
 
     def test_model_suite_has_save_method(self):
         """Test model suites have save method."""
-        from ppmat.rl.models import MatterGenSuite, DiffCSPSuite
+        from ppmat.models.matinvent.rl.models import MatterGenSuite, DiffCSPSuite
 
         # Check save method exists
         self.assertTrue(hasattr(MatterGenSuite, "save_model"))
@@ -261,7 +261,7 @@ class TestModelSaveLoad(unittest.TestCase):
 
     def test_model_suite_has_load_method(self):
         """Test model suites have load method."""
-        from ppmat.rl.models import MatterGenSuite, DiffCSPSuite
+        from ppmat.models.matinvent.rl.models import MatterGenSuite, DiffCSPSuite
 
         # Check load method exists
         self.assertTrue(hasattr(MatterGenSuite, "load_model"))

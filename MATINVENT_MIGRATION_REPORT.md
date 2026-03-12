@@ -397,8 +397,8 @@ python test/test_rl_pipeline.py
 
 ### 2. 使用 RL 框架
 ```python
-from ppmat.rl import MatInvent
-from ppmat.rl.models import MatterGenSuite
+from ppmat.models.mattergen.rl import MatInvent
+from ppmat.models.mattergen.rl.models import MatterGenSuite
 from ppmat.rewards import Reward
 
 # 创建 MatInvent 实例

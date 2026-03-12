@@ -30,8 +30,8 @@ from pymatgen.core.structure import Structure, Lattice
 # Add parent directory to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from ppmat.rl.base import ReinL, get_device
-from ppmat.rl.mat_invent import MatInvent
+from ppmat.models.matinvent.rl.base import ReinL, get_device
+from ppmat.models.matinvent.rl.mat_invent import MatInvent
 
 
 class TestGetDevice(unittest.TestCase):

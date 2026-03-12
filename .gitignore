@@ -190,3 +190,6 @@ electronic_structure/configs/crystal.json
 /raw-matinvent/**
 /.claude/
 *.pdparams
+*.cif
+/diff-matinvent/tmp/
+/tmp/

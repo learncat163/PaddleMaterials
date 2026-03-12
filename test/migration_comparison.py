@@ -84,8 +84,8 @@ class TestMigrationConsistency(unittest.TestCase):
 
     def test_rl_modules_consistency(self):
         """Test RL modules are consistent with original."""
-        from ppmat.rl import ReinL, MatInvent
-        from ppmat.rl.models import ModelSuite, MatterGenSuite, DiffCSPSuite
+        from ppmat.models.matinvent.rl import ReinL, MatInvent
+        from ppmat.models.matinvent.rl.models import ModelSuite, MatterGenSuite, DiffCSPSuite
 
         # Check classes exist
         self.assertTrue(ReinL is not None)
@@ -96,7 +96,7 @@ class TestMigrationConsistency(unittest.TestCase):
 
     def test_device_replacement(self):
         """Test that device selection uses Paddle instead of torch."""
-        from ppmat.rl.base import get_device
+        from ppmat.models.matinvent.rl.base import get_device
         import paddle
 
         # Test device selection

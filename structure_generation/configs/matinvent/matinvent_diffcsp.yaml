@@ -1,0 +1,94 @@
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# MatInvent + DiffCSP backbone configuration (Fast sampling version)
+# Reduced num_inference_steps for quick testing
+
+Global:
+  do_train: False
+  do_eval: False
+  do_test: False
+  num_train_timesteps: 1000
+
+Trainer:
+  max_epochs: 1000
+  seed: 42
+  output_dir: ./output/matinvent_diffcsp
+  save_freq: 100
+  log_freq: 10
+  start_eval_epoch: 1
+  eval_freq: 1
+  pretrained_model_path: null
+  resume_from_checkpoint: null
+  use_amp: False
+  amp_level: 'O1'
+  eval_with_no_grad: True
+  gradient_accumulation_steps: 1
+  best_metric_indicator: 'eval_loss'
+  name_for_best_metric: "loss"
+  greater_is_better: False
+  compute_metric_during_train: False
+  metric_strategy_during_eval: 'step'
+  use_visualdl: False
+  use_wandb: False
+  use_tensorboard: False
+
+Model:
+  __class_name__: DiffCSP
+  __init_params__:
+    decoder_cfg:
+      hidden_dim: 512
+      latent_dim: 256
+      num_layers: 6
+      act_fn: silu
+      dis_emb: sin
+      num_freqs: 128
+      edge_style: fc
+      ln: true
+      ip: true
+      smooth: False
+      pred_type: False
+      prop_dim: 512
+      pred_scalar: False
+      num_classes: 100
+    lattice_noise_scheduler_cfg:
+      __class_name__: DDPMScheduler
+      __init_params__:
+        beta_schedule: 'squaredcos_cap_v2'
+        num_train_timesteps: ${Global.num_train_timesteps}
+        clip_sample: False
+    coord_noise_scheduler_cfg:
+      __class_name__: ScoreSdeVeSchedulerWrapped
+      __init_params__:
+        num_train_timesteps: ${Global.num_train_timesteps}
+        sigma_min: 0.005
+        sigma_max: 0.5
+        snr: 1e-5
+    num_train_timesteps: ${Global.num_train_timesteps}
+    time_dim: 256
+    lattice_loss_weight: 1
+    coord_loss_weight: 1
+
+Sample:
+  data:
+    dataset:
+      __class_name__: NumAtomsCrystalDataset
+      __init_params__:
+        total_num: 4
+    sampler:
+      __class_name__: BatchSampler
+      __init_params__:
+        shuffle: False
+        drop_last: False
+        batch_size: 4
+  build_structure_cfg:
+    format: array
+    niggli: False
+
+  model_sample_params:
+    num_inference_steps: 1000

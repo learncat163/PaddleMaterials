@@ -21,9 +21,9 @@ https://github.com/your-repo/raw-matinvent/blob/main/models/suite/mattergen.py
 https://github.com/your-repo/raw-matinvent/blob/main/models/suite/diffcsp.py
 """
 
-from ppmat.rl.models.base import ModelSuite
-from ppmat.rl.models.mattergen_suite import MatterGenSuite
-from ppmat.rl.models.diffcsp_suite import DiffCSPSuite
+from ppmat.models.matinvent.rl.models.base import ModelSuite
+from ppmat.models.matinvent.rl.models.mattergen_suite import MatterGenSuite
+from ppmat.models.matinvent.rl.models.diffcsp_suite import DiffCSPSuite
 
 __all__ = [
     "ModelSuite",
