@@ -33,6 +33,15 @@ from ase.io import write
 from ppmat.models.matinvent.rl.base import ReinL
 from ppmat.models.matinvent.rewards.reward import Reward
 from ppmat.models.matinvent.rl.models.base import ModelSuite
+from ppmat.models.matinvent.rl.training_utils import (
+    is_valid_structure,
+    save_structures,
+    filter_valid_structures,
+    log_training_step,
+    save_rl_model,
+    load_rl_model,
+)
+from ppmat.models.matinvent.rl.utils import create_optimizer
 from ppmat.utils.scatter import scatter
 
 
@@ -150,35 +159,9 @@ class MatInvent(ReinL):
     def _is_valid_structure(self, struc: Structure) -> bool:
         """Check if a structure is valid.
 
-        Aligned with raw-matinvent/pipeline/filters/opt_filter.py invalid_filter:
-          - volume > 0.1 A^3
-          - minimum interatomic distance > 0.5 A
-          - max lattice parameter < 25 A
-
-        Args:
-            struc: pymatgen Structure
-
-        Returns:
-            True if structure is valid
+        Delegates to training_utils.is_valid_structure for code reuse.
         """
-        try:
-            if struc is None:
-                return False
-            if struc.num_sites == 0:
-                return False
-            if struc.volume <= 0.1:
-                return False
-            # max lattice parameter check (original: max(abc) < 25)
-            if max(struc.lattice.abc) > 25.0:
-                return False
-            # minimum interatomic distance > 0.5 A
-            dmat = struc.distance_matrix.copy()
-            np.fill_diagonal(dmat, np.inf)
-            if dmat.min() < 0.5:
-                return False
-            return True
-        except Exception:
-            return False
+        return is_valid_structure(struc)
 
     def _save_structures(
         self,

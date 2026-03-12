@@ -215,16 +215,17 @@ class CompleteChecklist:
         with open(report_file) as f:
             data = json.load(f)
 
-        # 提取关键指标
+        # 提取关键指标 - 使用新的报告格式
         if model_name == "diffcsp":
             pred_l_diff = data["pred_l_comparison"]["abs_diff"]["max"]
             pred_x_diff = data["pred_x_comparison"]["abs_diff"]["max"]
             max_diff = max(pred_l_diff, pred_x_diff)
             threshold = THRESHOLDS["diffcsp_forward_logit"]
 
-            # 检查是否满足阈值
-            pass_1e4 = data["pred_l_comparison"]["pass_1e-4"] and data["pred_x_comparison"]["pass_1e-4"]
-            pass_1e6 = data["pred_l_comparison"]["pass_1e-6"] and data["pred_x_comparison"]["pass_1e-6"]
+            # 检查是否满足阈值（使用新格式 thresholds_pct）
+            pred_l_pct_1e4 = data["pred_l_comparison"]["thresholds_pct"].get("lt_1e_4", 0)
+            pred_x_pct_1e4 = data["pred_x_comparison"]["thresholds_pct"].get("lt_1e_4", 0)
+            pass_1e4 = pred_l_pct_1e4 >= 99.0 and pred_x_pct_1e4 >= 99.0
 
             status = CheckStatus.PASS if pass_1e4 else CheckStatus.FAIL
 
@@ -233,18 +234,21 @@ class CompleteChecklist:
                 status=status,
                 value=max_diff,
                 threshold=threshold,
-                details=f"pred_l_diff={pred_l_diff:.2e}, pred_x_diff={pred_x_diff:.2e}, pass_1e4={pass_1e4}, pass_1e6={pass_1e6}",
+                details=f"pred_l_diff={pred_l_diff:.2e}, pred_x_diff={pred_x_diff:.2e}, lt_1e4_pct=({pred_l_pct_1e4:.1f}%, {pred_x_pct_1e4:.1f}%)",
                 raw_data=data
             )
 
         elif model_name == "mattergen":
             lattice_diff = data["pred_lattice_comparison"]["abs_diff"]["max"]
             coords_diff = data["pred_frac_coords_comparison"]["abs_diff"]["max"]
-            max_diff = max(lattice_diff, coords_diff)
+            atom_types_diff = data.get("pred_atom_types_comparison", {}).get("abs_diff", {}).get("max", 0)
+            max_diff = max(lattice_diff, coords_diff, atom_types_diff)
             threshold = THRESHOLDS["mattergen_forward_logit"]
 
-            pass_1e4 = data["pred_lattice_comparison"]["pass_1e-4"] and data["pred_frac_coords_comparison"]["pass_1e-4"]
-            pass_1e6 = data["pred_lattice_comparison"]["pass_1e-6"] and data["pred_frac_coords_comparison"]["pass_1e-6"]
+            lattice_pct_1e4 = data["pred_lattice_comparison"]["thresholds_pct"].get("lt_1e_4", 0)
+            coords_pct_1e4 = data["pred_frac_coords_comparison"]["thresholds_pct"].get("lt_1e_4", 0)
+            atom_types_pct_1e4 = data.get("pred_atom_types_comparison", {}).get("thresholds_pct", {}).get("lt_1e_4", 0)
+            pass_1e4 = lattice_pct_1e4 >= 99.0 and coords_pct_1e4 >= 99.0 and atom_types_pct_1e4 >= 99.0
 
             status = CheckStatus.PASS if pass_1e4 else CheckStatus.WARN
 
@@ -253,7 +257,7 @@ class CompleteChecklist:
                 status=status,
                 value=max_diff,
                 threshold=threshold,
-                details=f"lattice_diff={lattice_diff:.2e}, coords_diff={coords_diff:.2e}, pass_1e4={pass_1e4}, pass_1e6={pass_1e6}",
+                details=f"lattice_diff={lattice_diff:.2e}, coords_diff={coords_diff:.2e}, atom_types_diff={atom_types_diff:.2e}, lt_1e4_pct=({lattice_pct_1e4:.1f}%, {coords_pct_1e4:.1f}%, {atom_types_pct_1e4:.1f}%)",
                 raw_data=data
             )
 

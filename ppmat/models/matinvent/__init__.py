@@ -21,14 +21,28 @@ components for reinforcement learning based material discovery.
 Components:
 - memory: Long-term memory and replay buffer for RL
 - rewards: Reward system and property calculators
+- common: Shared utilities that reuse ppmat built-in functionality
 """
 
+from ppmat.models.matinvent.common import (
+    setup_matinvent_logging,
+    load_config,
+    build_model_from_config,
+    prepare_output_dir,
+)
 from ppmat.models.matinvent.memory import ReplayBuffer, LongTimeMem
 from ppmat.models.matinvent.rewards import Reward, Calculator
 
 __all__ = [
+    # Common utilities
+    "setup_matinvent_logging",
+    "load_config",
+    "build_model_from_config",
+    "prepare_output_dir",
+    # Memory
     "ReplayBuffer",
     "LongTimeMem",
+    # Rewards
     "Reward",
     "Calculator",
 ]

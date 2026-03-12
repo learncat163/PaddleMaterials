@@ -29,16 +29,14 @@ import paddle
 from ppmat.models.matinvent.memory.replay_buffer import ReplayBuffer
 from ppmat.models.matinvent.memory.ltm import LongTimeMem
 from ppmat.models.matinvent.rewards.reward import Reward
-
-
-def get_device(device: str | None = None):
-    """Get device for PaddlePaddle (replaces torch.backends.mps)."""
-    if device is None:
-        if paddle.is_compiled_with_cuda():
-            device = "gpu"
-        else:
-            device = "cpu"
-    return paddle.set_device(device)
+from ppmat.models.matinvent.rl.utils import (
+    get_device,
+    create_optimizer,
+    create_scheduler,
+    save_rl_checkpoint,
+    setup_rl_logger,
+    log_training_stats,
+)
 
 
 class ReinL:
@@ -95,19 +93,21 @@ class ReinL:
         else:
             self.replay = None
 
-    def init_optimizer(self, lr=5e-4):
-        """Initialize optimizer (replaces torch.optim.Adam)."""
-        self.optimizer = paddle.optimizer.Adam(
-            parameters=self.agent.parameters(),
-            learning_rate=lr
+    def init_optimizer(self, lr=5e-4, opt_type="Adam", **kwargs):
+        """Initialize optimizer using ppmat utility."""
+        self.optimizer = create_optimizer(
+            model=self.agent,
+            lr=lr,
+            opt_type=opt_type,
+            **kwargs
         )
 
-    def init_scheduler(self, start_factor=0.1, total_iters=10):
-        """Initialize learning rate scheduler (replaces torch.optim.lr_scheduler)."""
-        self.scheduler = paddle.optimizer.lr.LinearLR(
-            learning_rate=self.optimizer.get_lr(),
-            start_factor=start_factor,
-            total_iters=total_iters
+    def init_scheduler(self, scheduler_type="LinearLR", **kwargs):
+        """Initialize learning rate scheduler using ppmat utility."""
+        self.scheduler = create_scheduler(
+            optimizer=self.optimizer,
+            scheduler_type=scheduler_type,
+            **kwargs
         )
 
     def freeze_model(self, freeze):
