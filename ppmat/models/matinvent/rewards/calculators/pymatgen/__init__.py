@@ -15,10 +15,13 @@
 """
 PyMatGen property calculators.
 
-This code is adapted from:
-convert-matinvent/rewards/calculators/pymatgen/
 """
+
+import os
+
+SUBSTRATE_PATH = os.path.join(os.path.dirname(__file__), "substrates")
+SUBSTRATE_PATH = os.path.abspath(SUBSTRATE_PATH)
 
 from ppmat.models.matinvent.rewards.calculators.pymatgen.calc import PyMatGen
 
-__all__ = ["PyMatGen"]
+__all__ = ["PyMatGen", "SUBSTRATE_PATH"]

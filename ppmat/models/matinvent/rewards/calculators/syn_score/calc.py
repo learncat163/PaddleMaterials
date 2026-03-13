@@ -15,10 +15,6 @@
 """
 Synthesizability score calculator.
 
-This code is adapted from:
-convert-matinvent/rewards/calculators/syn_score/calc.py
-convert-matinvent/rewards/calculators/syn_score/predict.py
-
 Uses a pre-trained neural network ensemble to predict crystal synthesizability.
 """
 
@@ -110,7 +106,7 @@ def get_dataset(struc_list, emb_path):
     if not os.path.exists(emb_path):
         raise FileNotFoundError(
             f"Element embedding file not found: {emb_path}\n"
-            "Please copy element_emb.json from convert-matinvent/rewards/calculators/syn_score/"
+            "Please copy element_emb.json from matinvent/rewards/calculators/syn_score/"
         )
 
     with open(emb_path) as f:
@@ -165,7 +161,7 @@ def predict(struc_list, model_dir=MODEL_PATH, emb_path=EMB_PATH, device=None):
     if not os.path.exists(model_dir):
         raise FileNotFoundError(
             f"Model directory not found: {model_dir}\n"
-            "Please copy model_pt/ from convert-matinvent/rewards/calculators/syn_score/"
+            "Please copy model_pt/ from matinvent/rewards/calculators/syn_score/"
         )
 
     if device is None:
@@ -212,7 +208,7 @@ def predict(struc_list, model_dir=MODEL_PATH, emb_path=EMB_PATH, device=None):
     if len(pred_list) == 0:
         raise ValueError(
             f"No model checkpoints found in {model_dir}. "
-            "Please copy model_pt/ from convert-matinvent/rewards/calculators/syn_score/"
+            "Please copy model_pt/ from matinvent/rewards/calculators/syn_score/"
         )
 
     pred_array = np.array(pred_list)
@@ -260,7 +256,7 @@ class SynScore(Calculator):
             warnings.warn(
                 f"SynScore model files not found: {e}\n"
                 "Returning default scores of 0.5. "
-                "Please copy element_emb.json and model_pt/ from convert-matinvent/rewards/calculators/syn_score/"
+                "Please copy element_emb.json and model_pt/ from matinvent/rewards/calculators/syn_score/"
             )
             results = np.full(len(struc_list), 0.5)
 

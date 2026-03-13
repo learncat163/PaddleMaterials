@@ -31,7 +31,7 @@ Dataset:
   test: null
 
 Trainer:
-  max_epochs: 900
+  max_epochs: 1
   seed: 42
   output_dir: ./output/matinvent_mattergen
   save_freq: 100
@@ -53,8 +53,13 @@ Trainer:
   use_wandb: False
   use_tensorboard: False
 
+Optimizer:
+  __class_name__: Adam
+  __init_params__:
+    lr: 0.0001
+
 Model:
-  __class_name__: ppmat.models.matinvent.rl_wrapper.RLWrapperModel
+  __class_name__: "__import__('ppmat.models.matinvent.rl_wrapper', fromlist=['RLWrapperModel']).RLWrapperModel"
   __init_params__: {}
 
 # RL configuration
@@ -64,11 +69,12 @@ RL:
   topk_ratio: 0.5
   save_freq: 10
   sample_cfg:
-    batch_size: 4
+    batch_size: 1
     num_batches: 1
     num_samples: 16
+    num_inference_steps: 50
   finetune_cfg:
-    batch_size: 8
+    batch_size: 4
     lr: 0.0005
     epochs: 2
     timesteps: 100
@@ -83,7 +89,7 @@ RL:
         minv: 0.0
         maxv: 10.0
         calculator:
-          __class_name__: ppmat.models.matinvent.rewards.calculators.pymatgen.calc.PyMatGen
+          __class_name__: "__import__('ppmat.models.matinvent.rewards.calculators.pymatgen.calc', fromlist=['PyMatGen']).PyMatGen"
           root_dir: ./output/matinvent/rewards
           task: density
   replay_cfg:
@@ -110,7 +116,7 @@ Sample:
       __init_params__:
         shuffle: False
         drop_last: False
-        batch_size: 4
+        batch_size: 1
   build_structure_cfg:
     format: array
     niggli: False

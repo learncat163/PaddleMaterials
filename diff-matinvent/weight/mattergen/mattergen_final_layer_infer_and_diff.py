@@ -18,6 +18,7 @@ MatterGen 最终层推理 + 输出diff对比
 import json
 import logging
 import math
+import os
 import subprocess
 import sys
 from datetime import datetime
@@ -57,6 +58,10 @@ DIFF_REPORT_OUT_MD             = OUTPUT_DIR / "mattergen_final_infer_and_diff_re
 
 # 固定随机种子，保证确定性
 RANDOM_SEED = 42
+
+# PyTorch side inference can be slow on busy/shared GPUs.
+# Keep timeout configurable to avoid false timeout failures.
+PT_SUBPROCESS_TIMEOUT_SEC = int(os.environ.get("MATINVENT_PT_TIMEOUT_SEC", "600"))
 
 
 def build_fixed_test_input(seed: int = RANDOM_SEED) -> Dict:
@@ -148,7 +153,12 @@ def run_pytorch_inference(
     logger.info(f"  cmd: {' '.join(cmd)}")
 
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=PT_SUBPROCESS_TIMEOUT_SEC,
+        )
         for line in (proc.stdout or "").strip().splitlines():
             logger.info(f"    [PT] {line}")
         if proc.returncode != 0:
@@ -157,7 +167,9 @@ def run_pytorch_inference(
                 logger.error(f"    [PT stderr] {line}")
             return None
     except subprocess.TimeoutExpired:
-        logger.error("  PyTorch subprocess timed out")
+        logger.error(
+            f"  PyTorch subprocess timed out ({PT_SUBPROCESS_TIMEOUT_SEC}s)"
+        )
         return None
 
     if not pt_output_json.exists():
@@ -172,6 +184,11 @@ def load_paddle_model(ckpt_path: Path) -> paddle.nn.Layer:
     from ppmat.models.mattergen.mattergen import MatterGen
     from ppmat.schedulers import LatticeVPSDEScheduler, D3PMScheduler
     from ppmat.schedulers.scheduling_wrapped_sde_ve import NumAtomsVarianceAdjustedWrappedVESDE
+    from ppmat.models.matinvent.rl.pbc_patch import apply_mattergen_pbc_patch
+
+    # 对齐 MatInvent 训练侧行为：仅在当前脚本运行期应用 PBC 兼容补丁，
+    # 避免批内 PBC 检查在 Paddle 路径触发 "Different structures..."。
+    apply_mattergen_pbc_patch()
 
     model = MatterGen(
         decoder_cfg={
@@ -239,8 +256,8 @@ def run_paddle_forward(
         # 手动调用 GemNetTDenoiser 的 forward
         noise_batch = {
             "frac_coords": structure_array["frac_coords"],
-            "lattice": structure_array["lattice"],
             "atom_types": structure_array["atom_types"],
+            "lattice": structure_array["lattice"],
             "num_atoms": structure_array["num_atoms"],
             "batch": batch["batch_idx"],
         }

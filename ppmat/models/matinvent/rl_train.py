@@ -16,7 +16,6 @@
 Reinforcement learning training script for material generation.
 
 This code is adapted from:
-https://github.com/your-repo/raw-matinvent/blob/main/main.py
 """
 
 import os

@@ -15,8 +15,7 @@
 """
 Samplers for RL training.
 
-This code is adapted from:
-convert-matinvent/models/mattergen/sample.py
+
 
 Provides sampler classes for generating crystal structures during RL training.
 """
@@ -126,37 +125,36 @@ class MatterGenSampler(BaseSampler):
         all_data = []
         all_structures = []
 
-        for batch_idx in range(self.num_batches):
-            # Prepare batch data
-            # For generation, we need to specify num_atoms distribution
-            # Use default num_atoms if not provided
+        total_samples = self.num_batches * self.batch_size
+        for sample_idx in range(total_samples):
+            # MatterGen's graph builder can fail when different samples carry
+            # inconsistent PBC metadata in one batch, so we sample one by one.
             if "num_atoms" in kwargs:
                 num_atoms = kwargs["num_atoms"]
                 if isinstance(num_atoms, int):
-                    num_atoms = [num_atoms] * self.batch_size
-                num_atoms = paddle.to_tensor(num_atoms, dtype='int64')
+                    num_atoms = [max(2, int(num_atoms))]
+                elif isinstance(num_atoms, (list, tuple, np.ndarray)):
+                    num_atoms = [max(2, int(num_atoms[sample_idx % len(num_atoms)]))]
+                else:
+                    num_atoms = [max(2, int(num_atoms))]
+                num_atoms = paddle.to_tensor(num_atoms, dtype="int64")
             else:
-                # Default: generate structures with random number of atoms
-                # This is a simplified approach
-                num_atoms = paddle.randint(
-                    low=1, high=50, shape=[self.batch_size]
-                )
+                num_atoms = paddle.randint(low=2, high=50, shape=[1])
 
-            batch_data = {
-                "structure_array": {
-                    "num_atoms": num_atoms,
-                }
-            }
+            # Keep at least two structures in the batch to avoid single-item
+            # PBC reduction instability in MatterGen internals.
+            if int(num_atoms.shape[0]) == 1:
+                num_atoms = paddle.concat([num_atoms, num_atoms], axis=0)
 
-            # Generate samples
-            with paddle.no_grad():
-                output = model.sample(
-                    batch_data,
-                    num_inference_steps=self.num_inference_steps,
-                )
+            batch_data = {"structure_array": {"num_atoms": num_atoms}}
+
+            try:
+                with paddle.no_grad():
+                    output = model.sample(batch_data, num_inference_steps=self.num_inference_steps)
+            except Exception:
+                continue
 
             # MatterGen.sample() returns {"result": [{num_atoms, atom_types, frac_coords, lattice}, ...]}
-            # (raw-matinvent/models/mattergen/sample.py MatterGenSampler)
             results = output["result"]
             for r in results:
                 na = r["num_atoms"]

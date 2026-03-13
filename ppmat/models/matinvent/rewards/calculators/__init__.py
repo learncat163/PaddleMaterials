@@ -15,9 +15,6 @@
 """
 Property calculators for reward system.
 
-This code is adapted from:
-convert-matinvent/rewards/calculators/
-
 Available calculators:
 - PyMatGen: Crystal density, HHI score, element price, crustal abundance
 - SynScore: Synthesizability score prediction (requires model files)

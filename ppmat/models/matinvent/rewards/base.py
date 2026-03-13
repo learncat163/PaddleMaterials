@@ -16,7 +16,6 @@
 Base calculator class for reward system.
 
 This code is adapted from:
-https://github.com/your-repo/raw-matinvent/blob/main/rewards/calculators/base.py
 """
 
 import os

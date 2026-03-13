@@ -1,0 +1,32 @@
+# generated using pymatgen
+data_LiCa3Mg2
+_symmetry_space_group_name_H-M   'P 1'
+_cell_length_a   3.77194890
+_cell_length_b   3.77645416
+_cell_length_c   12.58574323
+_cell_angle_alpha   89.74781166
+_cell_angle_beta   89.73498464
+_cell_angle_gamma   89.53620270
+_symmetry_Int_Tables_number   1
+_chemical_formula_structural   LiCa3Mg2
+_chemical_formula_sum   'Li1 Ca3 Mg2'
+_cell_volume   179.26928032
+_cell_formula_units_Z   1
+loop_
+ _symmetry_equiv_pos_site_id
+ _symmetry_equiv_pos_as_xyz
+  1  'x, y, z'
+loop_
+ _atom_site_type_symbol
+ _atom_site_label
+ _atom_site_symmetry_multiplicity
+ _atom_site_fract_x
+ _atom_site_fract_y
+ _atom_site_fract_z
+ _atom_site_occupancy
+  Ca  Ca0  1  0.32825238  1.00514209  0.51328921  1
+  Ca  Ca1  1  0.32811207  0.00605335  0.18331967  1
+  Li  Li2  1  0.82871348  0.50566888  0.01682789  1
+  Ca  Ca3  1  0.32868198  0.00583395  0.84867513  1
+  Mg  Mg4  1  0.82805729  0.50498146  0.35289291  1
+  Mg  Mg5  1  0.82839900  0.50561601  0.67707169  1

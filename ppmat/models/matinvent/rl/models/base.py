@@ -12,13 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Base model suite class for reinforcement learning.
-
-This code is adapted from:
-https://github.com/your-repo/raw-matinvent/blob/main/models/suite/base.py
-"""
-
 from typing import Literal
 from omegaconf import DictConfig, OmegaConf
 import paddle

@@ -15,8 +15,7 @@
 """
 Neural network model for synthesizability score prediction.
 
-This code is adapted from:
-convert-matinvent/rewards/calculators/syn_score/model.py
+
 """
 
 import paddle

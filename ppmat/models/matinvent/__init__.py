@@ -22,6 +22,9 @@ Components:
 - memory: Long-term memory and replay buffer for RL
 - rewards: Reward system and property calculators
 - common: Shared utilities that reuse ppmat built-in functionality
+
+Note: RL compatibility for MatterGen is now provided through the
+MatterGenRLAdapter class instead of monkey patching.
 """
 
 from ppmat.models.matinvent.common import (
@@ -32,8 +35,11 @@ from ppmat.models.matinvent.common import (
 )
 from ppmat.models.matinvent.memory import ReplayBuffer, LongTimeMem
 from ppmat.models.matinvent.rewards import Reward, Calculator
+from ppmat.models.matinvent.rl import MatInvent
 
 __all__ = [
+    # Main RL classes
+    "MatInvent",
     # Common utilities
     "setup_matinvent_logging",
     "load_config",

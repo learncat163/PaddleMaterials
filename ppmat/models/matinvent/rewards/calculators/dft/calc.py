@@ -15,8 +15,7 @@
 """
 DFT property calculator.
 
-This code is adapted from:
-convert-matinvent/rewards/calculators/dft/calc.py
+
 
 Runs DFT calculations (e.g., VASP, Quantum ESPRESSO) to compute
 electronic properties like band gap, formation energy, etc.

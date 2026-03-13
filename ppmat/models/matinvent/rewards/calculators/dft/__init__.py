@@ -15,8 +15,6 @@
 """
 DFT property calculators.
 
-This code is adapted from:
-convert-matinvent/rewards/calculators/dft/
 
 Requires DFT software (VASP, Quantum ESPRESSO, etc.) and configuration.
 """

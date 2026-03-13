@@ -15,9 +15,7 @@
 """
 DiffCSP model suite for reinforcement learning.
 
-This code is adapted from:
-convert-matinvent/models/suite/diffcsp.py
-raw-matinvent/models/suite/diffcsp.py
+
 """
 
 import os
@@ -98,7 +96,6 @@ class DiffCSPSuite(ModelSuite):
             Loaded DiffCSP model in eval mode.
 
         Original reference:
-            raw-matinvent/models/suite/diffcsp.py  DiffCSPSuite.load_model()
         """
         from ppmat.models.diffcsp.diffcsp import DiffCSP
 

@@ -15,8 +15,7 @@
 """
 RL dataset for fine-tuning diffusion models during reinforcement learning.
 
-This code is adapted from:
-convert-matinvent/models/mattergen/dataset.py
+
 
 Provides dataset classes for loading samples and rewards for RL fine-tuning.
 Now reuses data_utils for common functionality.

@@ -16,7 +16,6 @@
 Base reinforcement learning class.
 
 This code is adapted from:
-https://github.com/your-repo/raw-matinvent/blob/main/pipeline/base.py
 """
 
 import os
@@ -33,7 +32,6 @@ from ppmat.models.matinvent.rl.utils import (
     get_device,
     create_optimizer,
     create_scheduler,
-    save_rl_checkpoint,
     setup_rl_logger,
     log_training_stats,
 )
@@ -143,9 +141,16 @@ class ReinL:
 
         logging.info(f'Evaluation costs to date: {self.cost}')
         logging.info(f'Number of samples that successfully obtained rewards: {len(success_struc)}')
-        logging.info(f'reward mean={success_rewards.mean():.4f} std={success_rewards.std():.4f}')
-        prop_str = [f'{k} mean={v.mean():.4f} std={v.std():.4f}' for k, v in success_prop_dict.items()]
-        logging.info(' | '.join(prop_str))
+        # 原始逻辑直接对空数组做 mean/std 会产生告警，这里在 MatInvent 侧做兼容保护。
+        if len(success_rewards) > 0:
+            logging.info(f'reward mean={success_rewards.mean():.4f} std={success_rewards.std():.4f}')
+            prop_str = [f'{k} mean={v.mean():.4f} std={v.std():.4f}' for k, v in success_prop_dict.items()]
+            logging.info(' | '.join(prop_str))
+        else:
+            logging.info('reward mean=nan std=nan')
+            if len(success_prop_dict) > 0:
+                prop_str = [f'{k} mean=nan std=nan' for k in success_prop_dict.keys()]
+                logging.info(' | '.join(prop_str))
 
         return success_data, success_struc, success_rewards, success_prop_dict
 

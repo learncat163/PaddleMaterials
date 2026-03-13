@@ -15,9 +15,7 @@
 """
 MatInvent main class for reinforcement learning.
 
-This code is adapted from:
-convert-matinvent/pipeline/mat_invent.py
-raw-matinvent/pipeline/mat_invent.py
+
 """
 
 import os
@@ -106,21 +104,32 @@ class MatInvent(ReinL):
         Returns:
             Tuple of (sample_data, sample_struc, eval_xyz_path, metrics)
         """
-        # Generate samples using the sampler
-        sample_data, sample_struc = self.sampler.generate(
-            model=self.agent,
-        )
-
-        # Filter invalid samples (basic validity check)
+        max_retry = int(self.sample_cfg.get('max_retry', 3))
         valid_data = []
         valid_struc = []
-        for data, struc in zip(sample_data, sample_struc):
-            if self._is_valid_structure(struc):
-                valid_data.append(data)
-                valid_struc.append(struc)
+        for attempt in range(max_retry):
+            # Generate samples using the sampler
+            sample_data, sample_struc = self.sampler.generate(
+                model=self.agent,
+            )
+
+            # Filter invalid samples (basic validity check)
+            valid_data = []
+            valid_struc = []
+            for data, struc in zip(sample_data, sample_struc):
+                if self._is_valid_structure(struc):
+                    valid_data.append(data)
+                    valid_struc.append(struc)
+
+            if len(valid_struc) > 0:
+                break
+
+            logging.warning(
+                f"No valid structures generated on attempt {attempt + 1}/{max_retry}."
+            )
 
         if len(valid_struc) == 0:
-            logging.warning("No valid structures generated!")
+            logging.warning("No valid structures generated after retries!")
             return [], [], "", {}
 
         # save all generated valid structures
@@ -219,7 +228,6 @@ class MatInvent(ReinL):
 
             loss_all, loss_diff_all, loss_kl_all = 0., 0., 0.
             for batch in loader:
-                # raw-matinvent/pipeline/mat_invent.py: adv = batch.reward (no baseline sub)
                 batch_rewards = batch["structure_array"]["reward"]
                 adv = batch_rewards
 
@@ -229,7 +237,6 @@ class MatInvent(ReinL):
                 loss, loss_diff, loss_kl = 0., 0., 0.
 
                 for t in range(cfg.timesteps):
-                    # raw-matinvent/pipeline/mat_invent.py:
                     #   noised_input = self.agent.add_noise(batch, t)
                     #   agent_pred <- agent.calc_sample_loss(noised_input)
                     #   prior_pred <- prior.calc_sample_loss(noised_input)  # same noise!
@@ -245,13 +252,11 @@ class MatInvent(ReinL):
                     _loss_diff = adv * sample_loss
 
                     # KL regularization with adaptive weight:
-                    #   raw-matinvent: _loss_kl = kl_term * (1.1 - batch.reward)
                     #   High reward -> small KL weight (allowed to deviate from prior)
                     #   Low reward  -> large KL weight (stay close to prior)
                     kl_term = self._calc_kl_reg_from_models(agent_pred, prior_pred, batch)
                     _loss_kl = kl_term * (1.1 - adv)
 
-                    # Combined loss: raw-matinvent: (_loss_diff + _loss_kl * sigma).mean()
                     _loss = (_loss_diff + _loss_kl * cfg.sigma).mean() / accum_steps
 
                     # Backward pass
@@ -303,13 +308,21 @@ class MatInvent(ReinL):
             sample_list, sample_struc, xyz_path, f'step_{self.step:0>4d}',
         )
 
-        log_dict = {f'{k} mean': v.mean() for k, v in prop_dict.items()}
-        log_dict.update({f'{k} std': v.std() for k, v in prop_dict.items()})
-        log_dict.update({'reward mean': rewards.mean(), 'reward std': rewards.std()})
+        if len(rewards) > 0:
+            log_dict = {f'{k} mean': v.mean() for k, v in prop_dict.items()}
+            log_dict.update({f'{k} std': v.std() for k, v in prop_dict.items()})
+            log_dict.update({'reward mean': rewards.mean(), 'reward std': rewards.std()})
+        else:
+            log_dict = {f'{k} mean': float('nan') for k in prop_dict.keys()}
+            log_dict.update({f'{k} std': float('nan') for k in prop_dict.keys()})
+            log_dict.update({'reward mean': float('nan'), 'reward std': float('nan')})
         log_dict.update(sample_metrics)
 
         # long-term memory
-        self.ltm.extend(sample_struc, rewards, self.step)
+        if len(rewards) > 0:
+            self.ltm.extend(sample_struc, rewards, self.step)
+        else:
+            logging.warning('No successful rewards in this loop, skip memory/replay/finetune updates.')
         metrics = self.ltm.calc_metrics(self.reward.threshold)
         self.ltm.save(os.path.join(self.sample_dir, 'long_term_memory.csv'))
         logging.info(
@@ -327,7 +340,27 @@ class MatInvent(ReinL):
             }
         )
         if self.logger is not None:
-            self.logger.log(log_dict, step=self.step)
+            # Support both experiment trackers (log(dict, step=...)) and stdlib logger.
+            try:
+                self.logger.log(log_dict, step=self.step)
+            except TypeError:
+                if hasattr(self.logger, "info"):
+                    self.logger.info(f"step={self.step} metrics={log_dict}")
+
+        if len(rewards) == 0:
+            if self.replay is not None and len(self.replay) > 0:
+                logging.info('FINETUNE (replay fallback):')
+                data_replay, reward_replay = self.replay.sample()
+                if len(data_replay) > 0:
+                    reward_replay = np.asarray(reward_replay, dtype=float)
+                    baseline = self.ltm.get_baseline(self.step)
+                    baseline = min(baseline, reward_replay.min())
+                    self.ft_step(data_replay, reward_replay, baseline)
+            end_time = time.time()
+            total_time = (end_time - start_time) / 60
+            logging.info(f'*****   LOOP {self.step} FINISH   *****')
+            logging.info(f'Total time taken: {total_time:.2f} min.\n\n')
+            return
 
         # diversity filter
         if self.div_filter:
@@ -346,7 +379,6 @@ class MatInvent(ReinL):
         reward_topk = rewards[topk_idx]
 
         # experience replay
-        # raw-matinvent: ft_data 传的是模型原生格式对象（ChemGraph）
         # ppmat 里对应的是 pymatgen Structure（RLDataset 期望 Structure，不是 dict）
         # 因此一律使用 strucs_topk（Structure 列表），replay buffer 的 "data" 列也存 Structure
         if self.replay is not None:
@@ -398,8 +430,6 @@ class MatInvent(ReinL):
         """Add noise to batch for reinforcement learning fine-tuning.
 
         This code is adapted from:
-        raw-matinvent/models/mattergen/pl_module.py  MatterGenModule.add_noise
-        raw-matinvent/models/diffcsp/pl_module.py     DiffCSPModule.add_noise
 
         Args:
             model: The diffusion model (agent or prior)
@@ -478,8 +508,6 @@ class MatInvent(ReinL):
         """Calculate sample loss for reinforcement learning fine-tuning.
 
         This code is adapted from:
-        raw-matinvent/models/mattergen/pl_module.py  MatterGenModule.calc_sample_loss
-        raw-matinvent/models/mattergen/loss.py       SampleLoss
 
         Args:
             model: The diffusion model (agent or prior)
@@ -504,16 +532,23 @@ class MatInvent(ReinL):
             "batch": batch_idx,
         }
 
-        # Run score model - get decoder output
-        # The model's decoder returns: eps_pos, lattice_update, atom_type_logits
-        eps_pos, lattice_update, atom_type_logits = model.decoder(
-            z=model.noise_level_encoding(t),
-            frac_coords=noise_batch["frac_coords"],
-            atom_types=noise_batch["atom_types"],
-            num_atoms=noise_batch["num_atoms"],
-            batch=noise_batch["batch"],
-            lattice=noise_batch["lattice"],
-        )
+        # Backward compatibility:
+        # - legacy path: decoder(...) -> tuple
+        # - current MatterGen path: model.model(x, t) -> dict
+        if hasattr(model, "decoder"):
+            eps_pos, lattice_update, atom_type_logits = model.decoder(
+                z=model.noise_level_encoding(t),
+                frac_coords=noise_batch["frac_coords"],
+                atom_types=noise_batch["atom_types"],
+                num_atoms=noise_batch["num_atoms"],
+                batch=noise_batch["batch"],
+                lattice=noise_batch["lattice"],
+            )
+        else:
+            score_model_output = model.model(noise_batch, t)
+            eps_pos = score_model_output["frac_coords"]
+            lattice_update = score_model_output["lattice"]
+            atom_type_logits = score_model_output["atom_types"]
 
         # Retrieve stored noise/clean tensors from add_noise
         rand_l = noisy_batch["rand_l"]
@@ -574,9 +609,6 @@ class MatInvent(ReinL):
     def _calc_kl_reg_from_models(self, agent_pred, prior_pred, batch):
         """Calculate KL divergence regularization for reinforcement learning.
 
-        This code is adapted from:
-        convert-matinvent/models/mattergen/pl_module.py
-        convert-matinvent/pipeline/mat_invent.py
 
         Uses paddle.scatter to replace torch_scatter.
 

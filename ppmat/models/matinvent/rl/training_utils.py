@@ -27,7 +27,6 @@ import paddle.nn as nn
 from pymatgen.core.structure import Structure
 
 from ppmat.utils import logger as ppmat_logger
-from ppmat.utils.save_load import load_checkpoint, save_checkpoint
 
 
 def is_valid_structure(
@@ -38,7 +37,6 @@ def is_valid_structure(
 ) -> bool:
     """Check if a structure is valid.
 
-    Aligned with raw-matinvent/pipeline/filters/opt_filter.py invalid_filter:
       - volume > min_volume A^3
       - minimum interatomic distance > min_interatomic_dist A
       - max lattice parameter < max_lattice_param A
@@ -178,8 +176,8 @@ def save_rl_model(
 ):
     """Save RL model checkpoint.
 
-    This function extends ppmat.utils.save_load.save_checkpoint
-    for RL-specific use cases.
+    Simplified wrapper for saving RL model checkpoints.
+    Uses paddle.save directly for RL-specific checkpoint format.
 
     Args:
         model: Model to save
@@ -201,7 +199,7 @@ def save_rl_model(
     if optimizer is not None:
         checkpoint_dict["optimizer"] = optimizer.state_dict()
 
-    save_checkpoint(checkpoint_dict, checkpoint_path)
+    paddle.save(checkpoint_dict, checkpoint_path)
     ppmat_logger.info(f"Model saved to {checkpoint_path}")
 
 
@@ -213,8 +211,8 @@ def load_rl_model(
 ) -> Dict:
     """Load RL model checkpoint.
 
-    This function wraps ppmat.utils.save_load.load_checkpoint
-    for RL-specific use cases.
+    Simplified wrapper for loading RL model checkpoints.
+    Uses paddle.load directly for RL-specific checkpoint format.
 
     Args:
         model: Model to load weights into
@@ -225,7 +223,7 @@ def load_rl_model(
     Returns:
         Dictionary with checkpoint information (epoch, etc.)
     """
-    checkpoint = load_checkpoint(checkpoint_path)
+    checkpoint = paddle.load(checkpoint_path)
 
     if "model" in checkpoint:
         model.set_state_dict(checkpoint["model"])

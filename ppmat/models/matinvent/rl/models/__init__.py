@@ -16,9 +16,6 @@
 Model suite classes for reinforcement learning.
 
 This code is adapted from:
-https://github.com/your-repo/raw-matinvent/blob/main/models/suite/base.py
-https://github.com/your-repo/raw-matinvent/blob/main/models/suite/mattergen.py
-https://github.com/your-repo/raw-matinvent/blob/main/models/suite/diffcsp.py
 """
 
 from ppmat.models.matinvent.rl.models.base import ModelSuite

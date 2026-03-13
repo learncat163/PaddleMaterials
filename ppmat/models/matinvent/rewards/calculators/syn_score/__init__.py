@@ -15,8 +15,6 @@
 """
 Synthesizability score calculator.
 
-This code is adapted from:
-convert-matinvent/rewards/calculators/syn_score/
 
 Uses a pre-trained neural network model to predict crystal synthesizability scores.
 Requires model weights and element embeddings to be present in the calculator directory.

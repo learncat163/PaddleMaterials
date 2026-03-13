@@ -15,9 +15,6 @@
 """
 Reinforcement learning module for material generation.
 
-This code is adapted from:
-convert-matinvent/pipeline/base.py
-convert-matinvent/pipeline/mat_invent.py
 """
 
 from ppmat.models.matinvent.rl.base import ReinL
@@ -37,9 +34,13 @@ from ppmat.models.matinvent.rl.utils import (
     get_device,
     create_optimizer,
     create_scheduler,
-    save_rl_checkpoint,
     setup_rl_logger,
     log_training_stats,
+)
+from ppmat.models.matinvent.rl.models.mattergen_adapter import (
+    MatterGenRLAdapter,
+    MatterGenAdapterFactory,
+    create_matinvent_adapter,
 )
 
 __all__ = [
@@ -59,7 +60,6 @@ __all__ = [
     "get_device",
     "create_optimizer",
     "create_scheduler",
-    "save_rl_checkpoint",
     "setup_rl_logger",
     "log_training_stats",
     # Training utilities
@@ -69,4 +69,8 @@ __all__ = [
     "log_training_step",
     "save_rl_model",
     "load_rl_model",
+    # MatterGen RL adapter (replaces monkey patching)
+    "MatterGenRLAdapter",
+    "MatterGenAdapterFactory",
+    "create_matinvent_adapter",
 ]

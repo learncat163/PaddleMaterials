@@ -15,8 +15,6 @@
 """
 FairChem property calculators.
 
-This code is adapted from:
-convert-matinvent/rewards/calculators/fairchem/
 
 Uses FairChem machine learning models to compute materials properties.
 """

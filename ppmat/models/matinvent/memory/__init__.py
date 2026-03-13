@@ -12,14 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Memory module for reinforcement learning.
-
-This code is adapted from:
-https://github.com/your-repo/raw-matinvent/blob/main/memory/replay_buffer.py
-https://github.com/your-repo/raw-matinvent/blob/main/memory/ltm.py
-"""
-
 from ppmat.models.matinvent.memory.replay_buffer import ReplayBuffer
 from ppmat.models.matinvent.memory.ltm import LongTimeMem
 

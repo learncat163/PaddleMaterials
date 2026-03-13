@@ -15,8 +15,6 @@
 """
 FairChem property calculator.
 
-This code is adapted from:
-convert-matinvent/rewards/calculators/fairchem/calc.py
 
 Uses FairChem machine learning models to compute materials properties
 like bulk modulus and heat capacity.

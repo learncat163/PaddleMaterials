@@ -16,8 +16,6 @@
 Reward system for reinforcement learning.
 
 This code is adapted from:
-https://github.com/your-repo/raw-matinvent/blob/main/rewards/reward.py
-https://github.com/your-repo/raw-matinvent/blob/main/rewards/calculators/
 """
 
 from ppmat.models.matinvent.rewards.reward import Reward

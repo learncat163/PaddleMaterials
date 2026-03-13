@@ -25,7 +25,6 @@ import paddle
 import paddle.nn as nn
 
 from ppmat.utils import logger as ppmat_logger
-from ppmat.utils.save_load import save_checkpoint
 
 
 def get_device(device: Optional[str] = None) -> str:
@@ -114,42 +113,6 @@ def create_scheduler(
         raise ValueError(f"Unsupported scheduler type: {scheduler_type}")
 
     return scheduler
-
-
-def save_rl_checkpoint(
-    save_dir: str,
-    epoch: int,
-    agent: nn.Layer,
-    optimizer: paddle.optimizer.Optimizer,
-    scheduler: Optional[paddle.optimizer.lr.LRScheduler] = None,
-    filename: str = "rl_checkpoint.pdparams",
-):
-    """Save RL training checkpoint using ppmat save_load utility.
-
-    Args:
-        save_dir: Directory to save checkpoint
-        epoch: Current epoch number
-        agent: Agent model
-        optimizer: Optimizer state
-        scheduler: Optional scheduler state
-        filename: Checkpoint filename
-    """
-    checkpoint_path = os.path.join(save_dir, filename)
-
-    # Prepare checkpoint dictionary
-    checkpoint_dict = {
-        "epoch": epoch,
-        "model": agent.state_dict(),
-        "optimizer": optimizer.state_dict(),
-    }
-
-    if scheduler is not None:
-        checkpoint_dict["scheduler"] = scheduler.state_dict()
-
-    # Save using ppmat utility
-    save_checkpoint(checkpoint_dict, checkpoint_path)
-
-    ppmat_logger.info(f"Checkpoint saved to {checkpoint_path}")
 
 
 def setup_rl_logger(log_file: Optional[str] = None, log_level: int = 20):

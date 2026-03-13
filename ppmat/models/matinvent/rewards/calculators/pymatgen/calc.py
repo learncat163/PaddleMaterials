@@ -15,22 +15,31 @@
 """
 PyMatGen property calculators.
 
-This code is adapted from:
-convert-matinvent/rewards/calculators/pymatgen/calc.py
-
 Calculates various crystallographic and materials properties using pymatgen.
 """
 
 import os
 from typing import List, Tuple
+from numpy.typing import ArrayLike
 
 import numpy as np
 from pymatgen.analysis.cost import CostAnalyzer, CostDBElements
 from pymatgen.analysis.hhi import HHIModel
+from pymatgen.analysis.interfaces.substrate_analyzer import SubstrateAnalyzer
 from pymatgen.core.structure import Structure
+from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 from smact import Element as SmactElement
 
 from ppmat.models.matinvent.rewards.base import Calculator
+from ppmat.models.matinvent.rewards.calculators.pymatgen import SUBSTRATE_PATH
+
+
+# Source: raw-matinvent/rewards/calculators/pymatgen/calc.py
+SUB_MILLERS = {
+    'Si': [(1, 0, 0)],
+    'GaAs': [(1, 0, 0)],
+    'InP': [(1, 0, 0)],
+}
 
 
 def abundance_crust(struc: Structure) -> float:
@@ -116,6 +125,55 @@ def calc_log_abundance_crust(struc_list: List[Structure]) -> np.ndarray:
     return log_abundance_arr
 
 
+# Source: raw-matinvent/rewards/calculators/pymatgen/calc.py
+def calc_mcia(
+    struc_list: List[Structure],
+    substrate: Structure,
+    substrate_millers: ArrayLike = None,
+) -> np.ndarray:
+    """ Calculate the minimal co-incident area (MCIA, unit: Å^2) between film and substrate
+    https://docs.materialsproject.org/methodology/materials-methodology/suggested-substrates
+    https://pubs.acs.org/doi/10.1021/acsami.6b01630
+    https://www.sciencedirect.com/topics/engineering/silicon-single-crystal
+    https://link.springer.com/chapter/10.1007/978-3-030-80135-9_1
+    O'Mara, William C. (1990). Handbook of Semiconductor Silicon Technology. William Andrew Inc. pp. 349-352.
+
+    Args:
+        struc_list (List[Structure]): list of film structures
+        substrate (Structure): substrate structure
+        substrate_millers (ArrayLike): substrate facets to consider in search as
+            defined by miller indices
+
+    Returns:
+        np.ndarray[float]: computed MCIA
+    """
+    sa = SubstrateAnalyzer(film_max_miller=1, substrate_max_miller=1)
+    substrate = SpacegroupAnalyzer(substrate, symprec=0.1).get_conventional_standard_structure()
+
+    sub_comp = substrate.composition.reduced_formula
+    if substrate_millers is None and sub_comp in SUB_MILLERS:
+        substrate_millers = SUB_MILLERS[sub_comp]
+
+    mcia_list = []
+    for struc in struc_list:
+        try:
+            film = SpacegroupAnalyzer(struc, symprec=0.1).get_conventional_standard_structure()
+            matches = sa.calculate(
+                film=film,
+                substrate=substrate,
+                substrate_millers=substrate_millers,
+                lowest=True,
+            )
+            mcia = min([m.match_area for m in matches])
+            assert isinstance(mcia, float)
+            mcia_list.append(mcia)
+        except:
+            mcia_list.append(np.nan)
+
+    mcia_arr = np.array(mcia_list, dtype=float)
+    return mcia_arr
+
+
 class PyMatGen(Calculator):
     """PyMatGen property calculator.
 
@@ -125,6 +183,7 @@ class PyMatGen(Calculator):
     - price: Element price (USD/kg)
     - abundance: Crustal abundance (ppm)
     - log_abundance: Log10 crustal abundance
+    - mcia: Minimal co-incident area (Å^2)
     - num_atoms: Number of atoms in structure
     - num_elements: Number of unique elements
     - volume: Unit cell volume (Å^3)
@@ -138,10 +197,13 @@ class PyMatGen(Calculator):
         Args:
             root_dir: Directory for output files
             task: Property to calculate (density, hhi, price, abundance, log_abundance,
-                  num_atoms, num_elements, volume)
-            substrate: Substrate material (for MCIA calculation, not yet implemented)
+                  mcia, num_atoms, num_elements, volume)
+            substrate: Substrate material (for MCIA calculation)
         """
         super().__init__(root_dir, task)
+        self.substrate = Structure.from_file(
+            os.path.join(SUBSTRATE_PATH, f'{substrate}.cif')
+        )
 
     def calc(
         self, samples: Tuple[List[Structure], str], label: str = "tmp"
@@ -169,6 +231,8 @@ class PyMatGen(Calculator):
             results = calc_abundance_crust(struc_list)
         elif self.task == "log_abundance":
             results = calc_log_abundance_crust(struc_list)
+        elif self.task == "mcia":
+            results = calc_mcia(struc_list, self.substrate)
         elif self.task == "num_atoms":
             results = np.array([len(struc) for struc in struc_list], dtype=float)
         elif self.task == "num_elements":

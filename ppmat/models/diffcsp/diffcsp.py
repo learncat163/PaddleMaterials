@@ -536,9 +536,6 @@ class DiffCSP(paddle.nn.Layer):
     def add_noise(self, batch, timestep: int):
         """Add noise to batch for reinforcement learning fine-tuning.
 
-        This code is adapted from:
-        convert-matinvent/models/diffcsp/diffusion.py
-
         Args:
             batch: Input batch data structure
             timestep: Diffusion timestep (0 to num_train_timesteps-1)
@@ -597,11 +594,6 @@ class DiffCSP(paddle.nn.Layer):
 
     def calc_sample_loss(self, noised_input):
         """Calculate sample loss for reinforcement learning fine-tuning.
-
-        This code is adapted from:
-        convert-matinvent/models/diffcsp/diffusion.py
-        convert-matinvent/pipeline/mat_invent.py
-
         Args:
             noised_input: Tuple of (noisy_batch, clean_batch, timesteps)
                 - noisy_batch: Dictionary with noisy frac_coords, lattice, atom_types
@@ -664,10 +656,6 @@ class DiffCSP(paddle.nn.Layer):
 
     def calc_kl_reg(self, agent_pred, prior_pred, batch):
         """Calculate KL divergence regularization for reinforcement learning.
-
-        This code is adapted from:
-        convert-matinvent/models/mattergen/pl_module.py
-        convert-matinvent/pipeline/mat_invent.py
 
         Uses paddle.scatter to replace torch_scatter.
 

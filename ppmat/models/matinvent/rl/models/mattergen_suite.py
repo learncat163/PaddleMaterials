@@ -15,9 +15,7 @@
 """
 MatterGen model suite for reinforcement learning.
 
-This code is adapted from:
-convert-matinvent/models/suite/mattergen.py
-raw-matinvent/models/suite/mattergen.py
+
 """
 
 import os
@@ -30,10 +28,11 @@ from pymatgen.core.structure import Structure
 
 from ppmat.models.matinvent.rl.datasets import create_rl_dataloader
 from ppmat.models.matinvent.rl.models.base import ModelSuite, get_device
+from ppmat.models.matinvent.rl.models.mattergen_adapter import create_matinvent_adapter
+from ppmat.models.matinvent.rl.pbc_patch import apply_mattergen_pbc_patch
 from ppmat.models.matinvent.rl.samplers import MatterGenSampler as Sampler
 
 # Standard MatterGen mp-20 model configuration
-# (参照 raw-matinvent/models/suite/mattergen.py + diff-matinvent/weight/all/all_infer_and_diff.py)
 _MATTERGEN_DEFAULT_CFG = dict(
     decoder_cfg={
         'gemnet_cfg': {
@@ -85,9 +84,11 @@ class MatterGenSuite(ModelSuite):
         Supports both absolute paths and paths relative to the workspace root.
 
         Returns:
-            Loaded MatterGen model in eval mode.
+            RL-adapted MatterGen model (wrapped in MatterGenRLAdapter).
         """
         from ppmat.models.mattergen.mattergen import MatterGen
+
+        apply_mattergen_pbc_patch()
 
         if self.model_path is None:
             raise ValueError(
@@ -105,7 +106,10 @@ class MatterGenSuite(ModelSuite):
         model = MatterGen(**_MATTERGEN_DEFAULT_CFG)
         model.set_state_dict(paddle.load(str(ckpt_path)))
         model.eval()
-        return model
+
+        # Wrap the model with RL adapter for compatibility
+        # This replaces the monkey patching approach
+        return create_matinvent_adapter(model)
 
     def get_sampler(self):
         """Get sampler for MatterGen generation."""

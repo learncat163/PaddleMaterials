@@ -42,6 +42,7 @@ from ppmat.models.mattersim.m3gnet_graph_converter import M3GNetGraphConvertor
 from ppmat.models.megnet.megnet import MEGNetPlus
 from ppmat.models.infgcn.infgcn import InfGCN
 from ppmat.models.mateno.mateno import MatENO
+import ppmat.models.matinvent.rl_wrapper
 from ppmat.utils import download
 from ppmat.utils import logger
 from ppmat.utils import save_load
@@ -164,14 +165,7 @@ def build_model(
     class_name = cfg.pop("__class_name__")
     init_params = cfg.pop("__init_params__")
 
-    # Handle module paths like 'ppmat.models.matinvent.rl_wrapper.RLWrapperModel'
-    if '.' in class_name:
-        import importlib
-        module_name, class_name = class_name.rsplit('.', 1)
-        module = importlib.import_module(module_name)
-        cls = getattr(module, class_name)
-    else:
-        cls = eval(class_name)
+    cls = eval(class_name)
 
     sig = inspect.signature(cls.__init__)
     accepts_kwargs = any(p.kind == p.VAR_KEYWORD for p in sig.parameters.values())

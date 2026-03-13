@@ -16,7 +16,6 @@
 Long-term memory for reinforcement learning.
 
 This code is adapted from:
-https://github.com/your-repo/raw-matinvent/blob/main/memory/ltm.py
 """
 
 from typing import Tuple, List

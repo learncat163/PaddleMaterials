@@ -16,7 +16,6 @@
 Reward class for reinforcement learning.
 
 This code is adapted from:
-https://github.com/your-repo/raw-matinvent/blob/main/rewards/reward.py
 """
 
 import os
@@ -69,6 +68,7 @@ class Reward:
         self.prop_cfg = prop_cfg
         self.threshold = reward_threshold
         self.reduce = reduce
+        self._calculator_cache = {}
         if not os.path.exists(self.root_dir):
             os.makedirs(self.root_dir)
 
@@ -79,8 +79,19 @@ class Reward:
     ):
         """Calculate properties for samples."""
         prop_dict, prop_list = {}, []
-        for _cfg in self.prop_cfg:
-            _prop1 = _cfg.calculator.calc(samples, label)
+        for idx, _cfg in enumerate(self.prop_cfg):
+            calculator = self._calculator_cache.get(idx, _cfg.calculator)
+            if not hasattr(calculator, "calc"):
+                cls_expr = calculator.get("__class_name__")
+                if cls_expr is None:
+                    raise ValueError("calculator config must contain '__class_name__'")
+                init_kwargs = {
+                    k: v for k, v in calculator.items() if k != "__class_name__"
+                }
+                calculator = eval(cls_expr)(**init_kwargs)
+                self._calculator_cache[idx] = calculator
+
+            _prop1 = calculator.calc(samples, label)
             prop_list.append(_prop1)
             _prop2 = np.nan_to_num(_prop1, nan=0.0)
             prop_dict[_cfg.name] = _prop2.astype(float)

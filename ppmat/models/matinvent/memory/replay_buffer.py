@@ -16,7 +16,6 @@
 Replay buffer for reinforcement learning.
 
 This code is adapted from:
-https://github.com/your-repo/raw-matinvent/blob/main/memory/replay_buffer.py
 
 Some code is based on the implementation from https://github.com/MolecularAI/Reinvent.
 """

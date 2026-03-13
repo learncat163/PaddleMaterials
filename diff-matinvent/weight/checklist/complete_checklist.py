@@ -62,6 +62,7 @@ class CheckStatus(Enum):
     FAIL = "FAIL"
     WARN = "WARN"
     SKIP = "SKIP"
+    ERROR = "ERROR"
 
 
 @dataclass
