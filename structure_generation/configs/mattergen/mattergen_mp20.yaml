@@ -57,7 +57,9 @@ Trainer:
   use_tensorboard: False
 
 Model:
-  __class_name__: MatterGen
+  # Use MatinventMatterGen (PBC-fixed subclass) instead of base MatterGen
+  # Original code: raw-matinvent/mattergen/mattergen/
+  __class_name__: MatinventMatterGen
   __init_params__:
     decoder_cfg:
       gemnet_cfg:

@@ -37,6 +37,7 @@ from ppmat.models.diffnmr.diffnmr import NMRNetCLIP
 from ppmat.models.dimenetpp.dimenetpp import DimeNetPlusPlus
 from ppmat.models.mattergen.mattergen import MatterGen
 from ppmat.models.mattergen.mattergen import MatterGenWithCondition
+from ppmat.models.matinvent.mattergen_compat import MatinventMatterGen
 from ppmat.models.mattersim.m3gnet import M3GNet
 from ppmat.models.mattersim.m3gnet_graph_converter import M3GNetGraphConvertor
 from ppmat.models.megnet.megnet import MEGNetPlus
@@ -55,6 +56,7 @@ __all__ = [
     "MEGNetPlus",
     "MatterGen",
     "MatterGenWithCondition",
+    "MatinventMatterGen",
     "DimeNetPlusPlus",
     "CrystalNN",
     "CHGNetGraphConverter",

@@ -12,7 +12,6 @@ from omegaconf import OmegaConf
 # This provides the namespace for eval() in build_model to work
 import ppmat
 import ppmat.models
-from ppmat.models.matinvent.rl.pbc_patch import apply_mattergen_pbc_patch
 
 # Make `ppmat` visible to eval() through builtins in modules that do not
 # define a local/global `ppmat` name.
@@ -32,11 +31,13 @@ class RLWrapperModel(nn.Layer):
         )
 
     def _ensure_sample_model(self):
-        """Build a MatterGen backbone for sampling/checkpoint IO when needed."""
+        """Build a MatterGen backbone for sampling/checkpoint IO when needed.
+
+        Uses MatinventMatterGen (subclass of MatterGen) to ensure PBC tensor
+        shape compatibility. See ppmat/models/matinvent/mattergen_compat.py for details.
+        """
         if self._sample_model is not None:
             return self._sample_model
-
-        apply_mattergen_pbc_patch()
 
         cfg_path = os.environ.get(
             "MATINVENT_SAMPLE_MODEL_CONFIG",

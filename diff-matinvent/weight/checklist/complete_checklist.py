@@ -168,11 +168,11 @@ class CompleteChecklist:
         else:
             report_file = self.tmp_root / MODEL_CONFIGS[model_name]["report_file"]
 
+        # 每次强制重新运行，不依赖已有报告
         if report_file.exists():
-            logger.info(f"找到现成验证报告: {report_file}")
-            return self._parse_forward_logits_report(model_name, report_file)
+            logger.info(f"删除旧报告，强制重新运行: {report_file}")
+            report_file.unlink()
 
-        # 如果没有报告，运行验证脚本
         logger.info(f"运行前向 logits 验证脚本...")
 
         script_path = self.weight_root / model_name / MODEL_CONFIGS[model_name]["pd_script"]
@@ -246,9 +246,9 @@ class CompleteChecklist:
             max_diff = max(lattice_diff, coords_diff, atom_types_diff)
             threshold = THRESHOLDS["mattergen_forward_logit"]
 
-            lattice_pct_1e4 = data["pred_lattice_comparison"]["thresholds_pct"].get("lt_1e_4", 0)
-            coords_pct_1e4 = data["pred_frac_coords_comparison"]["thresholds_pct"].get("lt_1e_4", 0)
-            atom_types_pct_1e4 = data.get("pred_atom_types_comparison", {}).get("thresholds_pct", {}).get("lt_1e_4", 0)
+            lattice_pct_1e4 = data["pred_lattice_comparison"]["thresholds_pct"].get("lt_1e-4", 0)
+            coords_pct_1e4 = data["pred_frac_coords_comparison"]["thresholds_pct"].get("lt_1e-4", 0)
+            atom_types_pct_1e4 = data.get("pred_atom_types_comparison", {}).get("thresholds_pct", {}).get("lt_1e-4", 0)
             pass_1e4 = lattice_pct_1e4 >= 99.0 and coords_pct_1e4 >= 99.0 and atom_types_pct_1e4 >= 99.0
 
             status = CheckStatus.PASS if pass_1e4 else CheckStatus.WARN
@@ -289,38 +289,100 @@ class CompleteChecklist:
         logger.info(f"检查 2: {model_name} 训练对齐")
         logger.info(f"{'='*60}")
 
-        # 检查配置是否正确
-        # 从 create_checklist_enhanced.py 读取配置
-        checklist_file = self.weight_root / "checklist" / "create_checklist_enhanced.py"
+        # 查找训练对齐脚本
+        script_candidates = [
+            self.weight_root / model_name / "training_alignment.py",
+            self.weight_root / model_name / f"{model_name}_training_alignment.py",
+        ]
+        # 也搜索目录下所有含 training_alignment 的 py 文件
+        model_dir = self.weight_root / model_name
+        if model_dir.exists():
+            for f in sorted(model_dir.glob("*training_alignment*.py")):
+                if f not in script_candidates:
+                    script_candidates.append(f)
 
-        if checklist_file.exists():
-            # 验证阈值配置
-            epoch_threshold = THRESHOLDS["training_loss_epoch_diff"]
-            step_threshold = THRESHOLDS["training_loss_step_diff"]
+        script_path = next((p for p in script_candidates if p.exists()), None)
 
-            # 验证训练轮数配置
-            num_epochs = 3  # 从 12_training_alignment_enhanced.py
+        if script_path is None:
+            return CheckResult(
+                name=f"{model_name}_training_alignment",
+                status=CheckStatus.SKIP,
+                details=f"未找到训练对齐脚本，搜索路径: {[str(p) for p in script_candidates]}"
+            )
 
-            if num_epochs >= 2 and epoch_threshold <= 1e-3:
+        logger.info(f"运行训练对齐脚本: {script_path}")
+        output_report = self.tmp_root / f"{model_name}_training_alignment_report.json"
+        if output_report.exists():
+            output_report.unlink()
+
+        try:
+            result = subprocess.run(
+                [sys.executable, str(script_path)],
+                capture_output=True,
+                text=True,
+                timeout=600,
+                cwd=str(script_path.parent)
+            )
+            stdout = result.stdout
+            stderr = result.stderr
+
+            if result.returncode != 0:
+                return CheckResult(
+                    name=f"{model_name}_training_alignment",
+                    status=CheckStatus.FAIL,
+                    details=f"脚本执行失败 (code={result.returncode}): {stderr[:300]}"
+                )
+
+            # 尝试读取 JSON 报告
+            if output_report.exists():
+                with open(output_report) as fp:
+                    data = json.load(fp)
+                epoch_diff = data.get("epoch_loss_diff", None)
+                num_epochs = data.get("num_epochs", 0)
+                threshold = THRESHOLDS["training_loss_epoch_diff"]
+                if epoch_diff is not None:
+                    status = CheckStatus.PASS if (num_epochs >= 2 and epoch_diff <= threshold) else CheckStatus.FAIL
+                    return CheckResult(
+                        name=f"{model_name}_training_alignment",
+                        status=status,
+                        value=epoch_diff,
+                        threshold=threshold,
+                        details=f"num_epochs={num_epochs}, epoch_loss_diff={epoch_diff:.2e}",
+                        raw_data=data
+                    )
+
+            # 没有 JSON 报告时，从 stdout 解析 PASS/FAIL
+            combined = stdout + stderr
+            if "PASS" in combined.upper():
                 return CheckResult(
                     name=f"{model_name}_training_alignment",
                     status=CheckStatus.PASS,
-                    value=float(epoch_threshold),
-                    threshold=1e-3,
-                    details=f"num_epochs={num_epochs} (≥2), epoch_diff_threshold={epoch_threshold} (≤1e-3), step_diff_threshold={step_threshold}",
+                    details=f"脚本输出含 PASS，详见: {stdout[:200]}"
+                )
+            elif "FAIL" in combined.upper():
+                return CheckResult(
+                    name=f"{model_name}_training_alignment",
+                    status=CheckStatus.FAIL,
+                    details=f"脚本输出含 FAIL: {stdout[:200]}"
                 )
             else:
                 return CheckResult(
                     name=f"{model_name}_training_alignment",
-                    status=CheckStatus.FAIL,
-                    details=f"配置不满足要求: num_epochs={num_epochs}, epoch_threshold={epoch_threshold}"
+                    status=CheckStatus.WARN,
+                    details=f"脚本执行完成但无法解析结果: {stdout[:200]}"
                 )
-
-        return CheckResult(
-            name=f"{model_name}_training_alignment",
-            status=CheckStatus.WARN,
-            details="未找到配置文件"
-        )
+        except subprocess.TimeoutExpired:
+            return CheckResult(
+                name=f"{model_name}_training_alignment",
+                status=CheckStatus.ERROR,
+                details="脚本执行超时（>600s）"
+            )
+        except Exception as e:
+            return CheckResult(
+                name=f"{model_name}_training_alignment",
+                status=CheckStatus.ERROR,
+                details=f"执行异常: {e}"
+            )
 
     def check_sampling_metrics(self, model_name: str) -> CheckResult:
         """检查 3: 采样指标保持误差 5% 以内"""
@@ -329,32 +391,97 @@ class CompleteChecklist:
         logger.info(f"检查 3: {model_name} 采样指标")
         logger.info(f"{'='*60}")
 
-        # 从 combined_checklist.md 读取结果
-        checklist_report = self.tmp_root / "checklist" / "combined_checklist.md"
+        # 查找采样指标脚本
+        script_candidates = [
+            self.weight_root / model_name / "sampling_metrics.py",
+            self.weight_root / model_name / f"{model_name}_sampling_metrics.py",
+        ]
+        model_dir = self.weight_root / model_name
+        if model_dir.exists():
+            for f in sorted(model_dir.glob("*sampling*.py")):
+                if f not in script_candidates:
+                    script_candidates.append(f)
 
-        if checklist_report.exists():
-            with open(checklist_report) as f:
-                content = f.read()
+        script_path = next((p for p in script_candidates if p.exists()), None)
 
-            # 检查 coord_diff_ratio 和 lattice_diff_ratio 是否为 0.05
-            if "coord_diff_ratio" in content and "0.05" in content:
-                # 检查模型是否通过
-                if f"| {model_name.lower()} " in content.lower() or "| diffcsp " in content.lower():
+        if script_path is None:
+            return CheckResult(
+                name=f"{model_name}_sampling_metrics",
+                status=CheckStatus.SKIP,
+                details=f"未找到采样指标脚本，搜索路径: {[str(p) for p in script_candidates]}"
+            )
+
+        logger.info(f"运行采样指标脚本: {script_path}")
+        output_report = self.tmp_root / f"{model_name}_sampling_metrics_report.json"
+        if output_report.exists():
+            output_report.unlink()
+
+        try:
+            result = subprocess.run(
+                [sys.executable, str(script_path)],
+                capture_output=True,
+                text=True,
+                timeout=900,
+                cwd=str(script_path.parent)
+            )
+            stdout = result.stdout
+            stderr = result.stderr
+
+            if result.returncode != 0:
+                return CheckResult(
+                    name=f"{model_name}_sampling_metrics",
+                    status=CheckStatus.FAIL,
+                    details=f"脚本执行失败 (code={result.returncode}): {stderr[:300]}"
+                )
+
+            if output_report.exists():
+                with open(output_report) as fp:
+                    data = json.load(fp)
+                coord_diff = data.get("coord_diff_ratio", None)
+                lattice_diff = data.get("lattice_diff_ratio", None)
+                threshold = THRESHOLDS["coord_diff_ratio"]
+                if coord_diff is not None and lattice_diff is not None:
+                    status = CheckStatus.PASS if (coord_diff <= threshold and lattice_diff <= threshold) else CheckStatus.FAIL
                     return CheckResult(
                         name=f"{model_name}_sampling_metrics",
-                        status=CheckStatus.PASS,
-                        value=0.05,
-                        threshold=0.05,
-                        details="coord_diff_ratio=0.05 (5%), lattice_diff_ratio=0.05 (5%), 所有检查通过",
+                        status=status,
+                        value=max(coord_diff, lattice_diff),
+                        threshold=threshold,
+                        details=f"coord_diff_ratio={coord_diff:.3f}, lattice_diff_ratio={lattice_diff:.3f}",
+                        raw_data=data
                     )
 
-        return CheckResult(
-            name=f"{model_name}_sampling_metrics",
-            status=CheckStatus.PASS,
-            value=0.05,
-            threshold=0.05,
-            details="coord_diff_ratio=0.05 (5%), lattice_diff_ratio=0.05 (5%), 基于 combined_checklist.md",
-        )
+            combined = stdout + stderr
+            if "PASS" in combined.upper():
+                return CheckResult(
+                    name=f"{model_name}_sampling_metrics",
+                    status=CheckStatus.PASS,
+                    details=f"脚本输出含 PASS: {stdout[:200]}"
+                )
+            elif "FAIL" in combined.upper():
+                return CheckResult(
+                    name=f"{model_name}_sampling_metrics",
+                    status=CheckStatus.FAIL,
+                    details=f"脚本输出含 FAIL: {stdout[:200]}"
+                )
+            else:
+                return CheckResult(
+                    name=f"{model_name}_sampling_metrics",
+                    status=CheckStatus.WARN,
+                    details=f"脚本执行完成但无法解析结果: {stdout[:200]}"
+                )
+        except subprocess.TimeoutExpired:
+            return CheckResult(
+                name=f"{model_name}_sampling_metrics",
+                status=CheckStatus.ERROR,
+                details="脚本执行超时（>900s）"
+            )
+        except Exception as e:
+            return CheckResult(
+                name=f"{model_name}_sampling_metrics",
+                status=CheckStatus.ERROR,
+                details=f"执行异常: {e}"
+            )
 
     def check_model(self, model_name: str) -> Dict[str, CheckResult]:
         """检查单个模型的所有要求"""

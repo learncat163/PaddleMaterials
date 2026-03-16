@@ -29,7 +29,7 @@ from pymatgen.core.structure import Structure
 from ppmat.models.matinvent.rl.datasets import create_rl_dataloader
 from ppmat.models.matinvent.rl.models.base import ModelSuite, get_device
 from ppmat.models.matinvent.rl.models.mattergen_adapter import create_matinvent_adapter
-from ppmat.models.matinvent.rl.pbc_patch import apply_mattergen_pbc_patch
+from ppmat.models.matinvent.mattergen_compat import MatinventMatterGen
 from ppmat.models.matinvent.rl.samplers import MatterGenSampler as Sampler
 
 # Standard MatterGen mp-20 model configuration
@@ -86,9 +86,7 @@ class MatterGenSuite(ModelSuite):
         Returns:
             RL-adapted MatterGen model (wrapped in MatterGenRLAdapter).
         """
-        from ppmat.models.mattergen.mattergen import MatterGen
-
-        apply_mattergen_pbc_patch()
+        from ppmat.models.matinvent.mattergen_compat import MatinventMatterGen
 
         if self.model_path is None:
             raise ValueError(
@@ -103,7 +101,7 @@ class MatterGenSuite(ModelSuite):
         if not ckpt_path.exists():
             raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
 
-        model = MatterGen(**_MATTERGEN_DEFAULT_CFG)
+        model = MatinventMatterGen(**_MATTERGEN_DEFAULT_CFG)
         model.set_state_dict(paddle.load(str(ckpt_path)))
         model.eval()
 
