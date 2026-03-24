@@ -1,57 +1,57 @@
 # MatInvent
 
-Paper: [MatInvent: Combining Diffusion Models with Reinforcement Learning for Crystal Invention](https://arxiv.org/abs/2503.09787)
+论文：[MatInvent: Combining Diffusion Models with Reinforcement Learning for Crystal Invention](https://arxiv.org/abs/2503.09787)
 
-## Introduction
+## 简介
 
-MatInvent is a crystal generation framework that combines diffusion model with RL fine-tuning loop. It uses a pre-trained diffusion model (MatterGen or DiffCSP) as backbone, generates candidate crystal structures, scores them by property calculator, and fine-tunes the generator with reward-weighted loss. After several rounds, the generator can produce new stable crystals that match user-specified property targets.
+MatInvent 是一个结合了扩散模型和强化学习微调循环的晶体生成框架。它使用预训练的扩散模型（MatterGen 或 DiffCSP）作为骨干网络，生成候选晶体结构，通过性质计算器对其进行评分，并使用奖励加权损失对生成器进行微调。经过几轮迭代后，生成器能够产生匹配用户指定性质目标的新稳定晶体。
 
-## Config Files
+## 配置文件
 
-| Config | Backbone | Default Reward Target |
+| 配置文件 | 骨干网络 | 默认奖励目标 |
 |--------|----------|-----------------------|
-| `matinvent_mattergen.yaml` | MatterGen | band_gap (ascending) |
-| `matinvent_diffcsp.yaml`   | DiffCSP   | formation_energy (descending) |
+| `matinvent_mattergen.yaml` | MatterGen | band_gap (升序) |
+| `matinvent_diffcsp.yaml`   | DiffCSP   | formation_energy (降序) |
 
-Both configs follow the same structure as normal training configs, but add an extra `RL:` section.
+两个配置文件都遵循与正常训练配置相同的结构，但增加了一个额外的 `RL:` 部分。
 
-## Key RL Parameters
+## 关键 RL 参数
 
-| Parameter | Description |
+| 参数 | 描述 |
 |-----------|-------------|
-| `rl_epoch` | how many RL outer-loop rounds to run |
-| `topk_ratio` | ratio of top structures to keep for fine-tuning each round |
-| `sample_cfg.num_samples` | how many structures to generate per round |
-| `finetune_cfg.lr` | learning rate for fine-tuning |
-| `reward_cfg.prop_cfg` | target property list (name, direction, value range) |
-| `replay_cfg.capacity` | max size of replay buffer |
-| `div_filter_cfg.method` | diversity filter method (`composition` or `rmsd`) |
+| `rl_epoch` | 运行多少轮 RL 外循环 |
+| `topk_ratio` | 每轮保留用于微调的顶级结构比例 |
+| `sample_cfg.num_samples` | 每轮生成多少个结构 |
+| `finetune_cfg.lr` | 微调学习率 |
+| `reward_cfg.prop_cfg` | 目标性质列表（名称、方向、数值范围） |
+| `replay_cfg.capacity` | 经验回放缓冲区最大容量 |
+| `div_filter_cfg.method` | 多样性过滤方法（`composition` 或 `rmsd`） |
 
-## Usage
+## 使用方法
 
-### 1. RL Fine-tuning (统一入口)
+### 1. RL 微调（统一入口）
 
 ```bash
-# MatterGen backbone
+# MatterGen 骨干网络
 python structure_generation/train.py \
     --config structure_generation/configs/matinvent/matinvent_mattergen.yaml
 
-# DiffCSP backbone
+# DiffCSP 骨干网络
 python structure_generation/train.py \
     --config structure_generation/configs/matinvent/matinvent_diffcsp.yaml
 ```
 
-### 2. Sampling
+### 2. 采样
 
 ```bash
-# Using pre-trained model
+# 使用预训练模型
 python structure_generation/sample.py \
     --config_path structure_generation/configs/matinvent/matinvent_mattergen.yaml \
     --checkpoint_path diff-matinvent/tmp/matinvent_mattergen_mp20.pdparams \
     --save_path results/matinvent_mattergen \
     --mode by_dataloader
 
-# Using RL-fine-tuned model
+# 使用 RL 微调后的模型
 python structure_generation/sample.py \
     --config_path structure_generation/configs/matinvent/matinvent_mattergen.yaml \
     --checkpoint_path output/matinvent_mattergen/models/final/model.pdparams \
@@ -59,4 +59,4 @@ python structure_generation/sample.py \
     --mode by_dataloader
 ```
 
-For DiffCSP backbone, just replace the config file with `matinvent_diffcsp.yaml`.
+对于 DiffCSP 骨干网络，只需将配置文件替换为 `matinvent_diffcsp.yaml`。

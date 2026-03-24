@@ -311,7 +311,8 @@ def run_paddle_mattergen_inference(test_input: Dict) -> Tuple[np.ndarray, np.nda
     """运行 Paddle MatterGen 推理"""
     import paddle
 
-    from ppmat.models.mattergen.mattergen import MatterGen
+    # 原始实现: from ppmat.models.mattergen.mattergen import MatterGen
+    from ppmat.models.matinvent.mattergen_compat import MatinventMatterGen
     from ppmat.schedulers import LatticeVPSDEScheduler, D3PMScheduler
     from ppmat.schedulers.scheduling_wrapped_sde_ve import NumAtomsVarianceAdjustedWrappedVESDE
 
@@ -329,7 +330,7 @@ def run_paddle_mattergen_inference(test_input: Dict) -> Tuple[np.ndarray, np.nda
         logger.error(f"Paddle checkpoint not found: {ckpt_path}")
         raise FileNotFoundError(f"Paddle checkpoint not found: {ckpt_path}")
 
-    model = MatterGen(
+    model = MatinventMatterGen(
         decoder_cfg={
             'gemnet_cfg': {
                 'num_targets': 1,

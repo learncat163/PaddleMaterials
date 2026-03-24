@@ -179,11 +179,12 @@ class _FirstLayerHook:
 
 
 def load_paddle_model(ckpt_path: Path) -> paddle.nn.Layer:
-    from ppmat.models.mattergen.mattergen import MatterGen
+    # 原始实现: from ppmat.models.mattergen.mattergen import MatterGen
+    from ppmat.models.matinvent.mattergen_compat import MatinventMatterGen
     from ppmat.schedulers import LatticeVPSDEScheduler, D3PMScheduler
     from ppmat.schedulers.scheduling_wrapped_sde_ve import NumAtomsVarianceAdjustedWrappedVESDE
 
-    model = MatterGen(
+    model = MatinventMatterGen(
         decoder_cfg={
             'gemnet_cfg': {
                 'num_targets': 1,
