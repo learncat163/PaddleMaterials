@@ -1,0 +1,782 @@
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""
+Utility functions for CSPNet model.
+
+This module is migrated from OMG (Open Materials Generation).
+Original code: models.diffcsp.utils
+"""
+
+import copy
+import math
+
+import numpy as np
+import paddle
+from paddle_scatter import scatter, segment_coo, segment_csr
+
+# Tensor of unit cells. Assumes 27 cells in -1, 0, 1 offsets in the x and y dimensions
+# Note that differing from OCP, we have 27 offsets here because we are in 3D
+OFFSET_LIST = [
+    [-1, -1, -1],
+    [-1, -1, 0],
+    [-1, -1, 1],
+    [-1, 0, -1],
+    [-1, 0, 0],
+    [-1, 0, 1],
+    [-1, 1, -1],
+    [-1, 1, 0],
+    [-1, 1, 1],
+    [0, -1, -1],
+    [0, -1, 0],
+    [0, -1, 1],
+    [0, 0, -1],
+    [0, 0, 0],
+    [0, 0, 1],
+    [0, 1, -1],
+    [0, 1, 0],
+    [0, 1, 1],
+    [1, -1, -1],
+    [1, -1, 0],
+    [1, -1, 1],
+    [1, 0, -1],
+    [1, 0, 0],
+    [1, 0, 1],
+    [1, 1, -1],
+    [1, 1, 0],
+    [1, 1, 1],
+]
+
+EPSILON = 1e-5
+
+chemical_symbols = [
+    # 0
+    'X',
+    # 1
+    'H', 'He',
+    # 2
+    'Li', 'Be', 'B', 'C', 'N', 'O', 'F', 'Ne',
+    # 3
+    'Na', 'Mg', 'Al', 'Si', 'P', 'S', 'Cl', 'Ar',
+    # 4
+    'K', 'Ca', 'Sc', 'Ti', 'V', 'Cr', 'Mn', 'Fe', 'Co', 'Ni', 'Cu', 'Zn',
+    'Ga', 'Ge', 'As', 'Se', 'Br', 'Kr',
+    # 5
+    'Rb', 'Sr', 'Y', 'Zr', 'Nb', 'Mo', 'Tc', 'Ru', 'Rh', 'Pd', 'Ag', 'Cd',
+    'In', 'Sn', 'Sb', 'Te', 'I', 'Xe',
+    # 6
+    'Cs', 'Ba', 'La', 'Ce', 'Pr', 'Nd', 'Pm', 'Sm', 'Eu', 'Gd', 'Tb', 'Dy',
+    'Ho', 'Er', 'Tm', 'Yb', 'Lu',
+    'Hf', 'Ta', 'W', 'Re', 'Os', 'Ir', 'Pt', 'Au', 'Hg', 'Tl', 'Pb', 'Bi',
+    'Po', 'At', 'Rn',
+    # 7
+    'Fr', 'Ra', 'Ac', 'Th', 'Pa', 'U', 'Np', 'Pu', 'Am', 'Cm', 'Bk',
+    'Cf', 'Es', 'Fm', 'Md', 'No', 'Lr',
+    'Rf', 'Db', 'Sg', 'Bh', 'Hs', 'Mt', 'Ds', 'Rg', 'Cn', 'Nh', 'Fl', 'Mc',
+    'Lv', 'Ts', 'Og',
+]
+
+
+def lattice_params_to_matrix_paddle(lengths, angles):
+    """Batched paddle version to compute lattice matrix from params.
+
+    lengths: paddle.Tensor of shape (N, 3), unit A
+    angles: paddle.Tensor of shape (N, 3), unit degree
+    """
+    angles_r = paddle.deg2rad(angles)
+    coses = paddle.cos(angles_r)
+    sins = paddle.sin(angles_r)
+
+    val = (coses[:, 0] * coses[:, 1] - coses[:, 2]) / (sins[:, 0] * sins[:, 1])
+    # Sometimes rounding errors result in values slightly > 1.
+    val = paddle.clip(val, -1.0, 1.0)
+    gamma_star = paddle.acos(val)
+
+    vector_a = paddle.stack([
+        lengths[:, 0] * sins[:, 1],
+        paddle.zeros([lengths.size(0)], dtype=lengths.dtype),
+        lengths[:, 0] * coses[:, 1]], axis=1)
+    vector_b = paddle.stack([
+        -lengths[:, 1] * sins[:, 0] * paddle.cos(gamma_star),
+        lengths[:, 1] * sins[:, 0] * paddle.sin(gamma_star),
+        lengths[:, 1] * coses[:, 0]], axis=1)
+    vector_c = paddle.stack([
+        paddle.zeros([lengths.size(0)], dtype=lengths.dtype),
+        paddle.zeros([lengths.size(0)], dtype=lengths.dtype),
+        lengths[:, 2]], axis=1)
+
+    return paddle.stack([vector_a, vector_b, vector_c], axis=1)
+
+
+def frac_to_cart_coords(
+    frac_coords,
+    lengths,
+    angles,
+    num_atoms,
+    regularized=True,
+    lattices=None
+):
+    if regularized:
+        frac_coords = frac_coords % 1.0
+    if lattices is None:
+        lattices = lattice_params_to_matrix_paddle(lengths, angles)
+    lattice_nodes = paddle.repeat_interleave(lattices, num_atoms, axis=0)
+    pos = paddle.einsum('bi,bij->bj', frac_coords, lattice_nodes)  # cart coords
+
+    return pos
+
+
+def cart_to_frac_coords(
+    cart_coords,
+    lengths,
+    angles,
+    num_atoms,
+    regularized=True
+):
+    lattice = lattice_params_to_matrix_paddle(lengths, angles)
+    # use pinv in case the predicted lattice is not rank 3
+    inv_lattice = paddle.linalg.pinv(lattice)
+    inv_lattice_nodes = paddle.repeat_interleave(inv_lattice, num_atoms, axis=0)
+    frac_coords = paddle.einsum('bi,bij->bj', cart_coords, inv_lattice_nodes)
+    if regularized:
+        frac_coords = frac_coords % 1.0
+    return frac_coords
+
+
+def get_pbc_distances(
+    coords,
+    edge_index,
+    lengths,
+    angles,
+    to_jimages,
+    num_atoms,
+    num_bonds,
+    coord_is_cart=False,
+    return_offsets=False,
+    return_distance_vec=False,
+    lattices=None
+):
+    if lattices is None:
+        lattices = lattice_params_to_matrix_paddle(lengths, angles)
+
+    if coord_is_cart:
+        pos = coords
+    else:
+        lattice_nodes = paddle.repeat_interleave(lattices, num_atoms, axis=0)
+        pos = paddle.einsum('bi,bij->bj', coords, lattice_nodes)  # cart coords
+
+    j_index, i_index = edge_index
+
+    distance_vectors = pos[j_index] - pos[i_index]
+
+    # correct for pbc
+    lattice_edges = paddle.repeat_interleave(lattices, num_bonds, axis=0)
+    offsets = paddle.einsum('bi,bij->bj', to_jimages.cast(lattice_edges.dtype), lattice_edges)
+    distance_vectors += offsets
+
+    # compute distances
+    distances = paddle.norm(distance_vectors, axis=-1)
+
+    out = {
+        "edge_index": edge_index,
+        "distances": distances,
+    }
+
+    if return_distance_vec:
+        out["distance_vec"] = distance_vectors
+
+    if return_offsets:
+        out["offsets"] = offsets
+
+    return out
+
+
+def radius_graph_pbc_wrapper(data, radius, max_num_neighbors_threshold, device):
+    cart_coords = frac_to_cart_coords(
+        data.frac_coords, data.lengths, data.angles, data.num_atoms)
+    return radius_graph_pbc(
+        cart_coords, data.lengths, data.angles, data.num_atoms, radius,
+        max_num_neighbors_threshold, device)
+
+
+def repeat_blocks(
+    sizes,
+    repeats,
+    continuous_indexing=True,
+    start_idx=0,
+    block_inc=0,
+    repeat_inc=0,
+):
+    """Repeat blocks of indices.
+    Adapted from https://stackoverflow.com/questions/51154989/numpy-vectorized-function-to-repeat-blocks-of-consecutive-elements
+
+    continuous_indexing: Whether to keep increasing the index after each block
+    start_idx: Starting index
+    block_inc: Number to increment by after each block,
+               either global or per block. Shape: len(sizes) - 1
+    repeat_inc: Number to increment by after each repetition,
+                either global or per block
+
+    Examples
+    --------
+        sizes = [1,3,2] ; repeats = [3,2,3] ; continuous_indexing = False
+        Return: [0 0 0  0 1 2 0 1 2  0 1 0 1 0 1]
+        sizes = [1,3,2] ; repeats = [3,2,3] ; continuous_indexing = True
+        Return: [0 0 0  1 2 3 1 2 3  4 5 4 5 4 5]
+        sizes = [1,3,2] ; repeats = [3,2,3] ; continuous_indexing = True ;
+        repeat_inc = 4
+        Return: [0 4 8  1 2 3 5 6 7  4 5 8 9 12 13]
+        sizes = [1,3,2] ; repeats = [3,2,3] ; continuous_indexing = True ;
+        start_idx = 5
+        Return: [5 5 5  6 7 8 6 7 8  9 10 9 10 9 10]
+        sizes = [1,3,2] ; repeats = [3,2,3] ; continuous_indexing = True ;
+        block_inc = 1
+        Return: [0 0 0  2 3 4 2 3 4  6 7 6 7 6 7]
+        sizes = [0,3,2] ; repeats = [3,2,3] ; continuous_indexing = True
+        Return: [0 1 2 0 1 2  3 4 3 4 3 4]
+        sizes = [2,3,2] ; repeats = [2,0,2] ; continuous_indexing = True
+        Return: [0 1 0 1  5 6 5 6]
+    """
+    assert sizes.dim() == 1
+    assert all(sizes >= 0)
+
+    # Remove 0 sizes
+    sizes_nonzero = sizes > 0
+    if not paddle.all(sizes_nonzero):
+        assert block_inc == 0  # Implementing this is not worth the effort
+        sizes = paddle.masked_select(sizes, sizes_nonzero)
+        if isinstance(repeats, paddle.Tensor):
+            repeats = paddle.masked_select(repeats, sizes_nonzero)
+        if isinstance(repeat_inc, paddle.Tensor):
+            repeat_inc = paddle.masked_select(repeat_inc, sizes_nonzero)
+
+    if isinstance(repeats, paddle.Tensor):
+        assert all(repeats >= 0)
+        insert_dummy = repeats[0] == 0
+        if insert_dummy:
+            one = sizes.new_ones(1)
+            zero = sizes.new_zeros(1)
+            sizes = paddle.concat([one, sizes])
+            repeats = paddle.concat([one, repeats])
+            if isinstance(block_inc, paddle.Tensor):
+                block_inc = paddle.concat([zero, block_inc])
+            if isinstance(repeat_inc, paddle.Tensor):
+                repeat_inc = paddle.concat([zero, repeat_inc])
+    else:
+        assert repeats >= 0
+        insert_dummy = False
+
+    # Get repeats for each group using group lengths/sizes
+    r1 = paddle.repeat_interleave(
+        paddle.arange(len(sizes), dtype='int64', place=sizes.place), repeats
+    )
+
+    # Get total size of output array, as needed to initialize output indexing array
+    N = (sizes * repeats).sum()
+
+    # Initialize indexing array with ones as we need to setup incremental indexing
+    # within each group when cumulatively summed at the final stage.
+    # Two steps here:
+    # 1. Within each group, we have multiple sequences, so setup the offsetting
+    # at each sequence lengths by the seq. lengths preceding those.
+    id_ar = paddle.ones([N], dtype='int64', place=sizes.place)
+    id_ar[0] = 0
+    insert_index = sizes[r1[:-1]].cumsum(0)
+    insert_val = (1 - sizes)[r1[:-1]]
+
+    if isinstance(repeats, paddle.Tensor) and paddle.any(repeats == 0):
+        diffs = r1[1:] - r1[:-1]
+        indptr = paddle.concat([sizes.new_zeros(1), diffs.cumsum(0)])
+        if continuous_indexing:
+            # If a group was skipped (repeats=0) we need to add its size
+            insert_val += segment_csr(sizes[: r1[-1]], indptr, reduce="sum")
+
+        # Add block increments
+        if isinstance(block_inc, paddle.Tensor):
+            insert_val += segment_csr(
+                block_inc[: r1[-1]], indptr, reduce="sum"
+            )
+        else:
+            insert_val += block_inc * (indptr[1:] - indptr[:-1])
+            if insert_dummy:
+                insert_val[0] -= block_inc
+    else:
+        idx = r1[1:] != r1[:-1]
+        if continuous_indexing:
+            # 2. For each group, make sure the indexing starts from the next group's
+            # first element. So, simply assign 1s there.
+            insert_val[idx] = 1
+
+        # Add block increments
+        insert_val[idx] += block_inc
+
+    # Add repeat_inc within each group
+    if isinstance(repeat_inc, paddle.Tensor):
+        insert_val += repeat_inc[r1[:-1]]
+        if isinstance(repeats, paddle.Tensor):
+            repeat_inc_inner = repeat_inc[repeats > 0][:-1]
+        else:
+            repeat_inc_inner = repeat_inc[:-1]
+    else:
+        insert_val += repeat_inc
+        repeat_inc_inner = repeat_inc
+
+    # Subtract the increments between groups
+    if isinstance(repeats, paddle.Tensor):
+        repeats_inner = repeats[repeats > 0][:-1]
+    else:
+        repeats_inner = repeats
+    insert_val[r1[1:] != r1[:-1]] -= repeat_inc_inner * repeats_inner
+
+    # Assign index-offsetting values
+    id_ar[insert_index] = insert_val
+
+    if insert_dummy:
+        id_ar = id_ar[1:]
+        if continuous_indexing:
+            id_ar[0] -= 1
+
+    # Set start index now, in case of insertion due to leading repeats=0
+    id_ar[0] += start_idx
+
+    # Finally index into input array for the group repeated o/p
+    res = id_ar.cumsum(0)
+    return res
+
+
+def radius_graph_pbc(pos, lengths, angles, natoms, radius, max_num_neighbors_threshold, device, lattices=None):
+    """Compute periodic boundary condition graph edges using radius graph.
+
+    This is a Paddle implementation adapted from the PyTorch original.
+    """
+    batch_size = len(natoms)
+    if lattices is None:
+        cell = lattice_params_to_matrix_paddle(lengths, angles)
+    else:
+        cell = lattices
+    # position of the atoms
+    atom_pos = pos
+
+    # Before computing the pairwise distances between atoms, first create a list of atom indices to compare for the entire batch
+    num_atoms_per_image = natoms
+    num_atoms_per_image_sqr = (num_atoms_per_image**2).cast('int64')
+
+    # index offset between images
+    index_offset = (
+        paddle.cumsum(num_atoms_per_image, axis=0) - num_atoms_per_image
+    )
+
+    index_offset_expand = paddle.repeat_interleave(
+        index_offset, num_atoms_per_image_sqr
+    )
+    num_atoms_per_image_expand = paddle.repeat_interleave(
+        num_atoms_per_image, num_atoms_per_image_sqr
+    )
+
+    # Compute a tensor containing sequences of numbers that range from 0 to num_atoms_per_image_sqr for each image
+    num_atom_pairs = paddle.sum(num_atoms_per_image_sqr)
+    index_sqr_offset = (
+        paddle.cumsum(num_atoms_per_image_sqr, axis=0) - num_atoms_per_image_sqr
+    )
+    index_sqr_offset = paddle.repeat_interleave(
+        index_sqr_offset, num_atoms_per_image_sqr
+    )
+    atom_count_sqr = (
+        paddle.arange(num_atom_pairs.cast('int64'), dtype='int64', place=device) - index_sqr_offset.cast('int64')
+    )
+
+    # Compute the indices for the pairs of atoms (using division and mod)
+    index1 = (
+        (atom_count_sqr // num_atoms_per_image_expand.cast('int64'))
+    ).cast('int64') + index_offset_expand.cast('int64')
+    index2 = (
+        atom_count_sqr % num_atoms_per_image_expand.cast('int64')
+    ).cast('int64') + index_offset_expand.cast('int64')
+    # Get the positions for each atom
+    pos1 = paddle.index_select(atom_pos, index1, axis=0)
+    pos2 = paddle.index_select(atom_pos, index2, axis=0)
+
+    unit_cell = paddle.to_tensor(OFFSET_LIST, dtype='float32', place=device)
+    num_cells = unit_cell.shape[0]
+    unit_cell_per_atom = unit_cell.reshape([1, num_cells, 3]).expand([len(index2), -1, -1])
+    unit_cell = paddle.transpose(unit_cell, [1, 0])
+    unit_cell_batch = unit_cell.reshape([1, 3, num_cells]).expand([batch_size, -1, -1])
+
+    # lattice matrix
+    lattice = lattice_params_to_matrix_paddle(lengths, angles)
+
+    # Compute the x, y, z positional offsets for each cell in each image
+    data_cell = paddle.transpose(lattice, [1, 2])
+    pbc_offsets = paddle.bmm(data_cell, unit_cell_batch)
+    pbc_offsets_per_atom = paddle.repeat_interleave(
+        pbc_offsets, num_atoms_per_image_sqr, axis=0
+    )
+
+    # Expand the positions and indices for the 9 cells
+    pos1 = pos1.reshape([-1, 3, 1]).expand([-1, -1, num_cells])
+    pos2 = pos2.reshape([-1, 3, 1]).expand([-1, -1, num_cells])
+    index1 = index1.reshape([-1, 1]).expand([-1, num_cells]).reshape([-1])
+    index2 = index2.reshape([-1, 1]).expand([-1, num_cells]).reshape([-1])
+    # Add the PBC offsets for the second atom
+    pos2 = pos2 + pbc_offsets_per_atom
+
+    # Compute the squared distance between atoms
+    atom_distance_sqr = paddle.sum((pos1 - pos2) ** 2, axis=1)
+    atom_distance_sqr = atom_distance_sqr.reshape([-1])
+
+    # Remove pairs that are too far apart
+    mask_within_radius = atom_distance_sqr <= radius * radius
+    # Remove pairs with the same atoms (distance = 0.0)
+    mask_not_same = atom_distance_sqr > 0.0001
+    mask = paddle.logical_and(mask_within_radius, mask_not_same)
+    index1 = paddle.mask_select(index1, mask)
+    index2 = paddle.mask_select(index2, mask)
+    unit_cell = paddle.mask_select(
+        unit_cell_per_atom.reshape([-1, 3]), mask.reshape([-1, 1]).expand([-1, 3])
+    )
+    unit_cell = unit_cell.reshape([-1, 3])
+    atom_distance_sqr = paddle.mask_select(atom_distance_sqr, mask)
+
+    if max_num_neighbors_threshold is not None:
+        mask_num_neighbors, num_neighbors_image = get_max_neighbors_mask(
+            natoms=natoms,
+            index=index1,
+            atom_distance=atom_distance_sqr,
+            max_num_neighbors_threshold=max_num_neighbors_threshold,
+        )
+
+        if not paddle.all(mask_num_neighbors):
+            # Mask out the atoms to ensure each atom has at most max_num_neighbors_threshold neighbors
+            index1 = paddle.mask_select(index1, mask_num_neighbors)
+            index2 = paddle.mask_select(index2, mask_num_neighbors)
+            unit_cell = paddle.mask_select(
+                unit_cell.reshape([-1, 3]), mask_num_neighbors.reshape([-1, 1]).expand([-1, 3])
+            )
+            unit_cell = unit_cell.reshape([-1, 3])
+    else:
+        ones = paddle.ones_like(index1)
+        num_neighbors = segment_coo(ones, index1, dim_size=natoms.sum())
+
+        # Get number of (thresholded) neighbors per image
+        image_indptr = paddle.zeros(
+            [natoms.shape[0] + 1], dtype='int64', place=device
+        )
+        image_indptr[1:] = paddle.cumsum(natoms, axis=0)
+        num_neighbors_image = segment_csr(num_neighbors, image_indptr)
+
+    edge_index = paddle.stack((index2, index1))
+
+    return edge_index, unit_cell, num_neighbors_image
+
+
+def get_max_neighbors_mask(
+    natoms, index, atom_distance, max_num_neighbors_threshold
+):
+    """
+    Give a mask that filters out edges so that each atom has at most
+    `max_num_neighbors_threshold` neighbors.
+    Assumes that `index` is sorted.
+    """
+    device = natoms.place
+    num_atoms = natoms.sum()
+
+    # Get number of neighbors
+    # segment_coo assumes sorted index
+    ones = paddle.ones_like(index)
+    num_neighbors = segment_coo(ones, index, dim_size=num_atoms)
+    max_num_neighbors = num_neighbors.max()
+    num_neighbors_thresholded = paddle.clip(num_neighbors, max=max_num_neighbors_threshold)
+
+    # Get number of (thresholded) neighbors per image
+    image_indptr = paddle.zeros(
+        [natoms.shape[0] + 1], dtype='int64', place=device
+    )
+    image_indptr[1:] = paddle.cumsum(natoms, axis=0)
+    num_neighbors_image = segment_csr(num_neighbors_thresholded, image_indptr)
+
+    # If max_num_neighbors is below the threshold, return early
+    if (
+        max_num_neighbors <= max_num_neighbors_threshold
+        or max_num_neighbors_threshold <= 0
+    ):
+        mask_num_neighbors = paddle.tensor(
+            [True], dtype='bool', place=device
+        ).expand_as(index)
+        return mask_num_neighbors, num_neighbors_image
+
+    # Create a tensor of size [num_atoms, max_num_neighbors] to sort the distances of the neighbors.
+    # Fill with infinity so we can easily remove unused distances later.
+    distance_sort = paddle.full(
+        [num_atoms * max_num_neighbors], np.inf, dtype='float32', place=device
+    )
+
+    # Create an index map to map distances from atom_distance to distance_sort
+    # index_sort_map assumes index to be sorted
+    index_neighbor_offset = paddle.cumsum(num_neighbors, axis=0) - num_neighbors
+    index_neighbor_offset_expand = paddle.repeat_interleave(
+        index_neighbor_offset, num_neighbors
+    )
+    index_sort_map = (
+        index * max_num_neighbors
+        + paddle.arange(len(index), dtype='int64', place=device)
+        - index_neighbor_offset_expand.cast('int64')
+    )
+    distance_sort = paddle.scatter(distance_sort, index_sort_map.cast('int64'), atom_distance)
+    distance_sort = distance_sort.reshape([num_atoms, max_num_neighbors])
+
+    # Sort neighboring atoms based on distance
+    distance_sort, index_sort = paddle.sort(distance_sort, axis=1)
+    # Select the max_num_neighbors_threshold neighbors that are closest
+    distance_real_cutoff = distance_sort[:, max_num_neighbors_threshold].reshape([-1, 1]).expand([-1, max_num_neighbors]) + 0.01
+
+    mask_distance = distance_sort < distance_real_cutoff
+
+    index_sort = index_sort + index_neighbor_offset.reshape([-1, 1]).expand(
+        [-1, max_num_neighbors]
+    )
+
+    # Remove "unused pairs" with infinite distances
+    mask_finite = paddle.isfinite(distance_sort)
+    index_sort = paddle.mask_select(index_sort, mask_finite & mask_distance)
+
+    num_neighbor_per_node = (mask_finite & mask_distance).sum(axis=-1)
+    num_neighbors_image = segment_csr(num_neighbor_per_node, image_indptr)
+
+    # At this point index_sort contains the index into index of the
+    # closest max_num_neighbors_threshold neighbors per atom
+    # Create a mask to remove all pairs not in index_sort
+    mask_num_neighbors = paddle.zeros([len(index)], dtype='bool', place=device)
+    mask_num_neighbors = paddle.scatter(mask_num_neighbors, index_sort.cast('int64'), paddle.ones_like(index_sort, dtype='bool'))
+
+    return mask_num_neighbors, num_neighbors_image
+
+
+def radius_graph_pbc_(cart_coords, lengths, angles, num_atoms,
+                     radius, max_num_neighbors_threshold, device,
+                     topk_per_pair=None):
+    """Computes pbc graph edges under pbc.
+
+    topk_per_pair: (num_atom_pairs,), select topk edges per atom pair
+
+    Note: topk should take into account self-self edge for (i, i)
+    """
+    batch_size = len(num_atoms)
+
+    # position of the atoms
+    atom_pos = cart_coords
+
+    # Before computing the pairwise distances between atoms, first create a list of atom indices to compare for the entire batch
+    num_atoms_per_image = num_atoms
+    num_atoms_per_image_sqr = (num_atoms_per_image ** 2).cast('int64')
+
+    # index offset between images
+    index_offset = (
+        paddle.cumsum(num_atoms_per_image, axis=0) - num_atoms_per_image
+    )
+
+    index_offset_expand = paddle.repeat_interleave(
+        index_offset, num_atoms_per_image_sqr
+    )
+    num_atoms_per_image_expand = paddle.repeat_interleave(
+        num_atoms_per_image, num_atoms_per_image_sqr
+    )
+
+    # Compute a tensor containing sequences of numbers that range from 0 to num_atoms_per_image_sqr for each image
+    num_atom_pairs = paddle.sum(num_atoms_per_image_sqr)
+    index_sqr_offset = (
+        paddle.cumsum(num_atoms_per_image_sqr, axis=0) - num_atoms_per_image_sqr
+    )
+    index_sqr_offset = paddle.repeat_interleave(
+        index_sqr_offset, num_atoms_per_image_sqr
+    )
+    atom_count_sqr = (
+        paddle.arange(num_atom_pairs.cast('int64'), dtype='int64', place=device) - index_sqr_offset.cast('int64')
+    )
+
+    # Compute the indices for the pairs of atoms (using division and mod)
+    index1 = (
+        (atom_count_sqr // num_atoms_per_image_expand.cast('int64'))
+    ).cast('int64') + index_offset_expand.cast('int64')
+    index2 = (
+        atom_count_sqr % num_atoms_per_image_expand.cast('int64')
+    ).cast('int64') + index_offset_expand.cast('int64')
+    # Get the positions for each atom
+    pos1 = paddle.index_select(atom_pos, index1, axis=0)
+    pos2 = paddle.index_select(atom_pos, index2, axis=0)
+
+    unit_cell = paddle.to_tensor(OFFSET_LIST, dtype='float32', place=device)
+    num_cells = unit_cell.shape[0]
+    unit_cell_per_atom = unit_cell.reshape([1, num_cells, 3]).expand([len(index2), -1, -1])
+    unit_cell = paddle.transpose(unit_cell, [1, 0])
+    unit_cell_batch = unit_cell.reshape([1, 3, num_cells]).expand([batch_size, -1, -1])
+
+    # lattice matrix
+    lattice = lattice_params_to_matrix_paddle(lengths, angles)
+
+    # Compute the x, y, z positional offsets for each cell in each image
+    data_cell = paddle.transpose(lattice, [1, 2])
+    pbc_offsets = paddle.bmm(data_cell, unit_cell_batch)
+    pbc_offsets_per_atom = paddle.repeat_interleave(
+        pbc_offsets, num_atoms_per_image_sqr, axis=0
+    )
+
+    # Expand the positions and indices for the 9 cells
+    pos1 = pos1.reshape([-1, 3, 1]).expand([-1, -1, num_cells])
+    pos2 = pos2.reshape([-1, 3, 1]).expand([-1, -1, num_cells])
+    index1 = index1.reshape([-1, 1]).expand([-1, num_cells]).reshape([-1])
+    index2 = index2.reshape([-1, 1]).expand([-1, num_cells]).reshape([-1])
+    # Add the PBC offsets for the second atom
+    pos2 = pos2 + pbc_offsets_per_atom
+
+    # Compute the squared distance between atoms
+    atom_distance_sqr = paddle.sum((pos1 - pos2) ** 2, axis=1)
+
+    if topk_per_pair is not None:
+        assert topk_per_pair.size(0) == num_atom_pairs
+        atom_distance_sqr_sort_index = paddle.argsort(atom_distance_sqr, axis=1)
+        assert atom_distance_sqr_sort_index.size() == (num_atom_pairs, num_cells)
+        atom_distance_sqr_sort_index = (
+            atom_distance_sqr_sort_index +
+            paddle.arange(num_atom_pairs, dtype='int64', place=device)[:, None] * num_cells).reshape([-1])
+        topk_mask = (paddle.arange(num_cells, dtype='int64', place=device)[None, :] <
+                     topk_per_pair[:, None])
+        topk_mask = topk_mask.reshape([-1])
+        topk_indices = atom_distance_sqr_sort_index.masked_select(topk_mask)
+
+        topk_mask = paddle.zeros(num_atom_pairs * num_cells, dtype='bool', place=device)
+        topk_mask = paddle.scatter(topk_mask, topk_indices.cast('int64'), paddle.ones_like(topk_indices, dtype='bool'))
+
+    atom_distance_sqr = atom_distance_sqr.reshape([-1])
+
+    # Remove pairs that are too far apart
+    mask_within_radius = atom_distance_sqr <= radius * radius
+    # Remove pairs with the same atoms (distance = 0.0)
+    mask_not_same = atom_distance_sqr > 0.0001
+    mask = paddle.logical_and(mask_within_radius, mask_not_same)
+    index1 = paddle.mask_select(index1, mask)
+    index2 = paddle.mask_select(index2, mask)
+    unit_cell = paddle.mask_select(
+        unit_cell_per_atom.reshape([-1, 3]), mask.reshape([-1, 1]).expand([-1, 3])
+    )
+    unit_cell = unit_cell.reshape([-1, 3])
+    if topk_per_pair is not None:
+        topk_mask = paddle.mask_select(topk_mask, mask)
+
+    num_neighbors = paddle.zeros([len(cart_coords)], dtype='int64', place=device)
+    num_neighbors = paddle.scatter(num_neighbors, index1.cast('int64'), paddle.ones([len(index1)], dtype='int64', place=device))
+    num_neighbors = num_neighbors.cast('int64')
+    max_num_neighbors = paddle.max(num_neighbors).cast('int64')
+
+    # Compute neighbors per image
+    _max_neighbors = copy.deepcopy(num_neighbors)
+    _max_neighbors[
+        _max_neighbors > max_num_neighbors_threshold
+    ] = max_num_neighbors_threshold
+    _num_neighbors = paddle.zeros([len(cart_coords) + 1], dtype='int64', place=device)
+    _natoms = paddle.zeros([num_atoms.shape[0] + 1], dtype='int64', place=device)
+    _num_neighbors[1:] = paddle.cumsum(_max_neighbors, axis=0)
+    _natoms[1:] = paddle.cumsum(num_atoms, axis=0)
+    num_neighbors_image = (
+        _num_neighbors[_natoms[1:]] - _num_neighbors[_natoms[:-1]]
+    )
+
+    # If max_num_neighbors is below the threshold, return early
+    if (
+        max_num_neighbors <= max_num_neighbors_threshold
+        or max_num_neighbors_threshold <= 0
+    ):
+        if topk_per_pair is None:
+            return paddle.stack((index2, index1)), unit_cell, num_neighbors_image
+        else:
+            return paddle.stack((index2, index1)), unit_cell, num_neighbors_image, topk_mask
+
+    atom_distance_sqr = paddle.mask_select(atom_distance_sqr, mask)
+
+    # Create a tensor of size [num_atoms, max_num_neighbors] to sort the distances of the neighbors.
+    # Fill with values greater than radius*radius so we can easily remove unused distances later.
+    distance_sort = paddle.zeros(
+        [len(cart_coords) * max_num_neighbors], dtype='float32', place=device
+    ).fill_(radius * radius + 1.0)
+
+    # Create an index map to map distances from atom_distance_sqr to distance_sort
+    index_neighbor_offset = paddle.cumsum(num_neighbors, axis=0) - num_neighbors
+    index_neighbor_offset_expand = paddle.repeat_interleave(
+        index_neighbor_offset, num_neighbors
+    )
+    index_sort_map = (
+        index1 * max_num_neighbors
+        + paddle.arange(len(index1), dtype='int64', place=device)
+        - index_neighbor_offset_expand.cast('int64')
+    )
+    distance_sort = paddle.scatter(distance_sort, index_sort_map.cast('int64'), atom_distance_sqr)
+    distance_sort = distance_sort.reshape([len(cart_coords), max_num_neighbors])
+
+    # Sort neighboring atoms based on distance
+    distance_sort, index_sort = paddle.sort(distance_sort, axis=1)
+    # Select the max_num_neighbors_threshold neighbors that are closest
+    distance_sort = distance_sort[:, :max_num_neighbors_threshold]
+    index_sort = index_sort[:, :max_num_neighbors_threshold]
+
+    # Offset index_sort so that it indexes into index1
+    index_sort = index_sort + index_neighbor_offset.reshape([-1, 1]).expand(
+        [-1, max_num_neighbors_threshold]
+    )
+    # Remove "unused pairs" with distances greater than the radius
+    mask_within_radius = distance_sort <= radius * radius
+    index_sort = paddle.mask_select(index_sort, mask_within_radius)
+
+    # At this point index_sort contains the index into index1 of the closest max_num_neighbors_threshold neighbors per atom
+    # Create a mask to remove all pairs not in index_sort
+    mask_num_neighbors = paddle.zeros([len(index1)], dtype='bool', place=device)
+    mask_num_neighbors = paddle.scatter(mask_num_neighbors, index_sort.cast('int64'), paddle.ones_like(index_sort, dtype='bool'))
+
+    # Finally mask out the atoms to ensure each atom has at most max_num_neighbors_threshold neighbors
+    index1 = paddle.mask_select(index1, mask_num_neighbors)
+    index2 = paddle.mask_select(index2, mask_num_neighbors)
+    unit_cell = paddle.mask_select(
+        unit_cell.reshape([-1, 3]), mask_num_neighbors.reshape([-1, 1]).expand([-1, 3])
+    )
+    unit_cell = unit_cell.reshape([-1, 3])
+
+
+class SinusoidalTimeEmbeddings(paddle.nn.Layer):
+    """
+    Sinusoidal time embeddings similar to Vaswani et al.
+    and Denoising Diffusion Probabilistic Models.
+    
+    dim: dimension of the embedding
+    """
+    def __init__(self, dim: int):
+        super().__init__()
+        self.dim = dim
+
+    def forward(self, t: paddle.Tensor) -> paddle.Tensor:
+        """
+        Compute sinusoidal embeddings for time.
+        
+        Args:
+            t: tensor of times, shape [batch_size, 1] or [batch_size]
+            
+        Returns:
+            embeddings of shape [batch_size, dim]
+        """
+        if len(t.shape) == 1:
+            t = t.unsqueeze(-1)
+        
+        half_dim = self.dim // 2
+        emb = paddle.log(paddle.to_tensor(10000.0)) / (half_dim - 1)
+        emb = paddle.exp(-emb * paddle.arange(half_dim))
+        emb = t * emb.unsqueeze(0)
+        emb = paddle.concat([emb.sin(), emb.cos()], axis=-1)
+        return emb

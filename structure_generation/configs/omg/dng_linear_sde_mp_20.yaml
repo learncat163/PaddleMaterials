@@ -1,0 +1,142 @@
+# OMG DNG (De Novo Generation) Training Configuration
+# Original: omg-raw/omg/conf_examples/dng_linear_sde_mp_20.yaml
+# DNG mode: Masked atomic species, SDE solver, Linear + PeriodicLinear interpolants
+
+Global:
+  device: gpu
+  seed: 42
+
+Model:
+  name: OMGModel
+  # Model architecture
+  encoder:
+    name: CSPNetFull
+    # CSPNet encoder configuration
+    # Will be loaded from ppmat.models.omg.model.cspnet
+  
+  head:
+    name: PassThrough
+  
+  time_embedder:
+    name: SinusoidalTimeEmbeddings
+    dim: 256
+  
+  # Stochastic Interpolants configuration
+  si:
+    # Species interpolant (masked for DNG)
+    species:
+      name: SingleStochasticInterpolant
+      interpolant: LinearInterpolant
+      gamma: null
+      epsilon: null
+      differential_equation_type: SDE
+      integrator_kwargs:
+        method: euler
+      velocity_annealing_factor: 1.0
+      correct_center_of_mass_motion: false
+    
+    # Position interpolant (fractional coordinates)
+    pos:
+      name: SingleStochasticInterpolant
+      interpolant: PeriodicLinearInterpolant
+      gamma: null
+      epsilon: null
+      differential_equation_type: SDE
+      integrator_kwargs:
+        method: euler
+      velocity_annealing_factor: 10.182659004291072
+      correct_center_of_mass_motion: true
+    
+    # Cell interpolant (lattice vectors)
+    cell:
+      name: SingleStochasticInterpolant
+      interpolant: LinearInterpolant
+      gamma: null
+      epsilon: null
+      differential_equation_type: SDE
+      integrator_kwargs:
+        method: euler
+      velocity_annealing_factor: 1.824475401606087
+      correct_center_of_mass_motion: false
+    
+    integration_time_steps: 210
+    data_fields: [species, pos, cell]
+  
+  # Loss weights (must sum to 1.0)
+  relative_si_costs:
+    species_loss: 0.5918
+    pos_loss_b: 0.1309
+    pos_loss_z: 0.2708
+    cell_loss_b: 0.0065
+  
+  # Sampler configuration
+  sampler:
+    name: IndependentSampler
+    pos_distribution:
+      name: UniformPositionDistribution
+    cell_distribution:
+      name: InformedLatticeDistribution
+      dataset_name: mp_20
+    species_distribution:
+      name: MaskedSpecies
+  
+  use_min_perm_dist: false
+  sobol_time: false
+  validation_mode: loss
+  dataset_name: mp_20
+
+Dataset:
+  name: OMGDataset
+  train:
+    type: StructureDataset
+    file_path: data/mp_20/train.lmdb
+    lazy_storage: true
+    niggli_reduce: false
+  val:
+    type: StructureDataset
+    file_path: data/mp_20/val.lmdb
+    lazy_storage: true
+    niggli_reduce: false
+  test:
+    type: StructureDataset
+    file_path: data/mp_20/test.lmdb
+    lazy_storage: true
+    niggli_reduce: false
+  
+  batch_size: 512
+  num_workers: 4
+
+Optimizer:
+  name: Adam
+  lr: 0.001
+  weight_decay: 0.01
+
+LRScheduler:
+  name: CosineAnnealingLR
+  T_max: 2000
+  eta_min: 0.0
+
+Trainer:
+  output_dir: output/omg_dng_mp_20
+  max_epochs: 2000
+  gradient_clip_val: 0.5
+  log_every_n_steps: 10
+  val_every_n_epochs: 1
+  save_every_n_epochs: 100
+  
+  # Checkpoint settings
+  save_best: true
+  monitor: val_loss_total
+  mode: min
+  
+  # Precision settings
+  precision: 32
+  
+  # Validation settings
+  num_sanity_val_steps: 0
+  enable_progress_bar: true
+
+Logging:
+  log_file: run.log
+  tensorboard: true
+  wandb: false
