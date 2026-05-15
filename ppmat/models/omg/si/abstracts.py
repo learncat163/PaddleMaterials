@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Abstract classes for Stochastic Interpolants.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: omg.si.abstracts
+"""Abstract classes for Stochastic Interpolants.
 """
 
 from abc import ABC, abstractmethod
@@ -26,65 +22,25 @@ import paddle
 
 
 class TimeChecker:
-    """
-    Abstract class providing a method to check that all times in a tensor are in [0,1].
-    """
+    """Check that all times in a tensor are in [0,1]."""
 
     @staticmethod
     def _check_t(t: paddle.Tensor) -> paddle.Tensor:
-        """
-        Check that all times are in [0,1].
-
-        The return value can be used in an assert statement.
-
-        :param t:
-            Times to check.
-        :type t: paddle.Tensor
-
-        :return:
-            Whether all times are in [0,1].
-        :rtype: paddle.Tensor
-        """
+        """Check that all times are in [0,1]."""
         return paddle.all((0.0 <= t) & (t <= 1.0))
 
 
 class Corrector(ABC):
-    """
-    Abstract class for defining a corrector function that corrects the input x
-    (for instance, wrapping back coordinates to a specific cell in periodic boundary conditions).
-    """
+    """Abstract corrector function (e.g., for PBC wrapping)."""
 
     @abstractmethod
     def correct(self, x: paddle.Tensor) -> paddle.Tensor:
-        """
-        Correct the input x.
-
-        :param x:
-            Input to correct.
-        :type x: paddle.Tensor
-
-        :return:
-            Corrected input.
-        :rtype: paddle.Tensor
-        """
+        """Correct the input x."""
         raise NotImplementedError
 
     @abstractmethod
     def unwrap(self, x_0: paddle.Tensor, x_1: paddle.Tensor) -> paddle.Tensor:
-        """
-        Correct the input x_1 based on the reference input x_0.
-
-        :param x_0:
-            Reference input.
-        :type x_0: paddle.Tensor
-        :param x_1:
-            Input to correct.
-        :type x_1: paddle.Tensor
-
-        :return:
-            Unwrapped x_1 value.
-        :rtype: paddle.Tensor
-        """
+        """Correct x_1 based on reference x_0."""
         raise NotImplementedError
 
 

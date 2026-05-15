@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Single Stochastic Interpolant Identity implementation.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: omg.si.single_stochastic_interpolant_identity
+"""Single Stochastic Interpolant Identity implementation.
 """
 
 from typing import Callable, Dict, Iterable, Tuple
@@ -28,16 +24,9 @@ from .corrector import IdentityCorrector
 
 
 class SingleStochasticInterpolantIdentity(StochasticInterpolantSpecies):
-    """
-    Stochastic interpolant x_t = x_0 = x_1, between points x_0 and x_1 from two distributions
-    p_0 and p_1 at times t. This is used for atom species which must remain constant.
-
-    Differs from the SingleStochasticInterpolant class insofar as the quantity represented
-    by x_0 and x_1 (such as atom types) must be equal during interpolation.
-    """
+    """Stochastic interpolant x_t = x_0 = x_1 for atom species which must remain constant."""
 
     def __init__(self) -> None:
-        """Construct stochastic interpolant."""
         super().__init__()
 
     def interpolate(
@@ -47,28 +36,8 @@ class SingleStochasticInterpolantIdentity(StochasticInterpolantSpecies):
         x_1: paddle.Tensor,
         batch_indices: paddle.Tensor,
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
-        """
-        Stochastically interpolate between points x_0 and x_1 from two distributions p_0 and p_1 at times t.
-
-        :param t:
-            Times in [0,1].
-        :type t: paddle.Tensor
-        :param x_0:
-            Points from p_0.
-        :type x_0: paddle.Tensor
-        :param x_1:
-            Points from p_1, must be same as x_0.
-        :type x_1: paddle.Tensor
-        :param batch_indices:
-            Tensor containing the configuration index for every atom in the batch.
-        :type batch_indices: paddle.Tensor
-
-        :return:
-            Stochastically interpolated points x_t, random variables z used for interpolation.
-        :rtype: tuple[paddle.Tensor, paddle.Tensor]
-        """
+        """Interpolate between x_0 and x_1 (must be equal)."""
         assert paddle.equal_all(x_0, x_1).item()
-        # Always return new object.
         return x_0.clone(), paddle.zeros_like(x_0)
 
     def loss_keys(self) -> Iterable[str]:

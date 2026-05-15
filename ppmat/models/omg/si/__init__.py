@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Stochastic Interpolants (SI) module for OMG.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: omg.si
+"""Stochastic Interpolants (SI) module for OMG.
 """
 
 from ppmat.models.omg.si.abstracts import (

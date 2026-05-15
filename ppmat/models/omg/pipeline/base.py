@@ -12,20 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Base reinforcement learning pipeline for crystal generation.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: pipeline.base
+"""Base reinforcement learning pipeline for crystal generation.
 """
 
-import os
 import logging
+import os
 from typing import List, Dict
 
-import numpy as np
 import paddle
-
 from pymatgen.core.structure import Structure
 
 
@@ -40,11 +34,7 @@ def get_device(device: str | None = None):
 
 
 class ReinL:
-    """
-    Base reinforcement learning pipeline for crystal generation.
-
-    This class provides the base structure for RL-based crystal generation pipelines.
-    """
+    """Base reinforcement learning pipeline for crystal generation."""
 
     def __init__(
         self,

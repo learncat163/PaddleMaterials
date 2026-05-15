@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-MatInvent pipeline for RL-based crystal generation.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: pipeline.mat_invent
+"""MatInvent pipeline for RL-based crystal generation.
 """
 
 import os
@@ -31,12 +27,7 @@ from .base import ReinL
 
 
 class MatInvent(ReinL):
-    """
-    MatInvent RL pipeline for crystal generation with reinforcement learning.
-
-    This pipeline implements the main RL loop for generating and optimizing
-    crystal structures using reward-based learning.
-    """
+    """MatInvent RL pipeline for crystal generation with reward-based learning."""
 
     def __init__(
         self,

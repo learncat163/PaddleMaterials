@@ -12,14 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Sampler module for OMG (Open Materials Generation).
-
-This module provides sampling functionality for crystal structures using
-independent base distributions for positions, cell, and species.
-
-Migrated from OMG (Open Materials Generation).
-Original code: omg.sampler
+"""Sampler module for crystal structures using independent distributions.
 """
 
 from .abstracts import PositionDistribution, CellDistribution, SpeciesDistribution

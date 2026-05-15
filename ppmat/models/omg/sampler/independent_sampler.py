@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Independent Sampler implementation.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: omg.sampler.independent_sampler
+"""Independent Sampler implementation.
 """
 
 import numpy as np
@@ -26,22 +22,7 @@ from .abstracts import PositionDistribution, CellDistribution, SpeciesDistributi
 
 
 class IndependentSampler:
-    """
-    Samples from a product of independent distributions for the cell, positions and species.
-
-    :param position_distribution:
-        The base distribution for the atomic positions.
-    :type position_distribution: PositionDistribution
-    :param cell_distribution:
-        The base distribution for the cell.
-    :type cell_distribution: CellDistribution
-    :param species_distribution:
-        The base distribution for the atomic species.
-    :type species_distribution: SpeciesDistribution
-
-    :raises ValueError:
-        If no distribution is provided.
-    """
+    """Sample from product of independent distributions for cell, positions, species."""
 
     def __init__(
         self,
@@ -49,7 +30,6 @@ class IndependentSampler:
         cell_distribution: CellDistribution | None = None,
         species_distribution: SpeciesDistribution | None = None,
     ) -> None:
-        """Constructor of the IndependentSampler class."""
         super().__init__()
 
         self._position_distribution = position_distribution
@@ -71,31 +51,7 @@ class IndependentSampler:
         np.ndarray | None,
         np.ndarray | None,
     ]:
-        """
-        Sample from each base distribution if it is provided.
-
-        :param pos:
-            The positions of the atoms in a single structure.
-            Only required if position_distribution is provided.
-        :type pos: paddle.Tensor | None
-        :param pos_is_fractional:
-            Whether the positions are in fractional coordinates.
-            Only required if position_distribution is provided.
-        :type pos_is_fractional: bool | None
-        :param cell:
-            The cell of a single structure.
-            Only required if cell_distribution is provided.
-        :type cell: paddle.Tensor | None
-        :param species:
-            The species (atomic numbers) of all atoms in the structure.
-            Only required if species_distribution is provided.
-        :type species: paddle.Tensor | None
-
-        :return:
-            (Sampled positions, Whether the sampled positions are in fractional coordinates,
-             Sampled cell, Sampled species)
-        :rtype: tuple[np.ndarray | None, bool | None, np.ndarray | None, np.ndarray | None]
-        """
+        """Sample from each base distribution if provided."""
         sampled_pos = None
         sampled_pos_is_fractional = None
         sampled_cell = None

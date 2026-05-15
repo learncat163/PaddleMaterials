@@ -12,13 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-OMG: Open Materials Generation
-
-A state-of-the-art generative model for crystal structure prediction and 
-de novo generation of inorganic crystals.
-
-Based on Stochastic Interpolants framework (ICML 2025, NeurIPS 2025).
+"""OMG: Open Materials Generation for crystal structure prediction.
+Based on Stochastic Interpolants (ICML 2025, NeurIPS 2025).
 """
 
 from ppmat.models.omg.datamodule.structure import Structure

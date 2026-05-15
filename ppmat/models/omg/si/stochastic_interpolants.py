@@ -12,21 +12,15 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Stochastic Interpolants main class.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: omg.si.stochastic_interpolants
+"""Stochastic Interpolants main class.
 """
 
 from enum import Enum
-from typing import Callable, Dict, List, Sequence, Tuple, Union
+from typing import Callable, List, Sequence, Tuple, Union
 
 import paddle
-from tqdm import trange
 
 from ppmat.models.omg.datamodule.omg_data import OMGData
-
 
 # Global constants
 SMALL_TIME: float = 1.0e-3
@@ -34,15 +28,10 @@ BIG_TIME: float = 1.0 - SMALL_TIME
 
 
 class DataField(Enum):
-    """
-    Enum for the different data fields in OMGData relevant for stochastic interpolants.
-    """
+    """Enum for data fields in OMGData relevant for stochastic interpolants."""
     pos = "pos"
-    """Atomic positions."""
     cell = "cell"
-    """Cell vectors."""
     species = "species"
-    """Atomic numbers."""
 
 
 def reshape_t(
@@ -50,25 +39,7 @@ def reshape_t(
     n_atoms: paddle.Tensor,
     data_field: DataField
 ) -> paddle.Tensor:
-    """
-    Reshape the given tensor of times for every configuration of the batch
-    so that it can be used for the given data field.
-
-    For a batch size of batch_size, the data format for the different data fields is as follows:
-    - species: paddle.Tensor of shape (sum(n_atoms), ) containing the atomic numbers
-    - cell: paddle.Tensor of shape (batch_size, 3, 3) containing the cell vectors
-    - pos: paddle.Tensor of shape (sum(n_atoms), 3) containing the atomic positions
-
-    :param t:
-        Tensor of times for the configurations in the batch.
-    :param n_atoms:
-        Tensor of the number of atoms in each configuration in the batch.
-    :param data_field:
-        Data field for which the tensor of times should be reshaped.
-
-    :return:
-        Tensor of times for the given data field.
-    """
+    """Reshape times tensor for batch configurations for the given data field."""
     assert len(t.shape) == 1
     assert len(n_atoms.shape) == 1
 

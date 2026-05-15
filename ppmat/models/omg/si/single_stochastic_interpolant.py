@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Single Stochastic Interpolant implementation.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: omg.si.single_stochastic_interpolant
+"""Single Stochastic Interpolant implementation.
 """
 
 from enum import Enum
@@ -30,46 +26,14 @@ from .abstracts import Corrector, Epsilon, Interpolant, LatentGamma, StochasticI
 
 
 class DifferentialEquationType(Enum):
-    """
-    Enum for the possible types of differential equation.
-    """
+    """Enum for differential equation types."""
     ODE = "ode"
     SDE = "sde"
 
 
 class SingleStochasticInterpolant(StochasticInterpolant):
-    """
-    Stochastic interpolant x_t = I(t, x_0, x_1) + gamma(t) * z between points x_0 and x_1
-    from two distributions p_0 and p_1 at times t based on an interpolant I(t, x_0, x_1),
-    a gamma function gamma(t), and a Gaussian random variable z.
-
-    The gamma function gamma(t) scaling the random variable z is optional.
-
-    The stochastic interpolant can either use an ordinary differential equation (ODE) or
-    a stochastic differential equation (SDE) during inference.
-
-    :param interpolant:
-        Interpolant I(t, x_0, x_1) between points from two distributions p_0 and p_1 at times t.
-    :type interpolant: Interpolant
-    :param gamma:
-        Optional gamma function gamma(t) in the latent variable gamma(t) * z.
-    :type gamma: Optional[LatentGamma]
-    :param epsilon:
-        Optional epsilon function epsilon(t) for the stochastic differential equation.
-    :type epsilon: Optional[Epsilon]
-    :param differential_equation_type:
-        Type of differential equation to use for inference.
-    :type differential_equation_type: str
-    :param integrator_kwargs:
-        Optional keyword arguments for the integrator.
-    :type integrator_kwargs: Optional[dict]
-    :param correct_center_of_mass_motion:
-        Whether to correct the center-of-mass motion to zero before computing the loss.
-    :type correct_center_of_mass_motion: bool
-    :param velocity_annealing_factor:
-        During inference, the predicted velocity fields b at time are multiplied by
-        (1 + velocity_annealing_factor * t).
-    :type velocity_annealing_factor: float
+    """Stochastic interpolant x_t = I(t, x_0, x_1) + gamma(t) * z.
+    Supports ODE or SDE during inference.
     """
 
     def __init__(

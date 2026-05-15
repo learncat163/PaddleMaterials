@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Cell distribution classes for Sampler module.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: omg.sampler.cell_distributions
+"""Cell distribution classes for Sampler module.
 """
 
 from ase.geometry.cell import cellpar_to_cell
@@ -27,51 +23,21 @@ from .abstracts import CellDistribution
 
 
 class MirrorCell(CellDistribution):
-    """
-    Base distribution that just mirrors the given cell of a single structure.
-    """
+    """Base distribution that mirrors the given cell."""
 
     def __init__(self) -> None:
-        """Constructor of the MirrorCell class."""
         super().__init__()
 
     def __call__(self, cell: paddle.Tensor) -> np.ndarray:
-        """
-        Sample a cell from the base distribution given the cell of a single structure.
-
-        This function just returns a clone of the input cell.
-
-        :param cell:
-            The cell of a single structure in a tensor of shape (3, 3).
-        :type cell: paddle.Tensor
-
-        :return:
-            A sampled cell from the base distribution in a tensor of shape (3, 3).
-        :rtype: np.ndarray
-        """
+        """Return clone of input cell."""
         return cell.detach().clone().cpu().numpy()
 
 
 class NormalCellDistribution(CellDistribution):
-    """
-    Base distribution that samples entries of cell vectors from a normal distribution
-    with given mean and standard deviation.
-
-    :param loc:
-        Mean of the normal distribution.
-        Defaults to 0.0.
-    :type loc: float
-    :param scale:
-        Standard deviation of the normal distribution.
-        Defaults to 1.0.
-    :type scale: float
-
-    :raises ValueError:
-        If the scale is less than or equal to 0.
-    """
+    """Sample cell entries from normal distribution with given mean and std."""
 
     def __init__(self, loc: float = 0.0, scale: float = 1.0) -> None:
-        """Constructor of the NormalCellDistribution class."""
+        super().__init__()
         super().__init__()
         if scale <= 0.0:
             raise ValueError("Scale must be greater than 0.")

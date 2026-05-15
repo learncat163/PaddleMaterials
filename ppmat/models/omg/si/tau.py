@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Tau schedule implementations for Stochastic Interpolants.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: omg.si.tau
+"""Tau schedule implementations for Stochastic Interpolants.
 """
 
 from math import exp, pi, sin
@@ -26,28 +22,13 @@ from .abstracts import Tau
 
 
 class TauConstantSchedule(Tau):
-    """
-    Tau function tau(t) = t corresponding to a constant noise schedule beta(s) = 2 in a variance-preserving interpolant.
-    """
+    """Tau function tau(t) = t for constant noise schedule beta(s) = 2."""
 
     def __init__(self) -> None:
-        """
-        Construct constant tau function.
-        """
         super().__init__()
 
     def tau(self, t: paddle.Tensor) -> paddle.Tensor:
-        """
-        Evaluate the tau function at times t.
-
-        :param t:
-            Times in [0,1].
-        :type t: paddle.Tensor
-
-        :return:
-            Tau function tau(t).
-        :rtype: paddle.Tensor
-        """
+        """Evaluate tau function at times t."""
         self._check_t(t)
         return t.clone()
 

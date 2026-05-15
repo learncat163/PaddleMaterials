@@ -12,13 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Pipeline module for OMG (Open Materials Generation).
-
-This module provides reinforcement learning pipelines for crystal generation.
-
-Migrated from OMG (Open Materials Generation).
-Original code: pipeline
+"""Pipeline module for OMG crystal generation.
 """
 
 from .base import ReinL, get_device

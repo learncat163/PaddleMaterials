@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-CSPNet model for crystal structure prediction.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: models.diffcsp.cspnet
+"""CSPNet model for crystal structure prediction.
 """
 
 import math
@@ -207,15 +203,7 @@ class CSPNet(paddle.nn.Layer):
             self.scalar_out = paddle.nn.Linear(hidden_dim, 1)
 
     def enable_masked_species(self) -> None:
-        """
-        Enable a masked species (with token 0) in the encoder.
-
-        For De Novo Generation (DNG) with DiscreteFlowMatchingMask,
-        token 0 is reserved as a special "masked" state.
-        The embedding vocabulary must be expanded to max_atoms + 1
-        to handle this additional token, while type_out remains at max_atoms.
-
-        Original code: omg/model/encoders/cspnet_full.py enable_masked_species()
+        """Enable masked species (token 0) for DNG with DiscreteFlowMatchingMask.
         """
         self.node_embedding = paddle.nn.Embedding(self.max_atoms + 1, self.hidden_dim)
         self.species_shift = 0
@@ -228,14 +216,7 @@ class CSPNet(paddle.nn.Layer):
         return tensor_ordered
 
     def reorder_symmetric_edges(self, edge_index, cell_offsets, neighbors, edge_vector):
-        """
-        Reorder edges to make finding counter-directional edges easier.
-
-        Some edges are only present in one direction in the data,
-        since every atom has a maximum number of neighbors. Since we only use i->j
-        edges here, we lose some j->i edges and add others by
-        making it symmetric.
-        """
+        """Reorder edges for symmetric counter-directional edge handling."""
         mask_sep_atoms = edge_index[0] < edge_index[1]
         cell_earlier = (
             (cell_offsets[:, 0] < 0)
@@ -321,15 +302,12 @@ class CSPNet(paddle.nn.Layer):
         else:
             node_features = self.node_embedding(atom_types - self.species_shift)
         
-        # Apply time embedding if configured, otherwise use raw time
         if self.time_embed_dim is not None:
             t_embed = self.time_embedder(t)
         else:
             t_embed = t
         
-        # Handle both 1D (single sample) and 2D (batched) time input
-        # repeat_interleave needs proper handling for single vs multi-graph batches
-        total_atoms = int(num_atoms.sum())  # Total number of atoms across all graphs
+        total_atoms = int(num_atoms.sum())
         if t_embed.ndim == 1:
             t_embed = t_embed.unsqueeze(0)  # Add batch dim if needed
         t_per_atom = t_embed.repeat_interleave(num_atoms, axis=0)  # Repeat for each atom

@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Abstract classes for Sampler module.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: omg.sampler.abstracts
+"""Abstract classes for Sampler module.
 """
 
 from abc import ABC, abstractmethod
@@ -26,93 +22,36 @@ import paddle
 
 
 class SpeciesDistribution(ABC):
-    """
-    Abstract base class for all species base distributions.
-
-    The base distribution can be conditioned on species data.
-    """
+    """Abstract base class for species distributions."""
 
     def __init__(self) -> None:
-        """Constructor for the SpeciesDistribution class."""
         super().__init__()
 
     @abstractmethod
     def __call__(self, species: paddle.Tensor) -> np.ndarray:
-        """
-        Sample species from the base distribution given the species of a single structure.
-
-        We use numpy arrays for the returned array because numpy offers a broader collection of distributions.
-
-        :param species:
-            The atomic numbers of all atoms in the structure in a tensor of shape (number_atoms, ).
-        :type species: paddle.Tensor
-
-        :return:
-            A sample of species from the base distribution in a tensor of shape (number_atoms, ).
-        :rtype: np.ndarray
-        """
+        """Sample species from base distribution. Returns numpy array."""
         raise NotImplementedError
 
 
 class CellDistribution(ABC):
-    """
-    Abstract base class for cell base distributions.
-
-    The base distribution can be conditioned on cell data.
-    """
+    """Abstract base class for cell distributions."""
 
     def __init__(self) -> None:
-        """Constructor for the CellDistribution class."""
         super().__init__()
 
     @abstractmethod
     def __call__(self, cell: paddle.Tensor) -> np.ndarray:
-        """
-        Sample a cell from the base distribution given the cell of a single structure.
-
-        We use numpy arrays for the returned array because numpy offers a broader collection of distributions.
-
-        :param cell:
-            The cell of a single structure in a tensor of shape (3, 3).
-        :type cell: paddle.Tensor
-
-        :return:
-            A sampled cell from the base distribution in a tensor of shape (3, 3).
-        :rtype: np.ndarray
-        """
+        """Sample cell from base distribution. Returns numpy array."""
         raise NotImplementedError
 
 
 class PositionDistribution(ABC):
-    """
-    Abstract base class for position base distributions.
-
-    Note that the sampled positions can be fractional or Cartesian coordinates.
-
-    The base distribution can be conditioned on position data.
-    """
+    """Abstract base class for position distributions (fractional or Cartesian)."""
 
     def __init__(self) -> None:
-        """Constructor for the PositionDistribution class."""
         super().__init__()
 
     @abstractmethod
     def __call__(self, pos: paddle.Tensor, pos_is_fractional: bool) -> tuple[np.ndarray, bool]:
-        """
-        Sample positions from the base distribution given the atomic positions of a single structure.
-
-        We use numpy arrays for the returned array because numpy offers a broader collection of distributions.
-
-        :param pos:
-            A tensor of shape (number_atoms, 3) containing the positions of the atoms in the structure.
-        :type pos: paddle.Tensor
-        :param pos_is_fractional:
-            Whether the input positions are in fractional coordinates.
-        :type pos_is_fractional: bool
-
-        :return:
-            (A sample of positions from the base distribution in a tensor of shape (number_atoms, 3),
-             Whether the sampled positions are in fractional coordinates.)
-        :rtype: tuple[np.ndarray, bool]
-        """
+        """Sample positions from base distribution. Returns (positions, is_fractional)."""
         raise NotImplementedError

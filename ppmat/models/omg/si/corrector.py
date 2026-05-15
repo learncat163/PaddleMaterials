@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Corrector classes for Stochastic Interpolants.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: omg.si.corrector
+"""Corrector classes for Stochastic Interpolants.
 """
 
 import paddle
@@ -24,68 +20,24 @@ from .abstracts import Corrector
 
 
 class IdentityCorrector(Corrector):
-    """
-    Corrector that does nothing.
-    """
+    """Corrector that does nothing."""
 
     def __init__(self):
-        """Construct identity corrector."""
         super().__init__()
 
     def correct(self, x: paddle.Tensor) -> paddle.Tensor:
-        """
-        Correct the input x.
-
-        :param x:
-            Input to correct.
-        :type x: paddle.Tensor
-
-        :return:
-            Corrected input.
-        :rtype: paddle.Tensor
-        """
+        """Return input unchanged."""
         return x
 
     def unwrap(self, x_0: paddle.Tensor, x_1: paddle.Tensor) -> paddle.Tensor:
-        """
-        Correct the input x_1 based on the reference input x_0.
-
-        This method just returns x_1.
-
-        :param x_0:
-            Reference input.
-        :type x_0: paddle.Tensor
-        :param x_1:
-            Input to correct.
-        :type x_1: paddle.Tensor
-
-        :return:
-            Unwrapped x_1 value.
-        :rtype: paddle.Tensor
-        """
+        """Return x_1 unchanged."""
         return x_1.clone()
 
 
 class PeriodicBoundaryConditionsCorrector(Corrector):
-    """
-    Corrector function that wraps back coordinates to the interval [min, max]
-    with periodic boundary conditions.
-
-    :param min_value:
-        Minimum value of the interval.
-    :type min_value: float
-    :param max_value:
-        Maximum value of the interval.
-    :type max_value: float
-
-    :raises ValueError:
-        If the minimum value is greater than the maximum value.
-    """
+    """Wrap coordinates to interval [min, max] with periodic boundary conditions."""
 
     def __init__(self, min_value: float, max_value: float) -> None:
-        """
-        Construct corrector function.
-        """
         super().__init__()
         self._min_value = min_value
         self._max_value = max_value
@@ -93,41 +45,15 @@ class PeriodicBoundaryConditionsCorrector(Corrector):
             raise ValueError("Minimum value must be less than maximum value.")
 
     def correct(self, x: paddle.Tensor) -> paddle.Tensor:
-        """
-        Correct the input x.
-
-        :param x:
-            Input to correct.
-        :type x: paddle.Tensor
-
-        :return:
-            Corrected input.
-        :rtype: paddle.Tensor
-        """
+        """Wrap x to [min, max] interval."""
         range_val = self._max_value - self._min_value
         return paddle.remainder(x - self._min_value, range_val) + self._min_value
 
     def unwrap(self, x_0: paddle.Tensor, x_1: paddle.Tensor) -> paddle.Tensor:
-        """
-        Correct the input x_1 based on the reference input x_0.
-
-        This method returns the image of x_1 closest to x_0 in periodic boundary conditions.
-
-        :param x_0:
-            Reference input.
-        :type x_0: paddle.Tensor
-        :param x_1:
-            Input to correct.
-        :type x_1: paddle.Tensor
-
-        :return:
-            Unwrapped x_1 value.
-        :rtype: paddle.Tensor
-        """
+        """Return x_1 image closest to x_0 in PBC."""
         separation_vector = x_1 - x_0
         length_over_two = (self._max_value - self._min_value) / 2.0
         range_val = self._max_value - self._min_value
-        # Shortest separation lies in interval [-L/2, L/2].
         shortest_separation_vector = paddle.remainder(
             separation_vector + length_over_two, range_val
         ) - length_over_two

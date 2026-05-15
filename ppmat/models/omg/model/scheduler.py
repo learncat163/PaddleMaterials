@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Scheduler modules for diffusion timesteps and sigma scheduling.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: models.diffcsp.scheduler
+"""Scheduler for diffusion timesteps and sigma scheduling.
 """
 
 import math
@@ -26,9 +22,7 @@ import paddle
 
 
 def cosine_beta_schedule(timesteps, s=0.008):
-    """
-    Cosine schedule as proposed in https://arxiv.org/abs/2102.09672
-    """
+    """Cosine schedule from https://arxiv.org/abs/2102.09672"""
     steps = timesteps + 1
     x = paddle.linspace(0, timesteps, steps)
     alphas_cumprod = paddle.cos((x / timesteps + s) / (1 + s) * math.pi * 0.5) ** 2

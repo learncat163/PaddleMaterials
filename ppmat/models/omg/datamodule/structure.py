@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Structure class for representing crystalline structures.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: omg.datamodule.structure
+"""Structure class for representing crystalline structures.
 """
 
 from typing import Any, Optional, Sequence
@@ -28,35 +24,8 @@ from ase.symbols import Symbols
 
 
 class Structure:
-    """
-    Storage for a single crystalline structure of atoms.
-
-    The structure is represented by its cell, atom numbers, and Cartesian or 
-    fractional atom coordinates. Additionally, one can store arbitrary properties 
-    and metadata associated with the structure in this class.
-
-    This class also provides methods to change the representation of the structure. 
-    It is possible to convert the Cartesian atom coordinates to fractional coordinates 
-    and vice versa, and to Niggli reduce the structure.
-
-    :param cell: A 3x3 matrix of the lattice vectors. The [i, j]-th element is the 
-        jth Cartesian coordinate of the ith unit vector.
-    :type cell: paddle.Tensor
-    :param atomic_numbers: A vector of N integers giving the atomic numbers of the 
-        atoms, where N is the number of atoms.
-    :type atomic_numbers: paddle.Tensor
-    :param pos: A Nx3 matrix of the fractional or Cartesian coordinates of the atoms 
-        in the structure, where N is the number of atoms.
-    :type pos: paddle.Tensor
-    :param property_dict: An optional dictionary of properties associated with the 
-        structure. Defaults to None.
-    :type property_dict: Optional[dict[str, Any]]
-    :param metadata: An optional dictionary of metadata associated with the structure. 
-        Defaults to None.
-    :type metadata: Optional[dict[str, Any]]
-    :param pos_is_fractional: Whether the given atomic positions are in fractional 
-        coordinates. Defaults to False.
-    :type pos_is_fractional: bool
+    """Storage for crystalline structure with cell, atomic numbers, coordinates, properties, and metadata.
+    Supports Cartesian/fractional coordinate conversion and Niggli reduction.
     """
 
     def __init__(

@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Interpolant classes for Stochastic Interpolants.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: omg.si.interpolants
+"""Interpolant classes for Stochastic Interpolants.
 """
 
 import math
@@ -26,29 +22,13 @@ from .corrector import Corrector, IdentityCorrector, PeriodicBoundaryConditionsC
 
 
 class LinearInterpolant(Interpolant):
-    """
-    Linear interpolant I(t, x_0, x_1) = (1 - t) * x_0 + t * x_1 between points x_0 and x_1
-    from two distributions p_0 and p_1 at times t.
-    """
+    """Linear interpolant I(t, x_0, x_1) = (1 - t) * x_0 + t * x_1."""
 
     def __init__(self) -> None:
-        """
-        Construct linear interpolant.
-        """
         super().__init__()
 
     def alpha(self, t: paddle.Tensor) -> paddle.Tensor:
-        """
-        Alpha function alpha(t) in the linear interpolant.
-
-        :param t:
-            Times in [0,1].
-        :type t: paddle.Tensor
-
-        :return:
-            Values of the alpha function at the given times.
-        :rtype: paddle.Tensor
-        """
+        """Alpha function alpha(t) in the linear interpolant."""
         return 1.0 - t
 
     def alpha_dot(self, t: paddle.Tensor) -> paddle.Tensor:

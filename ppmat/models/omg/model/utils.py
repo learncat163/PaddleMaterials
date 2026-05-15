@@ -12,22 +12,16 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Utility functions for CSPNet model.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: models.diffcsp.utils
+"""Utility functions for CSPNet model.
 """
 
 import copy
-import math
 
 import numpy as np
 import paddle
-from paddle_scatter import scatter, segment_coo, segment_csr
+from paddle_scatter import segment_coo, segment_csr
 
-# Tensor of unit cells. Assumes 27 cells in -1, 0, 1 offsets in the x and y dimensions
-# Note that differing from OCP, we have 27 offsets here because we are in 3D
+# 27 unit cells in -1, 0, 1 offsets for 3D PBC
 OFFSET_LIST = [
     [-1, -1, -1],
     [-1, -1, 0],
@@ -89,17 +83,12 @@ chemical_symbols = [
 
 
 def lattice_params_to_matrix_paddle(lengths, angles):
-    """Batched paddle version to compute lattice matrix from params.
-
-    lengths: paddle.Tensor of shape (N, 3), unit A
-    angles: paddle.Tensor of shape (N, 3), unit degree
-    """
+    """Convert lattice params to matrix. lengths: (N,3) A, angles: (N,3) degree"""
     angles_r = paddle.deg2rad(angles)
     coses = paddle.cos(angles_r)
     sins = paddle.sin(angles_r)
 
     val = (coses[:, 0] * coses[:, 1] - coses[:, 2]) / (sins[:, 0] * sins[:, 1])
-    # Sometimes rounding errors result in values slightly > 1.
     val = paddle.clip(val, -1.0, 1.0)
     gamma_star = paddle.acos(val)
 
@@ -132,7 +121,7 @@ def frac_to_cart_coords(
     if lattices is None:
         lattices = lattice_params_to_matrix_paddle(lengths, angles)
     lattice_nodes = paddle.repeat_interleave(lattices, num_atoms, axis=0)
-    pos = paddle.einsum('bi,bij->bj', frac_coords, lattice_nodes)  # cart coords
+    pos = paddle.einsum('bi,bij->bj', frac_coords, lattice_nodes)
 
     return pos
 
@@ -145,7 +134,6 @@ def cart_to_frac_coords(
     regularized=True
 ):
     lattice = lattice_params_to_matrix_paddle(lengths, angles)
-    # use pinv in case the predicted lattice is not rank 3
     inv_lattice = paddle.linalg.pinv(lattice)
     inv_lattice_nodes = paddle.repeat_interleave(inv_lattice, num_atoms, axis=0)
     frac_coords = paddle.einsum('bi,bij->bj', cart_coords, inv_lattice_nodes)
@@ -174,18 +162,16 @@ def get_pbc_distances(
         pos = coords
     else:
         lattice_nodes = paddle.repeat_interleave(lattices, num_atoms, axis=0)
-        pos = paddle.einsum('bi,bij->bj', coords, lattice_nodes)  # cart coords
+        pos = paddle.einsum('bi,bij->bj', coords, lattice_nodes)
 
     j_index, i_index = edge_index
 
     distance_vectors = pos[j_index] - pos[i_index]
 
-    # correct for pbc
     lattice_edges = paddle.repeat_interleave(lattices, num_bonds, axis=0)
     offsets = paddle.einsum('bi,bij->bj', to_jimages.cast(lattice_edges.dtype), lattice_edges)
     distance_vectors += offsets
 
-    # compute distances
     distances = paddle.norm(distance_vectors, axis=-1)
 
     out = {
@@ -218,40 +204,10 @@ def repeat_blocks(
     block_inc=0,
     repeat_inc=0,
 ):
-    """Repeat blocks of indices.
-    Adapted from https://stackoverflow.com/questions/51154989/numpy-vectorized-function-to-repeat-blocks-of-consecutive-elements
-
-    continuous_indexing: Whether to keep increasing the index after each block
-    start_idx: Starting index
-    block_inc: Number to increment by after each block,
-               either global or per block. Shape: len(sizes) - 1
-    repeat_inc: Number to increment by after each repetition,
-                either global or per block
-
-    Examples
-    --------
-        sizes = [1,3,2] ; repeats = [3,2,3] ; continuous_indexing = False
-        Return: [0 0 0  0 1 2 0 1 2  0 1 0 1 0 1]
-        sizes = [1,3,2] ; repeats = [3,2,3] ; continuous_indexing = True
-        Return: [0 0 0  1 2 3 1 2 3  4 5 4 5 4 5]
-        sizes = [1,3,2] ; repeats = [3,2,3] ; continuous_indexing = True ;
-        repeat_inc = 4
-        Return: [0 4 8  1 2 3 5 6 7  4 5 8 9 12 13]
-        sizes = [1,3,2] ; repeats = [3,2,3] ; continuous_indexing = True ;
-        start_idx = 5
-        Return: [5 5 5  6 7 8 6 7 8  9 10 9 10 9 10]
-        sizes = [1,3,2] ; repeats = [3,2,3] ; continuous_indexing = True ;
-        block_inc = 1
-        Return: [0 0 0  2 3 4 2 3 4  6 7 6 7 6 7]
-        sizes = [0,3,2] ; repeats = [3,2,3] ; continuous_indexing = True
-        Return: [0 1 2 0 1 2  3 4 3 4 3 4]
-        sizes = [2,3,2] ; repeats = [2,0,2] ; continuous_indexing = True
-        Return: [0 1 0 1  5 6 5 6]
-    """
+    """Repeat blocks of indices. From https://stackoverflow.com/questions/51154989"""
     assert sizes.dim() == 1
     assert all(sizes >= 0)
 
-    # Remove 0 sizes
     sizes_nonzero = sizes > 0
     if not paddle.all(sizes_nonzero):
         assert block_inc == 0  # Implementing this is not worth the effort
@@ -277,19 +233,12 @@ def repeat_blocks(
         assert repeats >= 0
         insert_dummy = False
 
-    # Get repeats for each group using group lengths/sizes
     r1 = paddle.repeat_interleave(
         paddle.arange(len(sizes), dtype='int64', place=sizes.place), repeats
     )
 
-    # Get total size of output array, as needed to initialize output indexing array
     N = (sizes * repeats).sum()
 
-    # Initialize indexing array with ones as we need to setup incremental indexing
-    # within each group when cumulatively summed at the final stage.
-    # Two steps here:
-    # 1. Within each group, we have multiple sequences, so setup the offsetting
-    # at each sequence lengths by the seq. lengths preceding those.
     id_ar = paddle.ones([N], dtype='int64', place=sizes.place)
     id_ar[0] = 0
     insert_index = sizes[r1[:-1]].cumsum(0)
@@ -299,10 +248,8 @@ def repeat_blocks(
         diffs = r1[1:] - r1[:-1]
         indptr = paddle.concat([sizes.new_zeros(1), diffs.cumsum(0)])
         if continuous_indexing:
-            # If a group was skipped (repeats=0) we need to add its size
             insert_val += segment_csr(sizes[: r1[-1]], indptr, reduce="sum")
 
-        # Add block increments
         if isinstance(block_inc, paddle.Tensor):
             insert_val += segment_csr(
                 block_inc[: r1[-1]], indptr, reduce="sum"
@@ -314,14 +261,10 @@ def repeat_blocks(
     else:
         idx = r1[1:] != r1[:-1]
         if continuous_indexing:
-            # 2. For each group, make sure the indexing starts from the next group's
-            # first element. So, simply assign 1s there.
             insert_val[idx] = 1
 
-        # Add block increments
         insert_val[idx] += block_inc
 
-    # Add repeat_inc within each group
     if isinstance(repeat_inc, paddle.Tensor):
         insert_val += repeat_inc[r1[:-1]]
         if isinstance(repeats, paddle.Tensor):
@@ -332,14 +275,12 @@ def repeat_blocks(
         insert_val += repeat_inc
         repeat_inc_inner = repeat_inc
 
-    # Subtract the increments between groups
     if isinstance(repeats, paddle.Tensor):
         repeats_inner = repeats[repeats > 0][:-1]
     else:
         repeats_inner = repeats
     insert_val[r1[1:] != r1[:-1]] -= repeat_inc_inner * repeats_inner
 
-    # Assign index-offsetting values
     id_ar[insert_index] = insert_val
 
     if insert_dummy:
@@ -347,32 +288,24 @@ def repeat_blocks(
         if continuous_indexing:
             id_ar[0] -= 1
 
-    # Set start index now, in case of insertion due to leading repeats=0
     id_ar[0] += start_idx
 
-    # Finally index into input array for the group repeated o/p
     res = id_ar.cumsum(0)
     return res
 
 
 def radius_graph_pbc(pos, lengths, angles, natoms, radius, max_num_neighbors_threshold, device, lattices=None):
-    """Compute periodic boundary condition graph edges using radius graph.
-
-    This is a Paddle implementation adapted from the PyTorch original.
-    """
+    """Compute PBC graph edges using radius graph."""
     batch_size = len(natoms)
     if lattices is None:
         cell = lattice_params_to_matrix_paddle(lengths, angles)
     else:
         cell = lattices
-    # position of the atoms
     atom_pos = pos
 
-    # Before computing the pairwise distances between atoms, first create a list of atom indices to compare for the entire batch
     num_atoms_per_image = natoms
     num_atoms_per_image_sqr = (num_atoms_per_image**2).cast('int64')
 
-    # index offset between images
     index_offset = (
         paddle.cumsum(num_atoms_per_image, axis=0) - num_atoms_per_image
     )

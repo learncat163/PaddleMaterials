@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Species distribution classes for Sampler module.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: omg.sampler.species_distributions
+"""Species distribution classes for Sampler module.
 """
 
 import numpy as np
@@ -26,42 +22,18 @@ from .abstracts import SpeciesDistribution
 
 
 class MirrorSpecies(SpeciesDistribution):
-    """
-    Base distribution that just mirrors the given species of a single structure.
-    """
+    """Base distribution that mirrors the given species."""
 
     def __init__(self) -> None:
-        """Constructor of the MirrorSpecies class."""
         super().__init__()
 
     def __call__(self, species: paddle.Tensor) -> np.ndarray:
-        """
-        Sample species from the base distribution given the species of a single structure.
-
-        This function just returns a clone of the input species.
-
-        :param species:
-            The atomic numbers of all atoms in the structure in a tensor of shape (number_atoms, ).
-        :type species: paddle.Tensor
-
-        :return:
-            A sample of species from the base distribution in a tensor of shape (number_atoms, ).
-        :rtype: np.ndarray
-        """
+        """Return clone of input species."""
         return species.detach().clone().cpu().numpy()
 
 
 class UniformSpeciesDistribution(SpeciesDistribution):
-    """
-    Base distribution that samples species uniformly over a given range of atomic numbers.
-
-    :param num_species:
-        Number of possible species.
-    :type num_species: int
-
-    :raises ValueError:
-        If the number of species is less than or equal to 0.
-    """
+    """Sample species uniformly over a range of atomic numbers."""
 
     def __init__(self, num_species: int) -> None:
         """Constructor of the UniformSpeciesDistribution class."""

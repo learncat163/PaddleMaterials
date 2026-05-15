@@ -12,14 +12,7 @@
 # See the the specific language governing permissions and
 # limitations under the License.
 
-"""
-OMGData class for representing batches of crystal structures.
-
-This module is migrated from OMG (Open Materials Generation).
-Original code: omg.datamodule.omg_data
-
-Unlike PyTorch Geometric's Data class, this implementation uses paddle
-and does not depend on torch_geometric.
+"""OMGData class for representing batches of crystal structures.
 """
 
 from typing import Optional, Any
@@ -30,26 +23,12 @@ from ppmat.models.omg.datamodule.structure import Structure
 
 
 class OMGData:
-    """
-    Representation of a single crystalline structure or a batch of structures.
-    
-    This class stores crystal structure data including atomic species, positions,
-    lattice vectors, and properties. It supports batching multiple structures
-    for efficient processing.
-
-    For a batch of structures:
-    - n_atoms: Shape (batch_size,) - number of atoms in each structure
-    - species: Shape (total_atoms,) - atomic numbers concatenated
-    - cell: Shape (batch_size, 3, 3) - lattice vectors
-    - pos: Shape (total_atoms, 3) - positions (fractional or Cartesian)
-    - pos_is_fractional: Shape (batch_size,) - boolean flags
-    - ptr: Shape (batch_size + 1,) - cumulative atom counts for indexing
-
-    :param structure: Structure object or None for empty initialization.
+    """Representation of single/batch crystal structures.
+    Batch format: n_atoms(batch_size,), species(total_atoms,), cell(batch,3,3),
+    pos(total_atoms,3), pos_is_fractional(batch_size,), ptr(batch+1,).
     """
 
     def __init__(self, structure: Optional[Structure] = None) -> None:
-        """Constructor for the OMGData class."""
         if structure is None:
             self.n_atoms = None
             self.species = None

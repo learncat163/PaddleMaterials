@@ -12,13 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Model module for OMG (Open Materials Generation).
-
-This module provides the CSPNet model for crystal structure prediction.
-
-Migrated from OMG (Open Materials Generation).
-Original code: models.diffcsp
+"""Model module for OMG crystal structure prediction.
 """
 
 from .cspnet import CSPNet, CSPLayer, SinusoidsEmbedding

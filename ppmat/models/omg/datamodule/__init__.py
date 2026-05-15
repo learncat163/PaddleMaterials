@@ -12,10 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Datamodule for OMG.
-
-Contains Structure and OMGData classes for representing crystal structures.
+"""Datamodule for OMG crystal structures.
 """
 
 from ppmat.models.omg.datamodule.structure import Structure
