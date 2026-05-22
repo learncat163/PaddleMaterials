@@ -128,7 +128,6 @@ class CSPNet(paddle.nn.Layer):
     def __init__(
         self,
         hidden_dim=128,
-        latent_dim=256,
         num_layers=4,
         max_atoms=100,
         act_fn='silu',
@@ -260,8 +259,6 @@ class CSPNet(paddle.nn.Layer):
 
     def gen_edges(self, num_atoms, frac_coords, lattices, node2graph):
         if self.edge_style == 'fc':
-            lis = [paddle.ones([n, n]) for n in num_atoms.tolist()]
-            fc_graph = paddle.block_diag(lis)
             # Convert to edge index using dense_to_sparse logic
             rows, cols = [], []
             offset = 0
@@ -294,7 +291,7 @@ class CSPNet(paddle.nn.Layer):
             )
             return edge_index_new, -edge_vector_new
 
-    def forward(self, t, atom_types, frac_coords, lattices, num_atoms, node2graph, prop=None):
+    def forward(self, t, atom_types, frac_coords, lattices, num_atoms, node2graph):
         edges, frac_diff = self.gen_edges(num_atoms, frac_coords, lattices, node2graph)
         edge2graph = node2graph[edges[0]]
         if self.smooth:
@@ -306,16 +303,15 @@ class CSPNet(paddle.nn.Layer):
             t_embed = self.time_embedder(t)
         else:
             t_embed = t
-        
-        total_atoms = int(num_atoms.sum())
+
         if t_embed.ndim == 1:
             t_embed = t_embed.unsqueeze(0)  # Add batch dim if needed
         t_per_atom = t_embed.repeat_interleave(num_atoms, axis=0)  # Repeat for each atom
         node_features = paddle.concat([node_features, t_per_atom], axis=1)
         node_features = self.atom_latent_emb(node_features)
 
-        for i in range(0, self.num_layers):
-            node_features = self._modules["csp_layer_%d" % i](
+        for _ in range(0, self.num_layers):
+            node_features = self._modules["csp_layer_%d" % _](
                 node_features,
                 frac_coords,
                 lattices,

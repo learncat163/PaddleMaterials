@@ -297,10 +297,6 @@ def repeat_blocks(
 def radius_graph_pbc(pos, lengths, angles, natoms, radius, max_num_neighbors_threshold, device, lattices=None):
     """Compute PBC graph edges using radius graph."""
     batch_size = len(natoms)
-    if lattices is None:
-        cell = lattice_params_to_matrix_paddle(lengths, angles)
-    else:
-        cell = lattices
     atom_pos = pos
 
     num_atoms_per_image = natoms

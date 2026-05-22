@@ -48,7 +48,6 @@ class ReinL:
         device: str = None,
         logger=None,
         replay: bool = False,
-        replay_args: Dict = None,
         **kwargs,
     ) -> None:
         """Initialize the ReinL pipeline."""
