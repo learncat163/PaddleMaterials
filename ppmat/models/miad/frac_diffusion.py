@@ -1,4 +1,4 @@
-# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,9 +13,7 @@
 # limitations under the License.
 
 """
-Fractional coordinate diffusion models for MiAD with periodic boundary conditions.
-Provides WrappedNormal diffusion and Periodic Flow Matching (PFM).
-Converted from PyTorch to PaddlePaddle.
+Fractional coordinate diffusion models for MiAD.
 """
 
 import os
@@ -25,11 +23,7 @@ from ppmat.models.miad.scheduler import scheduler as get_scheduler
 
 
 class WrappedNormal:
-    """Wrapped Normal diffusion for fractional coordinates.
-
-    Handles periodic boundary conditions on [0, 1)^3 via modular arithmetic.
-    Uses Langevin-type reverse sampling with pre-computed sigma schedule.
-    """
+    """Wrapped Normal diffusion for fractional coordinates."""
 
     def __init__(self, diffusion_config):
         self.config = diffusion_config.frac_diffusion
@@ -71,33 +65,12 @@ class WrappedNormal:
         return x0
 
     def forward_step_sample(self, x0, t, batch):
-        """Add wrapped normal noise to fractional coordinates.
-
-        Args:
-            x0: Fractional coordinates (total_atoms, 3).
-            t: Timestep indices (total_atoms,) per-atom expanded.
-            batch: Batch dict.
-
-        Returns:
-            xt: Noisy coordinates modulo 1.
-        """
         st = self.sigmas_t[t.cast('int64')]
         self.randn_x = paddle.randn(x0.shape)
         xt = (x0 + st * self.randn_x) % 1.0
         return xt
 
     def reverse_step_sample_part_1(self, normed_score_pred, xt, t, batch):
-        """First half of reverse step (Langevin drift + diffusion).
-
-        Args:
-            normed_score_pred: Normalized score prediction.
-            xt: Current noisy coordinates.
-            t: Timestep indices per-atom.
-            batch: Batch dict.
-
-        Returns:
-            xt_05: Intermediate coordinates.
-        """
         t_idx = t.cast('int64')
         st = self.sigmas_t[t_idx]
         snt = self.sigmas_norm_t[t_idx]
@@ -118,17 +91,6 @@ class WrappedNormal:
         return xt_05
 
     def reverse_step_sample_part_2(self, normed_score_pred, xt_05, t, batch):
-        """Second half of reverse step.
-
-        Args:
-            normed_score_pred: Normalized score prediction.
-            xt_05: Intermediate coordinates from part 1.
-            t: Timestep indices per-atom.
-            batch: Batch dict.
-
-        Returns:
-            xt_1: Denoised coordinates modulo 1.
-        """
         t_idx = t.cast('int64')
         st = self.sigmas_t[t_idx]
         st_1 = self.sigmas_t[paddle.maximum(t_idx - 1, paddle.to_tensor([0]))]
@@ -150,7 +112,6 @@ class WrappedNormal:
         return xt_1
 
     def reverse_step_sample(self, normed_score_pred, xt, t, batch):
-        """Combined reverse step (part 1 then part 2)."""
         xt_05 = self.reverse_step_sample_part_1(
             normed_score_pred, xt, t, batch
         )
@@ -160,18 +121,9 @@ class WrappedNormal:
         return xt_1
 
     def prior_sample(self, batch):
-        """Sample from uniform prior on [0, 1)^3."""
         return paddle.rand([batch['num_atoms'], 3], dtype='float32')
 
     def loss(self, batch):
-        """Compute score matching loss.
-
-        Args:
-            batch: Dict with 't', 'prediction', 'x0' keys.
-
-        Returns:
-            l2: Per-atom loss.
-        """
         t_idx = batch['t'][1].cast('int64')
         st = self.sigmas_t[t_idx]
         snt = self.sigmas_norm_t[t_idx]
@@ -193,7 +145,6 @@ class WrappedNormal:
         return l2
 
     def get_x0_prediction(self, normed_score_pred, xt, t, batch):
-        """Predict x0 from score prediction."""
         t_idx = t.cast('int64')
         x0_pred = (
             xt - self.sigmas_t[t_idx] * normed_score_pred
@@ -220,7 +171,6 @@ class PFM:
         return x0
 
     def forward_step_sample(self, x0, t, batch):
-        """Forward step: interpolate toward random target."""
         xT_minus_x0 = paddle.rand(x0.shape) - 0.5
         step = (1 + t[:, None]) * self.step
         xt = (x0 + step * xT_minus_x0) % 1.0
@@ -228,7 +178,6 @@ class PFM:
         return xt
 
     def reverse_step_sample(self, vt, xt, t, batch):
-        """Reverse step with periodic boundary."""
         t_idx = t.cast('int64')
         xt_1 = (xt + self.step_coef[t_idx] * self.step * vt) % 1.0
         return xt_1

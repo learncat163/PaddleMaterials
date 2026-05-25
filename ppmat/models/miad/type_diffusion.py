@@ -1,4 +1,4 @@
-# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,9 +14,6 @@
 
 """
 Atom type diffusion models for MiAD.
-Provides DDPM_onehot (inherits from lattice DDPM, reshaped for one-hot atom types)
-and D3PM (discrete transition matrix diffusion).
-Converted from PyTorch to PaddlePaddle.
 """
 
 import paddle
@@ -27,11 +24,7 @@ from ppmat.models.miad.scheduler import scheduler as get_scheduler
 
 
 class DDPM_onehot(DDPM):
-    """DDPM for atom types with one-hot encoding.
-
-    Inherits from lattice DDPM, sharing the same scheduler and coefficients.
-    Reshapes (N,3,3) tensors to (N,1) for one-hot atom type handling.
-    """
+    """DDPM for atom types with one-hot encoding."""
 
     def __init__(self, diffusion_config):
         # Temporarily swap lat_diffusion with type_diffusion so
@@ -63,32 +56,11 @@ class DDPM_onehot(DDPM):
         return x0
 
     def forward_step_sample(self, x0, t, batch):
-        """Forward diffusion for atom types (discrete -> one-hot -> noisy).
-
-        Args:
-            x0: Atom type indices (total_atoms,).
-            t: Timestep (batch_size,).
-            batch: Batch dict.
-
-        Returns:
-            onehot_xt: Noisy one-hot atom types (total_atoms, num_types).
-        """
         onehot_x0 = self.to_domain(x0)
         onehot_xt = super().forward_step_sample(onehot_x0, t, batch)
         return onehot_xt
 
     def reverse_step_sample(self, onehot_eps_pred, onehot_xt, t, batch):
-        """Reverse diffusion for atom types.
-
-        Args:
-            onehot_eps_pred: Predicted noise (total_atoms, num_types).
-            onehot_xt: Noisy one-hot atom types (total_atoms, num_types).
-            t: Timestep (batch_size,).
-            batch: Batch dict.
-
-        Returns:
-            Denoised atom types: discrete at t=0, one-hot otherwise.
-        """
         onehot_xt_1 = super().reverse_step_sample(
             onehot_eps_pred, onehot_xt, t, batch
         )
@@ -98,13 +70,11 @@ class DDPM_onehot(DDPM):
         return onehot_xt_1
 
     def prior_sample(self, batch):
-        """Sample from prior (pure noise)."""
         return paddle.randn(
             [batch['num_atoms'], self.num_types], dtype='float32'
         )
 
     def loss(self, batch):
-        """Compute MSE loss between predicted and actual noise."""
         eps_pred = batch['prediction'][2]
         l2 = ((eps_pred - self.randn_x) ** 2).reshape(
             [eps_pred.shape[0], -1]
@@ -113,18 +83,6 @@ class DDPM_onehot(DDPM):
 
     def get_x0_prediction(self, onehot_eps_pred, onehot_xt, t, batch,
                           x0_format='disc'):
-        """Predict x0 from noise prediction.
-
-        Args:
-            onehot_eps_pred: Predicted noise.
-            onehot_xt: Noisy one-hot.
-            t: Timestep.
-            batch: Batch dict.
-            x0_format: 'onehot' or 'disc'.
-
-        Returns:
-            x0 prediction in specified format.
-        """
         onehot_x0_pred = super().get_x0_prediction(
             onehot_eps_pred, onehot_xt, t, batch
         )
@@ -135,11 +93,7 @@ class DDPM_onehot(DDPM):
 
 
 class D3PM:
-    """Discrete Denoising Diffusion Probabilistic Model for atom types.
-
-    Uses transition matrices Q_t instead of Gaussian noise.
-    Loss is KL divergence between predicted and true reverse distributions.
-    """
+    """Discrete Denoising Diffusion Probabilistic Model for atom types."""
 
     def __init__(self, diffusion_config):
         self.config = diffusion_config.type_diffusion
@@ -184,7 +138,6 @@ class D3PM:
         return self.from_domain(x0)
 
     def forward_step_sample(self, x0, t, batch):
-        """Forward: apply transition matrix and sample."""
         onehot_x0 = self.to_domain(x0)
         xt_probs = paddle.matmul(
             onehot_x0[:, None, :], self.cumprod_Q_t[t.cast('int64')]
@@ -194,7 +147,6 @@ class D3PM:
         return onehot_xt
 
     def _reverse_step_distribution(self, onehot_x0, onehot_xt, t):
-        """Compute reverse transition distribution."""
         t_idx = t.cast('int64')
         numerator = (
             paddle.matmul(
@@ -213,7 +165,6 @@ class D3PM:
         return numerator / (denominator + 1e-8)
 
     def reverse_step_sample(self, onehot_pred, onehot_xt, t, batch):
-        """Reverse: predict x0, compute reverse distribution, sample."""
         onehot_x0 = self.prediction_to_domain(onehot_pred)
         xt_1_probs = self._reverse_step_distribution(
             onehot_x0, onehot_xt, t
@@ -228,7 +179,6 @@ class D3PM:
         return onehot_xt_1
 
     def prior_sample(self, batch):
-        """Uniform prior over atom types."""
         shape = [batch['num_atoms'], self.num_types]
         xT_probs = paddle.ones(shape, dtype='float32') / self.num_types
         xT = _multinomial_sample(xT_probs)
@@ -236,7 +186,6 @@ class D3PM:
         return onehot_xT
 
     def loss(self, batch):
-        """KL divergence loss between predicted and true reverse distributions."""
         onehot_xt = batch['xt'][2]
         t = batch['t'][1].cast('int64')
         onehot_x0_pred = self.prediction_to_domain(batch['prediction'][2])
@@ -258,18 +207,15 @@ class D3PM:
         return self.default_loss_scale * kl_loss
 
     def get_x0_prediction(self, onehot_pred, onehot_xt, t, batch):
-        """Predict x0 from model output."""
         onehot_x0 = self.prediction_to_domain(onehot_pred)
         return self.from_domain(onehot_x0)
 
     def get_prob_of_nonexistence(self, onehot_pred):
-        """Get probability of atom being a mirage atom (type 0)."""
         onehot_x0 = self.prediction_to_domain(onehot_pred)
         return onehot_x0[:, 0]
 
 
 def _multinomial_sample(probs):
-    """Sample from categorical distribution (row-wise multinomial)."""
     cum_probs = paddle.cumsum(probs, axis=-1)
     rand = paddle.rand([probs.shape[0], 1])
     samples = (rand > cum_probs).cast('int64').sum(axis=-1)

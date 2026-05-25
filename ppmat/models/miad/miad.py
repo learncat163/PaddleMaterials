@@ -1,4 +1,4 @@
-# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,13 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-MiAD (Mirage Atom Diffusion) top-level model.
-Thin nn.Layer wrapper that delegates training/sampling to CrystalGen or DiffCSP.
-"""
-
-import os
-import types
 import numpy as np
 
 import paddle
@@ -53,17 +46,7 @@ class _DefaultLogger:
 
 
 class MiAD(nn.Layer):
-    """Mirage Atom Diffusion for crystal structure generation.
-
-    Thin integration layer that:
-    - Holds the CSPNet denoiser (nn.Layer with parameters)
-    - Holds the diffusion controller (CrystalGen or DiffCSP, plain Python)
-    - Delegates forward (training) and sample (generation) to the controller
-
-    Args:
-        model_cfg: CSPNet encoder configuration dict.
-        diffusion_cfg: Diffusion process configuration dict.
-    """
+    """Mirage Atom Diffusion model."""
 
     def __init__(self, model_cfg=None, diffusion_cfg=None, **kwargs):
         super().__init__()
@@ -71,24 +54,13 @@ class MiAD(nn.Layer):
         model_cfg = model_cfg or {}
         diffusion_cfg = diffusion_cfg or {}
 
-        # Build CSPNet denoiser
         self.decoder = CSPNet(**model_cfg)
-
-        # Build diffusion controller (convert dict to object with attribute access)
         if isinstance(diffusion_cfg, dict):
             diffusion_cfg = DictToAttr(diffusion_cfg)
         logger = _DefaultLogger()
         self.diffusion = init_diffusion(diffusion_cfg, logger)
 
     def forward(self, batch, **kwargs):
-        """Training forward: delegates to diffusion.train_step().
-
-        Args:
-            batch: Dict with 'x0', 'batch_size', 'batch' keys.
-
-        Returns:
-            Dict with 'loss_dict' containing loss values.
-        """
         batch = self.diffusion.train_step(
             batch=batch,
             model=self.decoder,
@@ -102,15 +74,6 @@ class MiAD(nn.Layer):
 
     @paddle.no_grad()
     def sample(self, batch_data, num_inference_steps=None, **kwargs):
-        """Generate crystal structures via reverse diffusion.
-
-        Args:
-            batch_data: Dict with batch information.
-            num_inference_steps: Number of reverse steps (unused, kept for API).
-
-        Returns:
-            Dict with 'result' containing generated crystal data.
-        """
         # Ensure batch has all required keys for sampling
         if 'structure_array' in batch_data:
             num_atoms_data = batch_data['structure_array'].get('num_atoms', None)

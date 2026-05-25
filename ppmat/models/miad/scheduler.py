@@ -1,4 +1,4 @@
-# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,8 +14,6 @@
 
 """
 Diffusion schedulers for MiAD.
-Provides noise schedules used by lattice, coordinate, and type diffusion modules.
-Converted from PyTorch to PaddlePaddle.
 """
 
 import math
@@ -24,15 +22,6 @@ import paddle
 
 
 def scheduler(scheduler_name, num_steps):
-    """Create diffusion schedule parameters.
-
-    Args:
-        scheduler_name: Name of the scheduler.
-        num_steps: Number of diffusion steps.
-
-    Returns:
-        Scheduler-specific parameters (see each branch for details).
-    """
     if scheduler_name == 'diffcsp_cosine':
         return _scheduler_diffcsp_cosine(num_steps)
     elif scheduler_name == 'cosine':
@@ -46,9 +35,6 @@ def scheduler(scheduler_name, num_steps):
 
 
 def _scheduler_diffcsp_cosine(num_steps):
-    """Cosine schedule (DiffCSP variant).
-    Returns: (cumprod_alphas_t, None)
-    """
     s = 0.008
     discretization = paddle.linspace(0, num_steps, num_steps + 1)
     alphas_cumprod = paddle.cos(
@@ -66,9 +52,6 @@ def _scheduler_diffcsp_cosine(num_steps):
 
 
 def _scheduler_cosine(num_steps):
-    """Cosine schedule (continuous variant).
-    Returns: (cumprod_alphas_t, a_t_function)
-    """
     s = 0.008
 
     def f_t(t):
@@ -85,9 +68,6 @@ def _scheduler_cosine(num_steps):
 
 
 def _scheduler_default_d3pm(num_steps, vocab_size=100):
-    """Transition matrix schedule for D3PM.
-    Returns: (Q_t, cumprod_Q_t)
-    """
 
     def get_uniform_transition_mat(vocab_size, beta_t):
         mat = paddle.full(
@@ -133,9 +113,6 @@ def _scheduler_default_d3pm(num_steps, vocab_size=100):
 
 
 def _scheduler_default_wrapped_normal(num_steps):
-    """Wrapped Normal sigma schedule.
-    Returns: (sigmas_t, sigmas_norm_t, sigma_begin, sigma_end, d_log_p_fn)
-    """
     sigma_begin, sigma_end = 0.005, 0.5
     sigmas = paddle.to_tensor(
         np.exp(np.linspace(np.log(sigma_begin), np.log(sigma_end), num_steps)),

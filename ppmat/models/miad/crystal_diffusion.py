@@ -1,4 +1,4 @@
-# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,8 +14,6 @@
 
 """
 Crystal diffusion controllers for MiAD.
-Provides CrystalGen (standard) and DiffCSP (two-step reverse sampling).
-Converted from PyTorch to PaddlePaddle.
 """
 
 import os
@@ -36,15 +34,6 @@ from ppmat.models.miad.type_diffusion import D3PM
 
 
 def init_diffusion(diffusion_config, logger):
-    """Initialize diffusion controller from config.
-
-    Args:
-        diffusion_config: Diffusion configuration object.
-        logger: Logger instance.
-
-    Returns:
-        CrystalGen or DiffCSP instance.
-    """
     switch = {
         'Default': CrystalGen,
         'DiffCSP': DiffCSP,
@@ -56,11 +45,7 @@ def init_diffusion(diffusion_config, logger):
 
 
 class CrystalGen:
-    """Standard crystal generation with single-step reverse sampling.
-
-    Manages coordinated diffusion for lattice, fractional coordinates,
-    and atom types.
-    """
+    """Standard crystal generation with single-step reverse sampling."""
 
     def __init__(self, diffusion_config, logger):
         self.config = diffusion_config
@@ -104,16 +89,6 @@ class CrystalGen:
             self.type_diffusion = None
 
     def forward_step_sample(self, x0, t, batch):
-        """Forward diffusion: add noise to all components.
-
-        Args:
-            x0: [lattice, frac_coords, atom_types].
-            t: [t_batch, t_per_atom].
-            batch: Batch dict.
-
-        Returns:
-            [noisy_lattice, noisy_frac, noisy_atom_types].
-        """
         l0, f0, a0 = x0
         lt = self.lat_diffusion.forward_step_sample(l0, t[0], batch)
         ft = self.frac_diffusion.forward_step_sample(f0, t[1], batch)
@@ -125,17 +100,6 @@ class CrystalGen:
         return [lt, ft, at]
 
     def reverse_step_sample(self, xt, t, model, batch):
-        """Standard single-step reverse sampling.
-
-        Args:
-            xt: [noisy_lattice, noisy_frac, noisy_atom_types].
-            t: [t_batch, t_per_atom].
-            model: CSPNet denoiser.
-            batch: Batch dict.
-
-        Returns:
-            [denoised_lattice, denoised_frac, denoised_atom_types].
-        """
         lt, ft, at = xt
         batch['prediction'] = self.model_prediction(xt, t, model, batch)
         l_pred, f_pred, a_pred = batch['prediction']
@@ -149,7 +113,6 @@ class CrystalGen:
         return [lt_1, ft_1, at_1]
 
     def _get_batch_info(self, batch):
-        """Get batch info from either flat format or namedtuple format."""
         if 'batch_idx' in batch:
             # New flat format from MiADCollator
             return {
@@ -204,7 +167,6 @@ class CrystalGen:
             }
 
     def prior_sample(self, batch):
-        """Sample from prior distributions."""
         batch_info = self._get_batch_info(batch)
         return [
             self.lat_diffusion.prior_sample(batch),
@@ -217,17 +179,6 @@ class CrystalGen:
         ]
 
     def model_prediction(self, xt, t, model, batch):
-        """Run CSPNet model to get predictions.
-
-        Args:
-            xt: [noisy_lattice, noisy_frac, noisy_atom_types].
-            t: [t_batch, t_per_atom].
-            model: CSPNet denoiser.
-            batch: Batch dict.
-
-        Returns:
-            [l_pred, f_pred, a_pred].
-        """
         batch_info = self._get_batch_info(batch)
         lt, ft, at = xt
         nn_pred = model(
@@ -245,7 +196,6 @@ class CrystalGen:
         return [l_pred, f_pred, a_pred]
 
     def get_x0_prediction(self, pred, xt, t, batch):
-        """Predict x0 from model predictions."""
         l_pred, f_pred, a_pred = pred
         lt, ft, at = xt
         return [
@@ -261,16 +211,6 @@ class CrystalGen:
         ]
 
     def train_step(self, batch, model, mode):
-        """Execute one training step.
-
-        Args:
-            batch: Batch dict with 'x0', 'batch_size', 'batch'.
-            model: CSPNet denoiser.
-            mode: 'train' or eval mode string.
-
-        Returns:
-            batch: Updated with 't', 'xt', 'prediction', 'loss'.
-        """
         modifications = os.environ.get('MODIFICATIONS_FIELD', '')
 
         batch['t'] = self.time_distribution.sample(batch, mode)
@@ -350,16 +290,6 @@ class CrystalGen:
         return batch
 
     def sampling_procedure(self, model, batch, progress_printer):
-        """Full reverse sampling procedure.
-
-        Args:
-            model: CSPNet denoiser.
-            batch: Batch dict with batch info.
-            progress_printer: Callback(t_value) for progress display.
-
-        Returns:
-            batch: Updated with 'xt' (final samples) and 'x0_prediction'.
-        """
         batch['xt'] = self.prior_sample(batch)
         reverse_time_iterator = self.time_distribution.reverse_time_iterator(
             batch, start_from=self.num_steps - 1
@@ -376,7 +306,6 @@ class CrystalGen:
         return batch
 
     def output_transform(self, x0, batch):
-        """Transform outputs before returning."""
         return [
             self.lat_diffusion.output_transform(x0[0], batch),
             self.frac_diffusion.output_transform(x0[1], batch),
@@ -388,7 +317,6 @@ class CrystalGen:
         ]
 
     def to(self, device):
-        """Move all sub-model tensors to device."""
         submodels = [self]
         visited = set()
         while submodels:
@@ -415,23 +343,9 @@ class CrystalGen:
 
 
 class DiffCSP(CrystalGen):
-    """DiffCSP crystal generation with two-step reverse sampling.
-
-    Overrides reverse_step_sample to call the model twice per step:
-    1. First call: get fractional coordinate prediction, apply part 1
-    2. Second call with corrected coords: get all predictions, apply part 2
-
-    This intermediate coordinate correction is the key innovation of
-    the DiffCSP method, providing better denoising quality.
-    """
+    """DiffCSP with two-step reverse sampling."""
 
     def reverse_step_sample(self, xt, t, model, batch):
-        """Two-step reverse sampling (DiffCSP variant).
-
-        Step 1: Predict score for fractional coords, apply part 1
-                to get intermediate ft_05.
-        Step 2: Re-predict with corrected ft_05, apply all reverse steps.
-        """
         lt, ft, at = xt
 
         # Step 1: only use fractional prediction

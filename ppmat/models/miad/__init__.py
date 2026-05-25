@@ -1,4 +1,4 @@
-# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -11,21 +11,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-"""
-MiAD (Mirage Atom Diffusion) models and utilities.
-
-Modules:
-    - miad: Main MiAD model wrapper
-    - cspnet_complete: CSPNet encoder
-    - crystal_diffusion: CrystalGen/DiffCSP diffusion controllers
-    - lattice_diffusion: DDPM/FM for lattice
-    - frac_diffusion: WrappedNormal/PFM for fractional coords
-    - type_diffusion: DDPM_onehot/D3PM for atom types
-    - scheduler: Diffusion schedulers
-    - diffusion_utils: Time embeddings and utilities
-    - graph_utils: Graph operations
-"""
 
 from ppmat.models.miad.miad import MiAD
 from ppmat.models.miad.cspnet_complete import CSPNet
@@ -44,34 +29,21 @@ from ppmat.models.miad.graph_utils import (
 from ppmat.models.miad.scheduler import scheduler
 
 __all__ = [
-    # Core model
     'MiAD',
     'CSPNet',
-
-    # Diffusion controllers
     'CrystalGen',
     'DiffCSP',
     'init_diffusion',
-
-    # Lattice diffusion
     'DDPM',
     'FM',
     'FM_LenAng',
-
-    # Fractional coordinate diffusion
     'WrappedNormal',
     'PFM',
-
-    # Type diffusion
     'DDPM_onehot',
     'D3PM',
-
-    # Utilities
     'SinusoidalTimeEmbeddings',
     'TimeDistribution',
     'scheduler',
-
-    # Graph utilities
     'to_dense_adj',
     'dense_to_sparse',
     'block_diag',

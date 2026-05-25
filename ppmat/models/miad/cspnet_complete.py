@@ -1,4 +1,4 @@
-# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,16 +14,13 @@
 
 """
 CSPNet (Crystal Structure Prediction Network) for MiAD model.
-Converted from PyTorch to PaddlePaddle.
 """
 
 import paddle
 import paddle.nn as nn
-import paddle.nn.functional as F
 import math
 from paddle_scatter import scatter
 
-# Import graph utilities - now fully implemented
 from ppmat.models.miad.graph_utils import (
     to_dense_adj,
     dense_to_sparse,
@@ -35,9 +32,7 @@ MAX_ATOMIC_NUM = 100
 
 
 class SinusoidsEmbedding(nn.Layer):
-    """
-    Sinusoidal position embedding for fractional coordinates.
-    """
+    """Sinusoidal position embedding for fractional coordinates."""
 
     def __init__(self, n_frequencies=10, n_space=3):
         super().__init__()
@@ -47,13 +42,6 @@ class SinusoidsEmbedding(nn.Layer):
         self.dim = self.n_frequencies * 2 * self.n_space
 
     def forward(self, x):
-        """
-        Args:
-            x: Input tensor of shape (..., n_space)
-
-        Returns:
-            emb: Embedded tensor of shape (..., dim)
-        """
         emb = x.unsqueeze(-1) * self.frequencies[None, None, :]
         emb = emb.reshape([-1, self.n_frequencies * self.n_space])
         emb = paddle.concat([paddle.sin(emb), paddle.cos(emb)], axis=-1)
@@ -61,9 +49,7 @@ class SinusoidsEmbedding(nn.Layer):
 
 
 class CSPLayer(nn.Layer):
-    """
-    Message passing layer for CSPNet.
-    """
+    """Message passing layer for CSPNet."""
 
     def __init__(
         self,
@@ -96,20 +82,6 @@ class CSPLayer(nn.Layer):
             self.layer_norm = nn.LayerNorm(hidden_dim)
 
     def edge_model(self, node_features, frac_coords, lattices, edge_index, edge2graph, frac_diff=None):
-        """
-        Compute edge features.
-
-        Args:
-            node_features: Node features of shape (total_nodes, hidden_dim)
-            frac_coords: Fractional coordinates of shape (total_nodes, 3)
-            lattices: Lattice matrices of shape (batch_size, 3, 3)
-            edge_index: Edge connectivity of shape (2, total_edges)
-            edge2graph: Graph assignment for edges of shape (total_edges,)
-            frac_diff: Fractional coordinate differences of shape (total_edges, 3)
-
-        Returns:
-            edge_features: Edge features of shape (total_edges, hidden_dim)
-        """
         hi, hj = node_features[edge_index[0]], node_features[edge_index[1]]
         if frac_diff is None:
             xi, xj = frac_coords[edge_index[0]], frac_coords[edge_index[1]]
@@ -127,37 +99,12 @@ class CSPLayer(nn.Layer):
         return edge_features
 
     def node_model(self, node_features, edge_features, edge_index):
-        """
-        Aggregate edge features to update node features.
-
-        Args:
-            node_features: Node features of shape (total_nodes, hidden_dim)
-            edge_features: Edge features of shape (total_edges, hidden_dim)
-            edge_index: Edge connectivity of shape (2, total_edges)
-
-        Returns:
-            node_output: Updated node features of shape (total_nodes, hidden_dim)
-        """
         agg = scatter(edge_features, edge_index[0], dim=0, reduce='mean', dim_size=node_features.shape[0])
         agg = paddle.concat([node_features, agg], axis=1)
         out = self.node_mlp(agg)
         return out
 
     def forward(self, node_features, frac_coords, lattices, edge_index, edge2graph, frac_diff=None):
-        """
-        Forward pass of CSP layer.
-
-        Args:
-            node_features: Node features of shape (total_nodes, hidden_dim)
-            frac_coords: Fractional coordinates of shape (total_nodes, 3)
-            lattices: Lattice matrices of shape (batch_size, 3, 3)
-            edge_index: Edge connectivity of shape (2, total_edges)
-            edge2graph: Graph assignment for edges of shape (total_edges,)
-            frac_diff: Fractional coordinate differences (optional)
-
-        Returns:
-            node_output: Updated node features with residual connection
-        """
         node_input = node_features
         if self.ln:
             node_features = self.layer_norm(node_input)
@@ -174,21 +121,6 @@ def repeat_blocks(
     block_inc=0,
     repeat_inc=0,
 ):
-    """
-    Repeat blocks of indices.
-    Adapted from https://stackoverflow.com/questions/51154989/numpy-vectorized-function-to-repeat-blocks-of-consecutive-elements
-
-    Args:
-        sizes: Tensor of block sizes
-        repeats: Tensor or int of repeat counts per block
-        continuous_indexing: Whether to keep increasing the index after each block
-        start_idx: Starting index
-        block_inc: Number to increment by after each block
-        repeat_inc: Number to increment by after each repetition
-
-    Returns:
-        res: Tensor of repeated indices
-    """
     assert len(sizes.shape) == 1
     assert paddle.all(sizes >= 0)
 
@@ -286,26 +218,7 @@ def repeat_blocks(
 
 
 class CSPNet(nn.Layer):
-    """
-    Crystal Structure Prediction Network (CSPNet).
-
-    Args:
-        hidden_dim: Hidden dimension for node features
-        latent_dim: Dimension for time embedding
-        num_layers: Number of message passing layers
-        max_atoms: Maximum number of atoms in crystal
-        act_fn: Activation function name
-        dis_emb: Distance embedding type ('sin' or 'none')
-        num_freqs: Number of frequencies for sinusoidal embedding
-        edge_style: Edge generation style ('fc' for fully connected)
-        cutoff: Cutoff distance for edges (not used in 'fc' mode)
-        max_neighbors: Maximum number of neighbors
-        ln: Whether to use layer normalization
-        ip: Whether to use inner product
-        smooth: Whether to use smooth node embedding
-        pred_type: Whether to predict atom types
-        model_name: Name of the model
-    """
+    """Crystal Structure Prediction Network."""
 
     def __init__(
         self,
@@ -357,18 +270,6 @@ class CSPNet(nn.Layer):
             self.type_out = nn.Linear(hidden_dim, MAX_ATOMIC_NUM)
 
     def select_symmetric_edges(self, tensor, mask, reorder_idx, inverse_neg):
-        """
-        Select and reorder symmetric edges.
-
-        Args:
-            tensor: Edge tensor to reorder
-            mask: Boolean mask for edges
-            reorder_idx: Indices for reordering
-            inverse_neg: Whether to negate for inverse edges
-
-        Returns:
-            tensor_ordered: Reordered edge tensor
-        """
         # Mask out counter-edges
         tensor_directed = tensor[mask]
         # Concatenate counter-edges after normal edges
@@ -379,19 +280,6 @@ class CSPNet(nn.Layer):
         return tensor_ordered
 
     def gen_edges(self, num_atoms, frac_coords, lattices, node2graph):
-        """
-        Generate edges for the crystal graph.
-
-        Args:
-            num_atoms: Number of atoms per crystal
-            frac_coords: Fractional coordinates of shape (total_atoms, 3)
-            lattices: Lattice matrices of shape (batch_size, 3, 3)
-            node2graph: Graph assignment for nodes of shape (total_atoms,)
-
-        Returns:
-            edges: Edge index of shape (2, total_edges)
-            frac_diff: Fractional coordinate differences of shape (total_edges, 3)
-        """
         if self.edge_style == 'fc':
             # Fully connected graph within each crystal
             # Use our implemented block_diag function
@@ -401,23 +289,6 @@ class CSPNet(nn.Layer):
             return fc_edges, (frac_coords[fc_edges[1]] - frac_coords[fc_edges[0]])
 
     def forward(self, t, t_emb, atom_types, frac_coords, lattices, num_atoms, node2graph):
-        """
-        Forward pass of CSPNet.
-
-        Args:
-            t: Timestep of shape (batch_size,)
-            t_emb: Time embedding of shape (batch_size, latent_dim)
-            atom_types: Atom types of shape (total_atoms,)
-            frac_coords: Fractional coordinates of shape (total_atoms, 3)
-            lattices: Lattice matrices of shape (batch_size, 3, 3)
-            num_atoms: Number of atoms per crystal
-            node2graph: Graph assignment for nodes of shape (total_atoms,)
-
-        Returns:
-            lattice_out: Predicted lattice of shape (batch_size, 3, 3)
-            coord_out: Predicted fractional coordinates of shape (total_atoms, 3)
-            type_out: Predicted atom types (optional) of shape (total_atoms, MAX_ATOMIC_NUM)
-        """
         edges, frac_diff = self.gen_edges(num_atoms, frac_coords, lattices, node2graph)
         edge2graph = node2graph[edges[0]]
         # Handle both discrete atom types and one-hot encoding

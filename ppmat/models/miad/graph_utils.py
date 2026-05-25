@@ -1,4 +1,4 @@
-# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,7 +14,6 @@
 
 """
 Graph utility functions for CSPNet.
-Converted from PyTorch Geometric to PaddlePaddle.
 """
 
 import paddle
@@ -22,18 +21,6 @@ import paddle.nn.functional as F
 
 
 def to_dense_adj(edge_index, edge_attr=None, max_num_nodes=None):
-    """
-    Convert edge index to dense adjacency matrix.
-
-    Args:
-        edge_index: Edge indices of shape (2, num_edges)
-        edge_attr: Optional edge attributes of shape (num_edges, num_edge_features)
-        max_num_nodes: Maximum number of nodes (if None, inferred from edge_index)
-
-    Returns:
-        adj: Dense adjacency matrix of shape (batch_size, max_num_nodes, max_num_nodes)
-               or (max_num_nodes, max_num_nodes) if edge_attr is None
-    """
     if edge_index.shape[0] != 2:
         raise ValueError(f"edge_index must have shape (2, num_edges), got {edge_index.shape}")
 
@@ -82,17 +69,6 @@ def to_dense_adj(edge_index, edge_attr=None, max_num_nodes=None):
 
 
 def dense_to_sparse(adj):
-    """
-    Convert dense adjacency matrix to edge index and edge attributes.
-
-    Args:
-        adj: Dense adjacency matrix of shape (num_nodes, num_nodes) or
-             (batch_size, num_nodes, num_nodes)
-
-    Returns:
-        edge_index: Edge indices of shape (2, num_edges)
-        edge_attr: Edge attributes (optional)
-    """
     if adj.ndim == 2:
         # Single graph case: use nonzero for vectorized extraction
         nonzero = paddle.nonzero(adj.cast('float32'))
@@ -123,15 +99,6 @@ def dense_to_sparse(adj):
 
 
 def block_diag(*inputs):
-    """
-    Create a block diagonal matrix from input tensors.
-
-    Args:
-        *inputs: Variable number of 2D tensors (square matrices for fc graph)
-
-    Returns:
-        output: Block diagonal matrix of shape (total_size, total_size)
-    """
     # Get dimensions
     sizes = [tensor.shape[0] for tensor in inputs]
     total_size = sum(sizes)
@@ -151,17 +118,6 @@ def block_diag(*inputs):
 
 
 def segment_csr(data, indptr, reduce="sum"):
-    """
-    Compute reduction over segments using CSR format.
-
-    Args:
-        data: Input data of shape (N, *)
-        indptr: Index pointers of shape (M+1,)
-        reduce: Reduction operation ('sum', 'mean', 'max', 'min')
-
-    Returns:
-        output: Reduced data of shape (M, *)
-    """
     if indptr[0] != 0:
         raise ValueError("indptr must start with 0")
 
@@ -199,17 +155,6 @@ def segment_csr(data, indptr, reduce="sum"):
 
 
 def coalesce(edge_index, edge_attr=None):
-    """
-    Coalesce duplicate edges by summing their attributes.
-
-    Args:
-        edge_index: Edge indices of shape (2, num_edges)
-        edge_attr: Optional edge attributes of shape (num_edges, num_edge_features)
-
-    Returns:
-        edge_index: Coalesced edge indices
-        edge_attr: Coalesced edge attributes
-    """
     if edge_index.shape[1] == 0:
         return edge_index, edge_attr
 
