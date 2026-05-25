@@ -13,22 +13,31 @@
 # limitations under the License.
 
 """
-Batch utilities for MiAD.
-DEPRECATED: Use ppmat.datasets.miad instead.
-This module is kept for backwards compatibility.
+MiAD Pipelines.
+
+Modules:
+    - train: Training pipeline
+    - generate: Generation pipeline
 """
 
-# Re-export from the canonical location
-from ppmat.datasets.miad import (
-    MiADCollator,
-    CrystalBatch,
-    create_miad_dataloader,
-    create_sampling_batch,
+from ppmat.pipelines.miad.train import (
+    MiADConfig,
+    MiADTrainer,
+    create_miad_trainer_from_config,
+)
+from ppmat.pipelines.miad.generate import (
+    GenerationConfig,
+    MiADGenerator,
+    create_generator_from_checkpoint,
 )
 
 __all__ = [
-    'MiADCollator',
-    'CrystalBatch',
-    'create_miad_dataloader',
-    'create_sampling_batch',
+    # Training
+    'MiADConfig',
+    'MiADTrainer',
+    'create_miad_trainer_from_config',
+    # Generation
+    'GenerationConfig',
+    'MiADGenerator',
+    'create_generator_from_checkpoint',
 ]

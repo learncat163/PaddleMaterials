@@ -12,4 +12,69 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""
+MiAD (Mirage Atom Diffusion) models and utilities.
+
+Modules:
+    - miad: Main MiAD model wrapper
+    - cspnet_complete: CSPNet encoder
+    - crystal_diffusion: CrystalGen/DiffCSP diffusion controllers
+    - lattice_diffusion: DDPM/FM for lattice
+    - frac_diffusion: WrappedNormal/PFM for fractional coords
+    - type_diffusion: DDPM_onehot/D3PM for atom types
+    - scheduler: Diffusion schedulers
+    - diffusion_utils: Time embeddings and utilities
+    - graph_utils: Graph operations
+"""
+
 from ppmat.models.miad.miad import MiAD
+from ppmat.models.miad.cspnet_complete import CSPNet
+from ppmat.models.miad.crystal_diffusion import CrystalGen, DiffCSP, init_diffusion
+from ppmat.models.miad.lattice_diffusion import DDPM, FM, FM_LenAng
+from ppmat.models.miad.frac_diffusion import WrappedNormal, PFM
+from ppmat.models.miad.type_diffusion import DDPM_onehot, D3PM
+from ppmat.models.miad.diffusion_utils import SinusoidalTimeEmbeddings, TimeDistribution
+from ppmat.models.miad.graph_utils import (
+    to_dense_adj,
+    dense_to_sparse,
+    block_diag,
+    segment_csr,
+    coalesce,
+)
+from ppmat.models.miad.scheduler import scheduler
+
+__all__ = [
+    # Core model
+    'MiAD',
+    'CSPNet',
+
+    # Diffusion controllers
+    'CrystalGen',
+    'DiffCSP',
+    'init_diffusion',
+
+    # Lattice diffusion
+    'DDPM',
+    'FM',
+    'FM_LenAng',
+
+    # Fractional coordinate diffusion
+    'WrappedNormal',
+    'PFM',
+
+    # Type diffusion
+    'DDPM_onehot',
+    'D3PM',
+
+    # Utilities
+    'SinusoidalTimeEmbeddings',
+    'TimeDistribution',
+    'scheduler',
+
+    # Graph utilities
+    'to_dense_adj',
+    'dense_to_sparse',
+    'block_diag',
+    'segment_csr',
+    'coalesce',
+]
