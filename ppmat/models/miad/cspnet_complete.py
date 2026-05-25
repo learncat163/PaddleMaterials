@@ -424,15 +424,15 @@ class CSPNet(nn.Layer):
         # Discrete: atom_types shape (total_atoms,) with values in [1, max_atoms)
         # One-hot: atom_types shape (total_atoms, num_types)
         if atom_types.ndim > 1:
-            # One-hot input: convert back to discrete indices
-            atom_indices = atom_types.argmax(axis=-1)
-            # Add 1 because original atom types start from 1
-            # This avoids issues when argmax returns 0
-            atom_indices = atom_indices + 1
+            # One-hot input: for smooth=True Linear model, directly use one-hot input
             if self.smooth:
-                node_features = self.node_embedding(atom_indices.cast('float32'))
+                # Linear layer expects one-hot [N, 100] as input
+                node_features = self.node_embedding(atom_types.cast('float32'))
             else:
-                node_features = self.node_embedding(atom_indices - 1)
+                # Embedding expects indices
+                atom_indices = atom_types.argmax(axis=-1)
+                atom_indices = atom_indices + 1
+                node_features = self.node_embedding(atom_indices.cast('float32'))
         else:
             if self.smooth:
                 node_features = self.node_embedding(atom_types.cast('float32'))
