@@ -1,0 +1,143 @@
+Global:
+  do_train: True
+  do_eval: False
+  do_test: False
+  num_train_timesteps: 1000
+
+Trainer:
+  max_epochs: 8000
+  seed: 42
+  output_dir: ./output/miad_mp20
+  save_freq: 1000
+  log_freq: 10
+  start_eval_epoch: 1
+  eval_freq: 1
+  pretrained_model_path: null
+  resume_from_checkpoint: null
+  use_amp: False
+  amp_level: 'O1'
+  eval_with_no_grad: True
+  gradient_accumulation_steps: 1
+  best_metric_indicator: 'eval_loss'
+  name_for_best_metric: "loss"
+  greater_is_better: False
+  compute_metric_during_train: False
+  metric_strategy_during_eval: 'step'
+  use_visualdl: False
+  use_wandb: False
+  use_tensorboard: False
+
+Model:
+  __class_name__: MiAD
+  __init_params__:
+    encoder_cfg:
+      num_atom_types: 100
+      hidden_channels: 512
+      num_layers: 6
+      cutoff: 6.0
+      max_num_atoms: 25
+    diffusion_cfg:
+      task: gen-csp-mp20
+      cont_time: false
+      num_steps: 1000
+      lat_diffusion:
+        method: fm
+      lat_diffusion_config: {}
+      frac_diffusion:
+        method: wrapped_normal
+      frac_diffusion_config: {}
+      type_diffusion:
+        method: ddpm_onehot
+      type_diffusion_config: {}
+    time_dim: 256
+    lattice_loss_weight: 1
+    coord_loss_weight: 1
+    type_loss_weight: 1
+
+Optimizer:
+  __class_name__: Adam
+  __init_params__:
+    beta1: 0.9
+    beta2: 0.999
+    lr:
+      __class_name__: ReduceOnPlateau
+      __init_params__:
+        learning_rate: 0.001
+        factor: 0.6
+        by_epoch: True
+        patience: 30
+        min_lr: 0.0001
+        indicator: "train_loss"
+        indicator_name: 'loss'
+
+Dataset:
+  train:
+    dataset:
+      __class_name__: MP20Dataset
+      __init_params__:
+        path: "./data/mp_20/train.csv"
+        build_structure_cfg:
+          format: cif_str
+          num_cpus: 10
+    loader:
+      num_workers: 0
+      use_shared_memory: False
+    sampler:
+      __class_name__: BatchSampler
+      __init_params__:
+        shuffle: True
+        drop_last: False
+        batch_size: 256
+  val:
+    dataset:
+      __class_name__: MP20Dataset
+      __init_params__:
+        path: "./data/mp_20/val.csv"
+        build_structure_cfg:
+          format: cif_str
+          num_cpus: 10
+    sampler:
+      __class_name__: BatchSampler
+      __init_params__:
+        shuffle: False
+        drop_last: False
+        batch_size: 128
+  test:
+    dataset:
+      __class_name__: MP20Dataset
+      __init_params__:
+        path: "./data/mp_20/test.csv"
+        build_structure_cfg:
+          format: cif_str
+          num_cpus: 10
+    sampler:
+      __class_name__: DistributedBatchSampler
+      __init_params__:
+        shuffle: False
+        drop_last: False
+        batch_size: 128
+
+Sample:
+  data:
+    dataset:
+      __class_name__: MP20Dataset
+      __init_params__:
+        path: "./data/mp_20/test.csv"
+        build_structure_cfg:
+          format: cif_str
+          num_cpus: 10
+    sampler:
+      __class_name__: BatchSampler
+      __init_params__:
+        shuffle: False
+        drop_last: False
+        batch_size: 256
+  build_structure_cfg:
+    format: array
+    niggli: False
+  metrics:
+    __class_name__: CSPMetric
+    __init_params__:
+      gt_file_path: "./data/mp_20/test.csv"
+  model_sample_params:
+    num_inference_steps: 1000
