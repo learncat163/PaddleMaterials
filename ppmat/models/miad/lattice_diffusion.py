@@ -1,4 +1,4 @@
-# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -14,8 +14,6 @@
 
 """
 Lattice diffusion models for MiAD.
-Provides DDPM and Flow Matching (FM) for lattice vector diffusion.
-Converted from PyTorch to PaddlePaddle.
 """
 
 import paddle
@@ -25,11 +23,7 @@ from ppmat.models.miad.scheduler import scheduler as get_scheduler
 
 
 class DDPM(nn.Layer):
-    """DDPM for lattice diffusion using cosine noise schedule.
-
-    Uses pre-computed reverse coefficients derived from the cumulative
-    product of alphas provided by the scheduler.
-    """
+    """DDPM for lattice diffusion."""
 
     def __init__(self, diffusion_config):
         super().__init__()
@@ -81,16 +75,6 @@ class DDPM(nn.Layer):
         return x0
 
     def forward_step_sample(self, x0, t, batch):
-        """Add noise to lattice at timestep t.
-
-        Args:
-            x0: Original lattice (batch_size, 3, 3).
-            t: Timestep indices (batch_size,).
-            batch: Batch dict.
-
-        Returns:
-            xt: Noisy lattice (batch_size, 3, 3).
-        """
         if self.cont_time and self.f_cumprod_alphas_t is not None:
             at = self.f_cumprod_alphas_t(t)
         else:
@@ -100,17 +84,6 @@ class DDPM(nn.Layer):
         return xt
 
     def reverse_step_sample(self, eps_pred, xt, t, batch):
-        """Denoise lattice by one step.
-
-        Args:
-            eps_pred: Predicted noise (batch_size, 3, 3).
-            xt: Noisy lattice at timestep t (batch_size, 3, 3).
-            t: Timestep indices (batch_size,).
-            batch: Batch dict.
-
-        Returns:
-            xt_1: Denoised lattice at timestep t-1.
-        """
         t_idx = t.cast('int64')
         mu_xt_1 = self.reverse_c0[t_idx] * (
             xt - self.reverse_c1[t_idx] * eps_pred
@@ -122,11 +95,9 @@ class DDPM(nn.Layer):
         )
 
     def prior_sample(self, batch):
-        """Sample from prior (pure noise)."""
         return paddle.randn([batch['batch_size'], 3, 3], dtype='float32')
 
     def loss(self, batch):
-        """Compute MSE loss between predicted and actual noise."""
         eps_pred = batch['prediction'][0]
         l2 = ((eps_pred - self.randn_x) ** 2).reshape(
             [eps_pred.shape[0], -1]
@@ -134,7 +105,6 @@ class DDPM(nn.Layer):
         return l2
 
     def get_x0_prediction(self, eps_pred, xt, t, batch):
-        """Predict x0 from noise prediction."""
         t_idx = t.cast('int64')
         x0_pred = (
             self.eps_to_x0_c0[t_idx] * xt
@@ -144,10 +114,7 @@ class DDPM(nn.Layer):
 
 
 class FM(nn.Layer):
-    """Flow Matching for lattice diffusion.
-
-    Supports both 'eps' and 'v' parameterization.
-    """
+    """Flow Matching for lattice diffusion."""
 
     def __init__(self, diffusion_config):
         super().__init__()
@@ -167,16 +134,6 @@ class FM(nn.Layer):
         return x0
 
     def forward_step_sample(self, x0, t, batch):
-        """Interpolate between x0 and noise.
-
-        Args:
-            x0: Original lattice (batch_size, 3, 3).
-            t: Timestep indices (batch_size,).
-            batch: Batch dict.
-
-        Returns:
-            xt: Interpolated lattice.
-        """
         eps = paddle.randn(x0.shape)
         step = (1 + t[:, None, None]) * self.step
         xt = (1 - step) * x0 + step * eps
@@ -187,17 +144,6 @@ class FM(nn.Layer):
         return xt
 
     def reverse_step_sample(self, pred, xt, t, batch):
-        """Reverse flow matching step.
-
-        Args:
-            pred: Model prediction (velocity or eps).
-            xt: Current state (batch_size, 3, 3).
-            t: Timestep indices (batch_size,).
-            batch: Batch dict.
-
-        Returns:
-            xt_1: Updated state.
-        """
         t_idx = t.cast('int64')
         if self.parameterization == 'eps':
             if t_idx[0] >= 999:
@@ -212,17 +158,14 @@ class FM(nn.Layer):
         return xt_1
 
     def prior_sample(self, batch):
-        """Sample from prior (pure noise)."""
         return paddle.randn([batch['batch_size'], 3, 3], dtype='float32')
 
     def loss(self, batch):
-        """Compute MSE loss between predicted and target velocity."""
         vt = batch['prediction'][0]
         l2 = ((vt - self.ut) ** 2).reshape([-1, 9]).mean(axis=1)
         return l2
 
     def get_x0_prediction(self, pred, xt, t, batch):
-        """Predict x0 from velocity prediction."""
         step = (1 + t[:, None, None]) * self.step
         t_idx = t.cast('int64')
         if self.parameterization == 'eps':
@@ -237,11 +180,7 @@ class FM(nn.Layer):
 
 
 class FM_LenAng(nn.Layer):
-    """Flow Matching for lattice in length-angle parameterization.
-
-    Prior samples lattice lengths from Gamma distribution and angles
-    from constrained uniform, then converts back to lattice matrix.
-    """
+    """Flow Matching for lattice in length-angle parameterization."""
 
     def __init__(self, diffusion_config):
         super().__init__()
@@ -261,7 +200,6 @@ class FM_LenAng(nn.Layer):
         self.to_domain = lambda x: x
 
     def _get_converters(self):
-        """Lazy import to avoid circular dependency."""
         if self._lat2lenang is None:
             from ppmat.data.miad.crystal_utils import (
                 lattice_to_lengths_and_angles,
@@ -279,7 +217,6 @@ class FM_LenAng(nn.Layer):
         return x0
 
     def forward_step_sample(self, x0, t, batch):
-        """Interpolate toward prior sample."""
         xT = self.prior_sample(batch)
         step = (1 + t[:, None, None]) * self.step
         xt = (1 - step) * x0 + step * xT
@@ -287,12 +224,10 @@ class FM_LenAng(nn.Layer):
         return xt
 
     def reverse_step_sample(self, vt, xt, t, batch):
-        """Reverse step."""
         xt_1 = xt + self.step * vt
         return xt_1
 
     def prior_sample(self, batch):
-        """Sample from length-angle prior, convert to lattice matrix."""
         bs = batch['batch_size']
         lenang_xT = paddle.zeros([bs, 6], dtype='float32')
 
@@ -317,18 +252,15 @@ class FM_LenAng(nn.Layer):
         return xT
 
     def loss(self, batch):
-        """Compute FM loss with default scaling."""
         vt = batch['prediction'][0]
         l2 = ((vt - self.ut) ** 2).reshape([-1, 9]).mean(axis=1)
         return self.default_loss_scale * l2
 
     def get_x0_prediction(self, vt, xt, t, batch):
-        """Predict x0 from velocity."""
         step = (1 + t[:, None, None]) * self.step
         return xt + step * vt
 
 
 def _numpy_gamma(alpha, theta, shape):
-    """Sample from Gamma distribution using numpy (Paddle has no Gamma)."""
     import numpy as np
     return np.random.gamma(alpha, theta, shape)
