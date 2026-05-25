@@ -34,7 +34,7 @@ from ppmat.models.miad.graph_utils import (
 MAX_ATOMIC_NUM = 100
 
 
-class SinusoidsEmbedding(nn.Module):
+class SinusoidsEmbedding(nn.Layer):
     """
     Sinusoidal position embedding for fractional coordinates.
     """
@@ -60,7 +60,7 @@ class SinusoidsEmbedding(nn.Module):
         return emb.detach()
 
 
-class CSPLayer(nn.Module):
+class CSPLayer(nn.Layer):
     """
     Message passing layer for CSPNet.
     """
@@ -80,7 +80,7 @@ class CSPLayer(nn.Module):
         if dis_emb is not None:
             self.dis_dim = dis_emb.dim
         if act_fn is None:
-            act_fn = nn.Silu()
+            act_fn = nn.SiLU()
         self.edge_mlp = nn.Sequential(
             nn.Linear(hidden_dim * 2 + 9 + self.dis_dim, hidden_dim),
             act_fn,
@@ -138,7 +138,7 @@ class CSPLayer(nn.Module):
         Returns:
             node_output: Updated node features of shape (total_nodes, hidden_dim)
         """
-        agg = scatter(edge_features, edge_index[0], axis=0, reduce='mean', dim_size=node_features.shape[0])
+        agg = scatter(edge_features, edge_index[0], dim=0, reduce='mean', dim_size=node_features.shape[0])
         agg = paddle.concat([node_features, agg], axis=1)
         out = self.node_mlp(agg)
         return out
@@ -334,7 +334,7 @@ class CSPNet(nn.Layer):
             self.node_embedding = nn.Embedding(max_atoms, hidden_dim)
         self.atom_latent_emb = nn.Linear(hidden_dim + latent_dim, hidden_dim)
         if act_fn == 'silu':
-            self.act_fn = nn.Silu()
+            self.act_fn = nn.SiLU()
         if dis_emb == 'sin':
             self.dis_emb = SinusoidsEmbedding(n_frequencies=num_freqs)
         elif dis_emb == 'none':
@@ -420,10 +420,24 @@ class CSPNet(nn.Layer):
         """
         edges, frac_diff = self.gen_edges(num_atoms, frac_coords, lattices, node2graph)
         edge2graph = node2graph[edges[0]]
-        if self.smooth:
-            node_features = self.node_embedding(atom_types)
+        # Handle both discrete atom types and one-hot encoding
+        # Discrete: atom_types shape (total_atoms,) with values in [1, max_atoms)
+        # One-hot: atom_types shape (total_atoms, num_types)
+        if atom_types.ndim > 1:
+            # One-hot input: convert back to discrete indices
+            atom_indices = atom_types.argmax(axis=-1)
+            # Add 1 because original atom types start from 1
+            # This avoids issues when argmax returns 0
+            atom_indices = atom_indices + 1
+            if self.smooth:
+                node_features = self.node_embedding(atom_indices.cast('float32'))
+            else:
+                node_features = self.node_embedding(atom_indices - 1)
         else:
-            node_features = self.node_embedding(atom_types - 1)
+            if self.smooth:
+                node_features = self.node_embedding(atom_types.cast('float32'))
+            else:
+                node_features = self.node_embedding(atom_types - 1)
 
         t_per_atom = paddle.repeat_interleave(t_emb, num_atoms, axis=0)
         node_features = paddle.concat([node_features, t_per_atom], axis=1)
@@ -437,7 +451,7 @@ class CSPNet(nn.Layer):
 
         coord_out = self.coord_out(node_features)
 
-        graph_features = scatter(node_features, node2graph, axis=0, reduce='mean')
+        graph_features = scatter(node_features, node2graph, dim=0, reduce='mean')
         lattice_out = self.lattice_out(graph_features)
         lattice_out = lattice_out.reshape([-1, 3, 3])
 

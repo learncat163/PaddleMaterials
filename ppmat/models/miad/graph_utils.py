@@ -94,49 +94,31 @@ def dense_to_sparse(adj):
         edge_attr: Edge attributes (optional)
     """
     if adj.ndim == 2:
-        # Single graph case
-        adj = adj.unsqueeze(0)
-        squeeze_output = True
-    else:
-        squeeze_output = False
+        # Single graph case: use nonzero for vectorized extraction
+        nonzero = paddle.nonzero(adj.cast('float32'))
+        if nonzero.shape[0] == 0:
+            return paddle.zeros([2, 0], dtype='int64'), paddle.zeros([0], dtype='float32')
+        edge_index = nonzero.t()
+        return edge_index, paddle.ones([edge_index.shape[1]], dtype='float32')
 
+    # Batch case
     batch_size, num_nodes, _ = adj.shape
-
     edge_indices_list = []
     edge_attrs_list = []
 
     for b in range(batch_size):
         adj_b = adj[b]
-        # Find non-zero edges
-        edges = paddle.nonzero(adj_b)
-        if len(edges) == 0:
-            # No edges
-            edge_indices_list.append(paddle.zeros([2, 0], dtype='int64'))
-            if adj_b.shape[-1] > 1:
-                edge_attrs_list.append(paddle.zeros([0, adj_b.shape[-1]], dtype=adj_b.dtype))
-            else:
-                edge_attrs_list.append(paddle.zeros([0], dtype=adj_b.dtype))
+        nonzero = paddle.nonzero(adj_b.cast('float32'))
+        if nonzero.shape[0] == 0:
             continue
+        edge_indices_list.append(nonzero.t())
+        edge_attrs_list.append(paddle.ones([nonzero.shape[0]], dtype='float32'))
 
-        # Extract edge indices
-        edge_index_b = edges.t()
+    if not edge_indices_list:
+        return paddle.zeros([2, 0], dtype='int64'), paddle.zeros([0], dtype='float32')
 
-        # Extract edge attributes
-        if adj_b.shape[-1] > 1:
-            edge_attr_b = adj_b[edges[:, 0], edges[:, 1]]
-        else:
-            edge_attr_b = paddle.ones([len(edges)], dtype=adj_b.dtype)
-
-        edge_indices_list.append(edge_index_b)
-        edge_attrs_list.append(edge_attr_b)
-
-    # Concatenate all graphs
     edge_index = paddle.concat(edge_indices_list, axis=1)
     edge_attr = paddle.concat(edge_attrs_list, axis=0)
-
-    if squeeze_output:
-        edge_attr = edge_attr.squeeze(0) if edge_attr.shape[0] == 1 else edge_attr
-
     return edge_index, edge_attr
 
 
@@ -145,30 +127,24 @@ def block_diag(*inputs):
     Create a block diagonal matrix from input tensors.
 
     Args:
-        *inputs: Variable number of 2D tensors
+        *inputs: Variable number of 2D tensors (square matrices for fc graph)
 
     Returns:
-        output: Block diagonal matrix
+        output: Block diagonal matrix of shape (total_size, total_size)
     """
     # Get dimensions
     sizes = [tensor.shape[0] for tensor in inputs]
     total_size = sum(sizes)
 
-    # Get number of columns from first tensor
-    if inputs[0].ndim == 1:
-        # 1D tensors - convert to 2D
-        inputs = [tensor.unsqueeze(-1) if tensor.ndim == 1 else tensor for tensor in inputs]
-        num_cols = inputs[0].shape[1]
-        output = paddle.zeros([total_size, num_cols])
-    else:
-        num_cols = inputs[0].shape[1]
-        output = paddle.zeros([total_size, num_cols])
+    # All inputs should be square matrices (n, n)
+    # Output should be (total_size, total_size)
+    output = paddle.zeros([total_size, total_size], dtype=inputs[0].dtype)
 
     # Fill block diagonal
     row_offset = 0
     for tensor in inputs:
         rows, cols = tensor.shape
-        output[row_offset:row_offset + rows, :cols] = tensor
+        output[row_offset:row_offset + rows, row_offset:row_offset + cols] = tensor
         row_offset += rows
 
     return output

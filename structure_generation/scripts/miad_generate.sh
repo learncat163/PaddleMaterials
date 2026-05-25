@@ -68,19 +68,23 @@ from paddle.io import DataLoader
 from ppmat.models.miad.miad import MiAD
 
 # Load model
-cfg = {
-    '__class_name__': 'MiAD',
-    '__init_params__': {
-        'encoder_cfg': {'num_atom_types': 100, 'hidden_channels': 512, 'num_layers': 6},
-        'diffusion_cfg': {'task': 'gen-csp-mp20', 'lat_diffusion': {'method': 'fm'}},
-        'num_train_timesteps': 1000, 'time_dim': 256,
-    }
-}
-from ppmat.models import build_model
-model = build_model(cfg)
+model = MiAD(
+    model_cfg={
+        'hidden_dim': 512, 'latent_dim': 256, 'num_layers': 6,
+        'smooth': True, 'pred_type': True, 'num_freqs': 128,
+        'ln': True, 'ip': True, 'max_atoms': 100,
+    },
+    diffusion_cfg={
+        'task': 'gen_mp20', 'method': 'DiffCSP',
+        'cont_time': False, 'num_steps': 1000,
+        'lat_diffusion': {'method': 'fm', 'scheduler': 'diffcsp_cosine', 'parameterization': 'eps'},
+        'frac_diffusion': {'method': 'wrapped_normal', 'scheduler': 'default_wrapped_normal'},
+        'type_diffusion': {'method': 'ddpm_onehot', 'scheduler': 'diffcsp_cosine'},
+    },
+)
 
 # Load pretrained
-from ppmat.models.miad.cspnet import CSPNet
+from ppmat.models.miad.cspnet_complete import CSPNet
 pretrained = CSPNet.load_pytorch_weights('$CHECKPOINT')
 decoder_state = model.decoder.state_dict()
 for key in pretrained.state_dict():

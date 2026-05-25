@@ -39,7 +39,7 @@ def lengths_and_angles_to_lattice(lengths, angles):
     val = (coses[:, 0] * coses[:, 1] - coses[:, 2]) / (sins[:, 0] * sins[:, 1])
     # Sometimes rounding errors result in values slightly > 1.
     val = paddle.clip(val, -1., 1.)
-    gamma_star = paddle.arccos(val)
+    gamma_star = paddle.acos(val)
 
     vector_a = paddle.stack([
         lengths[:, 0] * sins[:, 1],
@@ -75,7 +75,7 @@ def lattice_to_lengths_and_angles(lattices):
         k = (i + 2) % 3
         angles[..., i] = paddle.clip(paddle.sum(lattices[..., j, :] * lattices[..., k, :], axis=-1) /
                                      (lengths[..., j] * lengths[..., k]), -1., 1.)
-    angles = paddle.arccos(angles) * 180.0 / np.pi
+    angles = paddle.acos(angles) * 180.0 / np.pi
     return lengths, angles
 
 

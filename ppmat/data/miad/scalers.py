@@ -57,16 +57,10 @@ class StandardContiniousScaler:
         self.eps = 1e-3
 
     def align_devices(self, data):
-        """
-        Align devices between data and scaler parameters.
-
-        Args:
-            data: Input tensor
-
-        Returns:
-            data: Data after device alignment
-        """
-        self.mean, self.std = self.mean.to(data.device), self.std.to(data.device)
+        """Align devices between data and scaler parameters."""
+        self.mean = self.mean.to(data.place)
+        self.std = self.std.to(data.place)
+        return data
         return data
 
     def rescale(self, data):

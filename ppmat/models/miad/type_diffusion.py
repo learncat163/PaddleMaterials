@@ -14,155 +14,263 @@
 
 """
 Atom type diffusion models for MiAD.
+Provides DDPM_onehot (inherits from lattice DDPM, reshaped for one-hot atom types)
+and D3PM (discrete transition matrix diffusion).
 Converted from PyTorch to PaddlePaddle.
 """
 
 import paddle
 import paddle.nn.functional as F
 
+from ppmat.models.miad.lattice_diffusion import DDPM
+from ppmat.models.miad.scheduler import scheduler as get_scheduler
 
-class DDPM_onehot:
-    """
-    DDPM for atom types with one-hot encoding.
 
-    Note: This class inherits logic from lattice DDPM but applies it to discrete atom types.
+class DDPM_onehot(DDPM):
+    """DDPM for atom types with one-hot encoding.
+
+    Inherits from lattice DDPM, sharing the same scheduler and coefficients.
+    Reshapes (N,3,3) tensors to (N,1) for one-hot atom type handling.
     """
 
     def __init__(self, diffusion_config):
-        """
-        Args:
-            diffusion_config: Diffusion configuration dictionary
-        """
-        # Reuse lattice diffusion config structure
-        self.num_steps = diffusion_config.num_steps
-        self.beta = paddle.linspace(diffusion_config.beta_start, diffusion_config.beta_end, self.num_steps)
-        self.alpha = 1.0 - self.beta
-        self.alpha_bar = paddle.cumprod(self.alpha, axis=0)
+        # Temporarily swap lat_diffusion with type_diffusion so
+        # the parent DDPM initializes with the type diffusion scheduler.
+        ddpm_config = diffusion_config.lat_diffusion
+        diffusion_config.lat_diffusion = diffusion_config.type_diffusion
+        super().__init__(diffusion_config)
+        diffusion_config.lat_diffusion = ddpm_config
 
-        # Reshape for atom types
-        for attr, value in self.__dict__.items():
-            if isinstance(value, paddle.Tensor) and len(value.shape) == 3:
-                self.__dict__[attr] = value.reshape([-1, 1])
+        # Reshape coefficients from (N,1,1) to (N,1) for atom types
+        _reshape_attrs = [
+            'betas_t', 'alphas_t', 'cumprod_alphas_t', 'cumprod_alphas_t_1',
+            'reverse_c0', 'reverse_c1', 'reverse_std_coef',
+            'eps_to_x0_c0', 'eps_to_x0_c1',
+        ]
+        for attr in _reshape_attrs:
+            value = getattr(self, attr, None)
+            if value is not None and isinstance(value, paddle.Tensor):
+                if len(value.shape) == 3:
+                    setattr(self, attr, value.reshape([-1, 1]))
 
         self.num_types = 100
-        self.to_domain = lambda types: F.one_hot(types - 1, num_classes=self.num_types).cast('float32')
+        self.to_domain = lambda types: F.one_hot(
+            types - 1, num_classes=self.num_types
+        ).cast('float32')
         self.from_domain = lambda onehot: onehot.argmax(axis=-1) + 1
 
+    def output_transform(self, x0, batch):
+        return x0
+
     def forward_step_sample(self, x0, t, batch):
-        """
-        Forward diffusion step: add noise to atom types (one-hot).
+        """Forward diffusion for atom types (discrete -> one-hot -> noisy).
 
         Args:
-            x0: Original atom types of shape (total_atoms,)
-            t: Timestep of shape (batch_size,)
-            batch: Batch dictionary
+            x0: Atom type indices (total_atoms,).
+            t: Timestep (batch_size,).
+            batch: Batch dict.
 
         Returns:
-            onehot_xt: Noisy one-hot atom types
+            onehot_xt: Noisy one-hot atom types (total_atoms, num_types).
         """
         onehot_x0 = self.to_domain(x0)
-        onehot_xt = self._forward_step_sample(onehot_x0, t, batch)
-        return onehot_xt
-
-    def _forward_step_sample(self, onehot_x0, t, batch):
-        """Internal forward step for one-hot encoded types."""
-        alpha_bar_t = self.alpha_bar[t.cast('int64')]
-        noise = paddle.randn(onehot_x0.shape)
-        onehot_xt = paddle.sqrt(alpha_bar_t[:, None]) * onehot_x0 + paddle.sqrt(1 - alpha_bar_t[:, None]) * noise
+        onehot_xt = super().forward_step_sample(onehot_x0, t, batch)
         return onehot_xt
 
     def reverse_step_sample(self, onehot_eps_pred, onehot_xt, t, batch):
-        """
-        Reverse diffusion step: denoise atom types.
+        """Reverse diffusion for atom types.
 
         Args:
-            onehot_eps_pred: Predicted noise (one-hot)
-            onehot_xt: Noisy one-hot atom types
-            t: Timestep
-            batch: Batch dictionary
+            onehot_eps_pred: Predicted noise (total_atoms, num_types).
+            onehot_xt: Noisy one-hot atom types (total_atoms, num_types).
+            t: Timestep (batch_size,).
+            batch: Batch dict.
 
         Returns:
-            onehot_xt_1: Denoised atom types (one-hot or discrete)
+            Denoised atom types: discrete at t=0, one-hot otherwise.
         """
-        onehot_xt_1 = self._reverse_step_sample(onehot_eps_pred, onehot_xt, t, batch)
-        if t[0] == 0:
+        onehot_xt_1 = super().reverse_step_sample(
+            onehot_eps_pred, onehot_xt, t, batch
+        )
+        if t.cast('int64')[0] == 0:
             xt_1 = self.from_domain(onehot_xt_1)
             return xt_1
         return onehot_xt_1
 
-    def _reverse_step_sample(self, onehot_eps_pred, onehot_xt, t, batch):
-        """Internal reverse step for one-hot encoded types."""
-        t_idx = t.cast('int64')
-        alpha_t = self.alpha[t_idx]
-        alpha_bar_t = self.alpha_bar[t_idx]
-        beta_t = self.beta[t_idx]
-        alpha_bar_t_prev = self.alpha_bar[paddle.maximum(t_idx - 1, 0)]
-
-        # Compute predicted x0
-        pred_x0 = (onehot_xt - paddle.sqrt(1 - alpha_bar_t[:, None]) * onehot_eps_pred) / paddle.sqrt(alpha_bar_t[:, None])
-
-        # Compute mean for reverse step
-        mean = (paddle.sqrt(alpha_bar_t_prev[:, None]) * beta_t[:, None] * pred_x0 +
-                paddle.sqrt(1 - beta_t[:, None]) * (1 - alpha_bar_t_prev[:, None]) * onehot_xt) / (
-                    1 - alpha_bar_t[:, None])
-
-        # Add noise if not last step
-        if t_idx[0] > 0:
-            noise = paddle.randn(onehot_xt.shape)
-            onehot_xt_1 = mean + paddle.sqrt(beta_t[:, None]) * noise
-        else:
-            onehot_xt_1 = mean
-
-        return onehot_xt_1
-
     def prior_sample(self, batch):
-        """
-        Sample from prior distribution (random noise).
-
-        Args:
-            batch: Batch dictionary
-
-        Returns:
-            sample: Random noise of shape (num_atoms, num_types)
-        """
-        return paddle.randn([batch['num_atoms'], self.num_types], dtype='float32')
+        """Sample from prior (pure noise)."""
+        return paddle.randn(
+            [batch['num_atoms'], self.num_types], dtype='float32'
+        )
 
     def loss(self, batch):
-        """
-        Compute DDPM loss for atom types.
-
-        Args:
-            batch: Batch dictionary
-
-        Returns:
-            loss: Per-sample loss
-        """
+        """Compute MSE loss between predicted and actual noise."""
         eps_pred = batch['prediction'][2]
-        l2 = ((eps_pred - self.randn_x) ** 2).reshape([eps_pred.shape[0], -1]).mean(axis=1)
+        l2 = ((eps_pred - self.randn_x) ** 2).reshape(
+            [eps_pred.shape[0], -1]
+        ).mean(axis=1)
         return l2
 
-    def get_x0_prediction(self, onehot_eps_pred, onehot_xt, t, batch, x0_format='disc'):
-        """
-        Get x0 prediction from noise prediction.
+    def get_x0_prediction(self, onehot_eps_pred, onehot_xt, t, batch,
+                          x0_format='disc'):
+        """Predict x0 from noise prediction.
 
         Args:
-            onehot_eps_pred: Predicted noise
-            onehot_xt: Noisy one-hot atom types
-            t: Timestep
-            batch: Batch dictionary
-            x0_format: Output format ('onehot' or 'disc')
+            onehot_eps_pred: Predicted noise.
+            onehot_xt: Noisy one-hot.
+            t: Timestep.
+            batch: Batch dict.
+            x0_format: 'onehot' or 'disc'.
 
         Returns:
-            x0_pred: Predicted original atom types
+            x0 prediction in specified format.
         """
-        alpha_bar_t = self.alpha_bar[t.cast('int64')]
-        onehot_x0_pred = (onehot_xt - paddle.sqrt(1 - alpha_bar_t[:, None]) * onehot_eps_pred) / paddle.sqrt(alpha_bar_t[:, None])
-
+        onehot_x0_pred = super().get_x0_prediction(
+            onehot_eps_pred, onehot_xt, t, batch
+        )
         if x0_format == 'onehot':
             return onehot_x0_pred
         elif x0_format == 'disc':
             return self.from_domain(onehot_x0_pred)
 
+
+class D3PM:
+    """Discrete Denoising Diffusion Probabilistic Model for atom types.
+
+    Uses transition matrices Q_t instead of Gaussian noise.
+    Loss is KL divergence between predicted and true reverse distributions.
+    """
+
+    def __init__(self, diffusion_config):
+        self.config = diffusion_config.type_diffusion
+        self.num_steps = diffusion_config.num_steps
+        self.num_types = 100
+
+        Q_t, cumprod_Q_t = get_scheduler(
+            self.config.scheduler, self.num_steps
+        )
+
+        Q_t_1 = paddle.concat(
+            [
+                paddle.eye(Q_t.shape[1], dtype='float32').unsqueeze(0),
+                Q_t[:-1],
+            ],
+            axis=0,
+        )
+        self.Q_t = Q_t.reshape([-1, self.num_types, self.num_types])
+        self.Q_t_1 = Q_t_1.reshape([-1, self.num_types, self.num_types])
+        cumprod_Q_t_1 = paddle.concat(
+            [
+                paddle.eye(cumprod_Q_t.shape[1], dtype='float32').unsqueeze(0),
+                cumprod_Q_t[:-1],
+            ],
+            axis=0,
+        )
+        self.cumprod_Q_t = cumprod_Q_t.reshape(
+            [-1, self.num_types, self.num_types]
+        )
+        self.cumprod_Q_t_1 = cumprod_Q_t_1.reshape(
+            [-1, self.num_types, self.num_types]
+        )
+
+        self.to_domain = lambda types: F.one_hot(
+            types, num_classes=self.num_types
+        ).cast('float32')
+        self.from_domain = lambda onehot: onehot.argmax(axis=-1)
+        self.prediction_to_domain = lambda pred: F.softmax(pred, axis=-1)
+        self.default_loss_scale = 1000
+
     def output_transform(self, x0, batch):
-        """Transform output before returning."""
-        return x0
+        return self.from_domain(x0)
+
+    def forward_step_sample(self, x0, t, batch):
+        """Forward: apply transition matrix and sample."""
+        onehot_x0 = self.to_domain(x0)
+        xt_probs = paddle.matmul(
+            onehot_x0[:, None, :], self.cumprod_Q_t[t.cast('int64')]
+        )[:, 0, :]
+        xt = _multinomial_sample(xt_probs)
+        onehot_xt = self.to_domain(xt)
+        return onehot_xt
+
+    def _reverse_step_distribution(self, onehot_x0, onehot_xt, t):
+        """Compute reverse transition distribution."""
+        t_idx = t.cast('int64')
+        numerator = (
+            paddle.matmul(
+                onehot_xt[:, None, :], self.Q_t[t_idx].transpose([0, 2, 1])
+            )[:, 0, :]
+            * paddle.matmul(
+                onehot_x0[:, None, :], self.cumprod_Q_t_1[t_idx]
+            )[:, 0, :]
+        )
+        denominator = (
+            paddle.matmul(
+                onehot_x0[:, None, :], self.cumprod_Q_t[t_idx]
+            )[:, 0, :]
+            * onehot_xt
+        ).sum(axis=-1)[:, None]
+        return numerator / (denominator + 1e-8)
+
+    def reverse_step_sample(self, onehot_pred, onehot_xt, t, batch):
+        """Reverse: predict x0, compute reverse distribution, sample."""
+        onehot_x0 = self.prediction_to_domain(onehot_pred)
+        xt_1_probs = self._reverse_step_distribution(
+            onehot_x0, onehot_xt, t
+        )
+        if t.cast('int64')[0] == 0:
+            return self.to_domain(
+                self.from_domain(xt_1_probs.cast('float32'))
+            )
+        xt_1 = _multinomial_sample(xt_1_probs)
+        onehot_xt_1 = self.to_domain(xt_1)
+        self.xt_1_probs = xt_1_probs
+        return onehot_xt_1
+
+    def prior_sample(self, batch):
+        """Uniform prior over atom types."""
+        shape = [batch['num_atoms'], self.num_types]
+        xT_probs = paddle.ones(shape, dtype='float32') / self.num_types
+        xT = _multinomial_sample(xT_probs)
+        onehot_xT = self.to_domain(xT)
+        return onehot_xT
+
+    def loss(self, batch):
+        """KL divergence loss between predicted and true reverse distributions."""
+        onehot_xt = batch['xt'][2]
+        t = batch['t'][1].cast('int64')
+        onehot_x0_pred = self.prediction_to_domain(batch['prediction'][2])
+        pred_xt_1_probs = self._reverse_step_distribution(
+            onehot_x0_pred, onehot_xt, t
+        )
+        onehot_x0 = self.to_domain(batch['x0'][2])
+        orig_xt_1_probs = self._reverse_step_distribution(
+            onehot_x0, onehot_xt, t
+        )
+        eps = 1e-4
+        kl_loss = (
+            orig_xt_1_probs
+            * (
+                paddle.log(orig_xt_1_probs + eps)
+                - paddle.log(pred_xt_1_probs + eps)
+            )
+        ).reshape([onehot_xt.shape[0], -1]).sum(axis=-1)
+        return self.default_loss_scale * kl_loss
+
+    def get_x0_prediction(self, onehot_pred, onehot_xt, t, batch):
+        """Predict x0 from model output."""
+        onehot_x0 = self.prediction_to_domain(onehot_pred)
+        return self.from_domain(onehot_x0)
+
+    def get_prob_of_nonexistence(self, onehot_pred):
+        """Get probability of atom being a mirage atom (type 0)."""
+        onehot_x0 = self.prediction_to_domain(onehot_pred)
+        return onehot_x0[:, 0]
+
+
+def _multinomial_sample(probs):
+    """Sample from categorical distribution (row-wise multinomial)."""
+    cum_probs = paddle.cumsum(probs, axis=-1)
+    rand = paddle.rand([probs.shape[0], 1])
+    samples = (rand > cum_probs).cast('int64').sum(axis=-1)
+    return samples.clip(0, probs.shape[1] - 1)

@@ -14,18 +14,18 @@
 
 """
 Diffusion utilities for MiAD model.
+Provides time embeddings, time distribution, and helper functions.
 Converted from PyTorch to PaddlePaddle.
 """
 
+import os
+import math
 import paddle
 import paddle.nn as nn
-import math
 
 
-class SinusoidalTimeEmbeddings(nn.Module):
-    """
-    Sinusoidal time embeddings for diffusion models.
-    """
+class SinusoidalTimeEmbeddings(nn.Layer):
+    """Sinusoidal time embeddings (from 'Attention is all you need')."""
 
     def __init__(self, dim):
         super().__init__()
@@ -34,97 +34,135 @@ class SinusoidalTimeEmbeddings(nn.Module):
     def forward(self, time):
         """
         Args:
-            time: Tensor of shape (batch_size,) containing time values
+            time: Tensor of shape (batch_size,) containing time values.
 
         Returns:
-            embeddings: Tensor of shape (batch_size, dim)
+            embeddings: Tensor of shape (batch_size, dim).
         """
-        device = time.place
         half_dim = self.dim // 2
         embeddings = math.log(10000) / (half_dim - 1)
-        embeddings = paddle.exp(paddle.arange(half_dim, dtype='float32') * -embeddings)
+        embeddings = paddle.exp(
+            paddle.arange(half_dim, dtype='float32') * -embeddings
+        )
         embeddings = time[:, None] * embeddings[None, :]
-        embeddings = paddle.concat([paddle.sin(embeddings), paddle.cos(embeddings)], axis=-1)
+        embeddings = paddle.concat(
+            [paddle.sin(embeddings), paddle.cos(embeddings)], axis=-1
+        )
         return embeddings
 
 
 class TimeDistribution:
-    """
-    Time distribution for diffusion sampling.
-    """
+    """Time sampling and iteration utilities for diffusion models."""
 
     def __init__(self, num_steps, cont_time):
-        """
-        Args:
-            num_steps: Total number of diffusion steps
-            cont_time: Whether to use continuous time
-        """
         self.num_steps = num_steps
         self.cont_time = cont_time
+        self.eps = 1e-3
+        modifications = os.environ.get('MODIFICATIONS_FIELD', '')
+        if 'time_log_normal_0_1_clip' in modifications:
+            print("MODIF: time_log_normal_0_1_clip", flush=True)
 
-    def sample(self, batch, mode):
+    def _atom_expand(self, batch, t):
+        """Expand time from batch-level to atom-level.
+
+        Returns [t_batch, t_per_atom] where t_per_atom repeats each
+        batch time value for the corresponding number of atoms.
         """
-        Sample random timesteps.
-
-        Args:
-            batch: Batch dictionary containing batch information
-            mode: 'uniform' or other sampling mode
-
-        Returns:
-            t: Sampled timesteps
-        """
-        if self.cont_time:
-            t = paddle.rand([batch['batch_size']])
+        # Support both new flat format (batch_idx tensor) and old format (batch object with num_atoms)
+        if 'batch_idx' in batch:
+            # New flat format from MiADCollator
+            num_atoms = batch['num_atoms']
         else:
-            t = paddle.randint(0, self.num_steps, [batch['batch_size']], dtype='int64')
-            t = t.cast('float32')
-        return [t, t, t]
+            # Old BatchInfo namedtuple format
+            num_atoms = batch['batch'].num_atoms
 
-    def reverse_time_iterator(self, batch, start_from=None):
+        t_per_atom = t.repeat_interleave(num_atoms)
+        return [t, t_per_atom]
+
+    def sample(self, batch, mode=None):
+        """Sample random timesteps.
+
+        Returns [t_batch, t_per_atom] with shape (batch_size,) and
+        (total_atoms,) respectively.
         """
-        Generate reverse time iterator for sampling.
+        modifications = os.environ.get('MODIFICATIONS_FIELD', '')
+        if 'time_log_normal_0_1_clip' in modifications:
+            s_eps = 2e-2
+            t = paddle.clip(
+                (1 + 2 * s_eps)
+                * paddle.nn.functional.sigmoid(paddle.randn(batch['batch_size']))
+                - s_eps,
+                0,
+                1,
+            )
+        else:
+            t = paddle.rand([batch['batch_size']])
 
-        Args:
-            batch: Batch dictionary
-            start_from: Starting timestep (default: num_steps - 1)
+        if 'max_time_' in modifications:
+            max_time = float(
+                modifications.split("max_time_")[1].split("+")[0]
+            )
+            t = t * max_time
 
-        Yields:
-            t_vector: Time vectors for each step
+        # Map [0, 1] to [eps, num_steps - 1 - eps]
+        t = self.eps + (self.num_steps - 1 - self.eps) * t
+        if not self.cont_time:
+            t = t.round().cast('int64').cast('float32')
+
+        return self._atom_expand(batch, t)
+
+    def get_time_points_tensor(self, batch, t):
+        """Get a specific time point for all samples."""
+        if t == -1:
+            t = self.num_steps - 1
+        t = paddle.full(
+            [batch['batch_size']], t, dtype='float32'
+        )
+        return self._atom_expand(batch, t)
+
+    def reverse_time_iterator(self, batch, start_from=-1):
+        """Iterate timesteps in reverse order for sampling.
+
+        Yields [t_batch, t_per_atom] at each step.
         """
-        if start_from is None:
+        if start_from == -1:
             start_from = self.num_steps - 1
+        for t_val in range(start_from, -1, -1):
+            t = paddle.full(
+                [batch['batch_size']], t_val, dtype='float32'
+            )
+            yield self._atom_expand(batch, t)
 
-        for t_value in range(start_from, -1, -1):
-            if self.cont_time:
-                t = paddle.full([batch['batch_size']], t_value / self.num_steps, dtype='float32')
-            else:
-                t = paddle.full([batch['batch_size']], t_value, dtype='float32')
-            yield [t, t, t]
+    def forward_time_iterator(self, batch, start_from):
+        """Iterate timesteps forward."""
+        for t_val in range(start_from, self.num_steps):
+            t = paddle.full(
+                [batch['batch_size']], t_val, dtype='float32'
+            )
+            yield self._atom_expand(batch, t)
 
     def to_cuda(self, t_vector, batch):
-        """
-        Move time vectors to device.
-
-        Args:
-            t_vector: Time vectors
-            batch: Batch dictionary
-
-        Returns:
-            t_vector: Time vectors on device
-        """
+        """Move time vectors to device (no-op in Paddle, kept for API compat)."""
         return t_vector
 
 
-def mean_interleave(tensor, num_atoms):
-    """
-    Interleave mean values across atoms.
+def mean_interleave(t, num_repeats):
+    """Compute per-group mean by interleaving.
+
+    Groups elements of t according to num_repeats, computing the mean
+    of each group.
 
     Args:
-        tensor: Tensor of shape (total_atoms,)
-        num_atoms: Number of atoms per sample
+        t: Tensor of shape (total_elements,).
+        num_repeats: Tensor of shape (num_groups,) specifying group sizes.
 
     Returns:
-        result: Interleaved tensor of shape (num_steps,)
+        mean_t: Tensor of shape (num_groups,).
     """
-    # TODO: Implement proper interleave logic
-    return tensor.mean()
+    mean_t = paddle.zeros([num_repeats.shape[0]], dtype=t.dtype)
+    shift = 0
+    for i, n in enumerate(num_repeats):
+        n = int(n)
+        mean_t[i] = t[shift : shift + n].mean()
+        shift += n
+    return mean_t

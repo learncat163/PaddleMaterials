@@ -14,79 +14,30 @@
 
 """
 Fractional coordinate diffusion models for MiAD with periodic boundary conditions.
+Provides WrappedNormal diffusion and Periodic Flow Matching (PFM).
 Converted from PyTorch to PaddlePaddle.
 """
 
 import os
 import paddle
-import numpy as np
 
-
-def scheduler(scheduler_name, num_steps):
-    """
-    Create diffusion scheduler.
-
-    Args:
-        scheduler_name: Name of the scheduler
-        num_steps: Number of diffusion steps
-
-    Returns:
-        scheduler_params: Tuple of scheduler parameters
-    """
-    if scheduler_name == 'default_wrapped_normal':
-        # params
-        sigma_begin, sigma_end = 0.005, 0.5
-        sigmas = paddle.to_tensor(
-            np.exp(np.linspace(np.log(sigma_begin), np.log(sigma_end), num_steps)),
-            dtype='float32'
-        )
-
-        # approx of WrappedNormal(x|sigma)
-        def p_wrapped_normal(x, sigma, N=10, T=1.0):
-            p_ = 0
-            for i in range(-N, N + 1):
-                p_ += paddle.exp(-(x + T * i) ** 2 / 2 / sigma ** 2)
-            return p_
-
-        # approx of grad_x(log(WrappedNormal(x|sigma)))
-        def d_log_p_wrapped_normal(x, sigma, N=10, T=1.0):
-            p_ = 0
-            for i in range(-N, N + 1):
-                p_ += (x + T * i) / sigma ** 2 * paddle.exp(-(x + T * i) ** 2 / 2 / sigma ** 2)
-            return p_ / p_wrapped_normal(x, sigma, N, T)
-
-        # approx of expectation_x(grad_x(log(WrappedNormal(x|sigma)))^2)
-        def sigma_norm(sigma, T=1.0, sn=100000):
-            sigmas = paddle.tile(sigma[None, :], [sn, 1])
-            x_sample = sigma * paddle.randn(sigmas.shape)
-            x_sample = x_sample % T
-            normal_ = d_log_p_wrapped_normal(x_sample, sigmas, T=T)
-            return (normal_ ** 2).mean(axis=0)
-
-        # computation
-        sigmas_norm_ = sigma_norm(sigmas)
-        sigmas_t = sigmas
-        sigmas_norm_t = sigmas_norm_
-        d_log_p = d_log_p_wrapped_normal
-        return sigmas_t, sigmas_norm_t, sigma_begin, sigma_end, d_log_p
-
-    raise NotImplementedError(f"Scheduler {scheduler_name} not implemented")
+from ppmat.models.miad.scheduler import scheduler as get_scheduler
 
 
 class WrappedNormal:
-    """
-    Wrapped Normal diffusion for fractional coordinates with periodic boundary conditions.
+    """Wrapped Normal diffusion for fractional coordinates.
+
+    Handles periodic boundary conditions on [0, 1)^3 via modular arithmetic.
+    Uses Langevin-type reverse sampling with pre-computed sigma schedule.
     """
 
     def __init__(self, diffusion_config):
-        """
-        Args:
-            diffusion_config: Diffusion configuration dictionary
-        """
         self.config = diffusion_config.frac_diffusion
         self.num_steps = diffusion_config.num_steps
 
-        sigmas_t, sigmas_norm_t, sb, se, d_log_p = scheduler(self.config.scheduler, self.num_steps)
+        sigmas_t, sigmas_norm_t, sb, se, d_log_p = get_scheduler(
+            self.config.scheduler, self.num_steps
+        )
 
         self.sigmas_t = sigmas_t[:, None]
         self.sigmas_norm_t = sigmas_norm_t[:, None]
@@ -94,7 +45,6 @@ class WrappedNormal:
         self.se = se
         self.d_log_p = d_log_p
 
-        # Optimal gamma for different tasks
         switch_optimal_gamma = {
             'csp_perov5': 5e-7,
             'gen_perov5': 5e-7,
@@ -105,146 +55,192 @@ class WrappedNormal:
             'csp_mpts52': 1e-5,
             'gen_mpts52': 1e-5,
             'csp_carbon24': 5e-7,
-            'gen_carbon24': 1e-5
+            'gen_carbon24': 1e-5,
         }
         self.step_lr = switch_optimal_gamma[diffusion_config.task]
 
-        self.drift_step_coef = paddle.ones([self.num_steps], dtype='float32')[:, None]
-        self.diff_step_coef = paddle.ones([self.num_steps], dtype='float32')[:, None]
+        self.drift_step_coef = paddle.ones(
+            [self.num_steps], dtype='float32'
+        )[:, None]
+        self.diff_step_coef = paddle.ones(
+            [self.num_steps], dtype='float32'
+        )[:, None]
         self.to_domain = lambda x: x
 
     def output_transform(self, x0, batch):
-        """Transform output before returning."""
         return x0
 
     def forward_step_sample(self, x0, t, batch):
-        """
-        Forward diffusion step: add noise to fractional coordinates.
+        """Add wrapped normal noise to fractional coordinates.
 
         Args:
-            x0: Original fractional coordinates of shape (total_atoms, 3)
-            t: Timestep of shape (batch_size,)
-            batch: Batch dictionary
+            x0: Fractional coordinates (total_atoms, 3).
+            t: Timestep indices (total_atoms,) per-atom expanded.
+            batch: Batch dict.
 
         Returns:
-            xt: Noisy fractional coordinates with periodic boundary
+            xt: Noisy coordinates modulo 1.
         """
         st = self.sigmas_t[t.cast('int64')]
-        self.randn_x = paddle.randn_like(x0)
-        xt = (x0 + st * self.randn_x) % 1.
+        self.randn_x = paddle.randn(x0.shape)
+        xt = (x0 + st * self.randn_x) % 1.0
         return xt
 
     def reverse_step_sample_part_1(self, normed_score_pred, xt, t, batch):
-        """
-        First part of reverse diffusion step.
+        """First half of reverse step (Langevin drift + diffusion).
 
         Args:
-            normed_score_pred: Normalized score prediction
-            xt: Noisy fractional coordinates
-            t: Timestep
-            batch: Batch dictionary
+            normed_score_pred: Normalized score prediction.
+            xt: Current noisy coordinates.
+            t: Timestep indices per-atom.
+            batch: Batch dict.
 
         Returns:
-            xt_05: Intermediate denoised coordinates
+            xt_05: Intermediate coordinates.
         """
-        st, snt = self.sigmas_t[t.cast('int64')], self.sigmas_norm_t[t.cast('int64')]
+        t_idx = t.cast('int64')
+        st = self.sigmas_t[t_idx]
+        snt = self.sigmas_norm_t[t_idx]
         step_size = self.step_lr * (st / self.sb) ** 2
         std_x = paddle.sqrt(2 * step_size)
-        drift = -step_size * normed_score_pred * paddle.sqrt(snt) * self.drift_step_coef[t.cast('int64')]
-        diffusion = std_x * paddle.randn_like(xt) * self.diff_step_coef[t.cast('int64')]
+        drift = (
+            -step_size
+            * normed_score_pred
+            * paddle.sqrt(snt)
+            * self.drift_step_coef[t_idx]
+        )
+        diffusion = (
+            std_x
+            * paddle.randn(xt.shape)
+            * self.diff_step_coef[t_idx]
+        )
         xt_05 = xt + drift + diffusion
         return xt_05
 
     def reverse_step_sample_part_2(self, normed_score_pred, xt_05, t, batch):
-        """
-        Second part of reverse diffusion step.
+        """Second half of reverse step.
 
         Args:
-            normed_score_pred: Normalized score prediction
-            xt_05: Intermediate coordinates from part 1
-            t: Timestep
-            batch: Batch dictionary
+            normed_score_pred: Normalized score prediction.
+            xt_05: Intermediate coordinates from part 1.
+            t: Timestep indices per-atom.
+            batch: Batch dict.
 
         Returns:
-            xt_1: Denoised fractional coordinates
+            xt_1: Denoised coordinates modulo 1.
         """
         t_idx = t.cast('int64')
-        st, st_1 = self.sigmas_t[t_idx], self.sigmas_t[paddle.maximum(t_idx - 1, 0)]
+        st = self.sigmas_t[t_idx]
+        st_1 = self.sigmas_t[paddle.maximum(t_idx - 1, paddle.to_tensor([0]))]
         snt = self.sigmas_norm_t[t_idx]
         step_size = st ** 2 - st_1 ** 2
         std_x = paddle.sqrt((st_1 ** 2 * (st ** 2 - st_1 ** 2)) / (st ** 2))
-        drift = -step_size * normed_score_pred * paddle.sqrt(snt) * self.drift_step_coef[t_idx]
-        diffusion = std_x * paddle.randn_like(xt_05) * self.diff_step_coef[t_idx]
-        xt_1 = (xt_05 + drift + diffusion) % 1.
+        drift = (
+            -step_size
+            * normed_score_pred
+            * paddle.sqrt(snt)
+            * self.drift_step_coef[t_idx]
+        )
+        diffusion = (
+            std_x
+            * paddle.randn(xt_05.shape)
+            * self.diff_step_coef[t_idx]
+        )
+        xt_1 = (xt_05 + drift + diffusion) % 1.0
         return xt_1
 
     def reverse_step_sample(self, normed_score_pred, xt, t, batch):
-        """
-        Combined reverse diffusion step.
-
-        Args:
-            normed_score_pred: Normalized score prediction
-            xt: Noisy fractional coordinates
-            t: Timestep
-            batch: Batch dictionary
-
-        Returns:
-            xt_1: Denoised fractional coordinates
-        """
-        xt_05 = self.reverse_step_sample_part_1(normed_score_pred, xt, t, batch)
-        xt_1 = self.reverse_step_sample_part_2(normed_score_pred, xt_05, t, batch)
+        """Combined reverse step (part 1 then part 2)."""
+        xt_05 = self.reverse_step_sample_part_1(
+            normed_score_pred, xt, t, batch
+        )
+        xt_1 = self.reverse_step_sample_part_2(
+            normed_score_pred, xt_05, t, batch
+        )
         return xt_1
 
     def prior_sample(self, batch):
-        """
-        Sample from prior distribution (uniform on [0,1)^3).
-
-        Args:
-            batch: Batch dictionary
-
-        Returns:
-            sample: Random fractional coordinates
-        """
+        """Sample from uniform prior on [0, 1)^3."""
         return paddle.rand([batch['num_atoms'], 3], dtype='float32')
 
     def loss(self, batch):
-        """
-        Compute Wrapped Normal loss.
+        """Compute score matching loss.
 
         Args:
-            batch: Batch dictionary
+            batch: Dict with 't', 'prediction', 'x0' keys.
 
         Returns:
-            loss: Per-sample loss
+            l2: Per-atom loss.
         """
-        st, snt = self.sigmas_t[batch['t'][1].cast('int64')], self.sigmas_norm_t[batch['t'][1].cast('int64')]
+        t_idx = batch['t'][1].cast('int64')
+        st = self.sigmas_t[t_idx]
+        snt = self.sigmas_norm_t[t_idx]
         normed_score_pred = batch['prediction'][1]
         normed_score = self.d_log_p(st * self.randn_x, st) / paddle.sqrt(snt)
-        l2 = ((normed_score_pred - normed_score) ** 2).reshape([normed_score_pred.shape[0], -1]).mean(axis=1)
+        l2 = (
+            (normed_score_pred - normed_score) ** 2
+        ).reshape([normed_score_pred.shape[0], -1]).mean(axis=1)
 
         # mirage infusion code
-        if "miad:add_mirage_atoms_upto" in os.environ['MODIFICATIONS_FIELD']:
+        modifications = os.environ.get('MODIFICATIONS_FIELD', '')
+        if "miad:add_mirage_atoms_upto" in modifications:
             mirage_type = 0
             atom_types = batch['x0'][2]
             mask = (atom_types != mirage_type).cast(l2.dtype)
-            # coef to keep the same loss scale after average over increased number of atoms
             coef = mask.shape[0] / mask.sum()
             l2 = l2 * mask * coef
 
         return l2
 
     def get_x0_prediction(self, normed_score_pred, xt, t, batch):
-        """
-        Get x0 prediction from score prediction.
-
-        Args:
-            normed_score_pred: Normalized score prediction
-            xt: Noisy fractional coordinates
-            t: Timestep
-            batch: Batch dictionary
-
-        Returns:
-            x0_pred: Predicted original fractional coordinates
-        """
-        x0_pred = (xt - self.sigmas_t[t.cast('int64')] * normed_score_pred) % 1.
+        """Predict x0 from score prediction."""
+        t_idx = t.cast('int64')
+        x0_pred = (
+            xt - self.sigmas_t[t_idx] * normed_score_pred
+        ) % 1.0
         return x0_pred
+
+
+class PFM:
+    """Periodic Flow Matching for fractional coordinates."""
+
+    def __init__(self, diffusion_config):
+        self.config = diffusion_config.frac_diffusion
+        self.num_steps = diffusion_config.num_steps
+        self.cont_time = diffusion_config.cont_time
+        self.final_t = diffusion_config.num_steps
+        self.step_coef = paddle.ones(
+            [self.final_t], dtype='float32'
+        )[:, None]
+        self.step = paddle.to_tensor(1.0 / self.final_t)
+        self.to_domain = lambda x: x
+        self.default_loss_scale = 10
+
+    def output_transform(self, x0, batch):
+        return x0
+
+    def forward_step_sample(self, x0, t, batch):
+        """Forward step: interpolate toward random target."""
+        xT_minus_x0 = paddle.rand(x0.shape) - 0.5
+        step = (1 + t[:, None]) * self.step
+        xt = (x0 + step * xT_minus_x0) % 1.0
+        self.ut = (-1) * xT_minus_x0
+        return xt
+
+    def reverse_step_sample(self, vt, xt, t, batch):
+        """Reverse step with periodic boundary."""
+        t_idx = t.cast('int64')
+        xt_1 = (xt + self.step_coef[t_idx] * self.step * vt) % 1.0
+        return xt_1
+
+    def prior_sample(self, batch):
+        return paddle.rand([batch['num_atoms'], 3])
+
+    def loss(self, batch):
+        vt = batch['prediction'][1]
+        l2 = ((vt - self.ut) ** 2).reshape([-1, 3]).mean(axis=1)
+        return l2 * self.default_loss_scale
+
+    def get_x0_prediction(self, vt, xt, t, batch):
+        step = (1 + t[:, None]) * self.step
+        return (xt + step * vt) % 1.0

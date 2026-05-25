@@ -5,10 +5,10 @@ Global:
   num_train_timesteps: 1000
 
 Trainer:
-  max_epochs: 8000
+  max_epochs: 2
   seed: 42
   output_dir: ./output/miad_mp20
-  save_freq: 1000
+  save_freq: 100
   log_freq: 10
   start_eval_epoch: 1
   eval_freq: 1
@@ -30,29 +30,35 @@ Trainer:
 Model:
   __class_name__: MiAD
   __init_params__:
-    encoder_cfg:
-      num_atom_types: 100
-      hidden_channels: 512
+    model_cfg:
+      hidden_dim: 512
+      latent_dim: 256
       num_layers: 6
+      max_atoms: 100
+      act_fn: silu
+      dis_emb: sin
+      num_freqs: 128
+      edge_style: fc
       cutoff: 6.0
-      max_num_atoms: 25
+      max_neighbors: 20
+      ln: true
+      ip: true
+      smooth: false
+      pred_type: true
+      model_name: CSPNet
     diffusion_cfg:
-      task: gen-csp-mp20
+      method: Default
+      task: gen_mp20
       cont_time: false
       num_steps: 1000
       lat_diffusion:
         method: fm
-      lat_diffusion_config: {}
       frac_diffusion:
         method: wrapped_normal
-      frac_diffusion_config: {}
+        scheduler: default_wrapped_normal
       type_diffusion:
-        method: ddpm_onehot
-      type_diffusion_config: {}
-    time_dim: 256
-    lattice_loss_weight: 1
-    coord_loss_weight: 1
-    type_loss_weight: 1
+        method: d3pm
+        scheduler: default_d3pm
 
 Optimizer:
   __class_name__: Adam
@@ -82,12 +88,13 @@ Dataset:
     loader:
       num_workers: 0
       use_shared_memory: False
+      collate_fn: MiADCollator
     sampler:
       __class_name__: BatchSampler
       __init_params__:
         shuffle: True
         drop_last: False
-        batch_size: 256
+        batch_size: 4
   val:
     dataset:
       __class_name__: MP20Dataset
@@ -101,7 +108,9 @@ Dataset:
       __init_params__:
         shuffle: False
         drop_last: False
-        batch_size: 128
+        batch_size: 4
+    loader:
+      collate_fn: MiADCollator
   test:
     dataset:
       __class_name__: MP20Dataset
@@ -115,7 +124,9 @@ Dataset:
       __init_params__:
         shuffle: False
         drop_last: False
-        batch_size: 128
+        batch_size: 4
+    loader:
+      collate_fn: MiADCollator
 
 Sample:
   data:
@@ -131,7 +142,7 @@ Sample:
       __init_params__:
         shuffle: False
         drop_last: False
-        batch_size: 256
+        batch_size: 4
   build_structure_cfg:
     format: array
     niggli: False
