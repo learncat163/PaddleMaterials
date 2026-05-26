@@ -13,12 +13,14 @@
 # limitations under the License.
 
 from ppmat.models.miad.miad import MiAD
-from ppmat.models.miad.cspnet_complete import CSPNet
-from ppmat.models.miad.crystal_diffusion import CrystalGen, DiffCSP, init_diffusion
-from ppmat.models.miad.lattice_diffusion import DDPM, FM, FM_LenAng
-from ppmat.models.miad.frac_diffusion import WrappedNormal, PFM
-from ppmat.models.miad.type_diffusion import DDPM_onehot, D3PM
-from ppmat.models.miad.diffusion_utils import SinusoidalTimeEmbeddings, TimeDistribution
+from ppmat.models.miad.cspnet_complete import CSPNet as MiadCSPNet
+from ppmat.models.miad.cspnet_light import CSPNetLight as MiadCSPNetLight
+from ppmat.models.miad.crystal_diffusion import CrystalGen as MiadCrystalGen, DiffCSP as MiadDiffCSP
+from ppmat.models.miad.crystal_diffusion import init_diffusion, parse_batch
+from ppmat.models.miad.lattice_diffusion import DDPM as MiadDDPM, FM as MiadFM, FM_LenAng as MiadFM_LenAng
+from ppmat.models.miad.frac_diffusion import WrappedNormal as MiadWrappedNormal, PFM as MiadPFM
+from ppmat.models.miad.type_diffusion import DDPM_onehot as MiadDDPM_onehot, D3PM as MiadD3PM
+from ppmat.models.miad.diffusion_utils import SinusoidalTimeEmbeddings as MiadSinusoidalTimeEmbeddings, TimeDistribution as MiadTimeDistribution
 from ppmat.models.miad.graph_utils import (
     to_dense_adj,
     dense_to_sparse,
@@ -30,19 +32,21 @@ from ppmat.models.miad.scheduler import scheduler
 
 __all__ = [
     'MiAD',
-    'CSPNet',
-    'CrystalGen',
-    'DiffCSP',
+    'MiadCSPNet',
+    'MiadCSPNetLight',
+    'MiadCrystalGen',
+    'MiadDiffCSP',
     'init_diffusion',
-    'DDPM',
-    'FM',
-    'FM_LenAng',
-    'WrappedNormal',
-    'PFM',
-    'DDPM_onehot',
-    'D3PM',
-    'SinusoidalTimeEmbeddings',
-    'TimeDistribution',
+    'parse_batch',
+    'MiadDDPM',
+    'MiadFM',
+    'MiadFM_LenAng',
+    'MiadWrappedNormal',
+    'MiadPFM',
+    'MiadDDPM_onehot',
+    'MiadD3PM',
+    'MiadSinusoidalTimeEmbeddings',
+    'MiadTimeDistribution',
     'scheduler',
     'to_dense_adj',
     'dense_to_sparse',

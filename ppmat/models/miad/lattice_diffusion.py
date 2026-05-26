@@ -25,9 +25,9 @@ from ppmat.models.miad.scheduler import scheduler as get_scheduler
 class DDPM(nn.Layer):
     """DDPM for lattice diffusion."""
 
-    def __init__(self, diffusion_config):
+    def __init__(self, diffusion_config, scheduler_cfg=None):
         super().__init__()
-        self.config = diffusion_config.lat_diffusion
+        self.config = scheduler_cfg if scheduler_cfg is not None else diffusion_config.lat_diffusion
         self.num_steps = diffusion_config.num_steps
         self.cont_time = diffusion_config.cont_time
 
@@ -231,11 +231,11 @@ class FM_LenAng(nn.Layer):
         bs = batch['batch_size']
         lenang_xT = paddle.zeros([bs, 6], dtype='float32')
 
-        # Sample lengths from Gamma distribution
-        lenang_xT[:, :3] = 2 + paddle.to_tensor(
-            _numpy_gamma(self.gamma_alpha, self.gamma_theta, [bs, 3]),
-            dtype='float32',
+        gamma_dist = paddle.distribution.Gamma(
+            paddle.to_tensor([self.gamma_alpha], dtype='float32'),
+            paddle.to_tensor([self.gamma_theta], dtype='float32'),
         )
+        lenang_xT[:, :3] = 2 + gamma_dist.sample([bs, 3]).reshape([bs, 3])
 
         # Sample angles from constrained uniform
         ang = 60 + 60 * paddle.rand([4 * bs, 3])
@@ -261,6 +261,4 @@ class FM_LenAng(nn.Layer):
         return xt + step * vt
 
 
-def _numpy_gamma(alpha, theta, shape):
-    import numpy as np
-    return np.random.gamma(alpha, theta, shape)
+

@@ -51,7 +51,7 @@ class WrappedNormal:
             'csp_carbon24': 5e-7,
             'gen_carbon24': 1e-5,
         }
-        self.step_lr = switch_optimal_gamma[diffusion_config.task]
+        self.step_lr = switch_optimal_gamma.get(diffusion_config.task, 1e-5)
 
         self.drift_step_coef = paddle.ones(
             [self.num_steps], dtype='float32'

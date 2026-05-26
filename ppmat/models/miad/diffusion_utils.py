@@ -54,13 +54,12 @@ class TimeDistribution:
             print("MODIF: time_log_normal_0_1_clip", flush=True)
 
     def _atom_expand(self, batch, t):
-        # Support both new flat format (batch_idx tensor) and old format (batch object with num_atoms)
-        if 'batch_idx' in batch:
-            # New flat format from MiADCollator
+        if 'batch' in batch:
+            num_atoms = batch['batch'].num_atoms
+        elif 'batch_idx' in batch:
             num_atoms = batch['num_atoms']
         else:
-            # Old BatchInfo namedtuple format
-            num_atoms = batch['batch'].num_atoms
+            raise ValueError("Cannot determine num_atoms from batch")
 
         t_per_atom = t.repeat_interleave(num_atoms)
         return [t, t_per_atom]
@@ -85,10 +84,9 @@ class TimeDistribution:
             )
             t = t * max_time
 
-        # Map [0, 1] to [eps, num_steps - 1 - eps]
         t = self.eps + (self.num_steps - 1 - self.eps) * t
         if not self.cont_time:
-            t = t.round().cast('int64').cast('float32')
+            t = t.round().cast('int64')
 
         return self._atom_expand(batch, t)
 

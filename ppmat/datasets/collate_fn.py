@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import numbers
+import warnings
 from collections.abc import Mapping
 from collections.abc import Sequence
 from typing import Any
@@ -24,13 +25,11 @@ from typing import List
 import numpy as np
 import paddle
 import pgl
-import warnings
 
 from ppmat.datasets.custom_data_type import ConcatData
 from ppmat.datasets.custom_data_type import ConcatNumpyWarper
 from ppmat.datasets.geometric_data_type.batch import Batch
 from ppmat.datasets.geometric_data_type.data import Data
-from ppmat.models.miad.collate_fn import MiADCollator
 
 
 class DefaultCollator(object):

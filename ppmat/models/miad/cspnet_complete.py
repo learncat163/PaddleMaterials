@@ -22,10 +22,8 @@ import math
 from paddle_scatter import scatter
 
 from ppmat.models.miad.graph_utils import (
-    to_dense_adj,
     dense_to_sparse,
     block_diag,
-    segment_csr
 )
 
 MAX_ATOMIC_NUM = 100
@@ -38,7 +36,8 @@ class SinusoidsEmbedding(nn.Layer):
         super().__init__()
         self.n_frequencies = n_frequencies
         self.n_space = n_space
-        self.frequencies = 2 * math.pi * paddle.arange(self.n_frequencies)
+        frequencies = 2 * math.pi * paddle.arange(self.n_frequencies)
+        self.register_buffer('frequencies', frequencies)
         self.dim = self.n_frequencies * 2 * self.n_space
 
     def forward(self, x):
@@ -62,7 +61,7 @@ class CSPLayer(nn.Layer):
         super(CSPLayer, self).__init__()
         self.dis_dim = 3
         self.dis_emb = dis_emb
-        self.ip = True
+        self.ip = ip
         if dis_emb is not None:
             self.dis_dim = dis_emb.dim
         if act_fn is None:
@@ -268,16 +267,6 @@ class CSPNet(nn.Layer):
             self.final_layer_norm = nn.LayerNorm(hidden_dim)
         if self.pred_type:
             self.type_out = nn.Linear(hidden_dim, MAX_ATOMIC_NUM)
-
-    def select_symmetric_edges(self, tensor, mask, reorder_idx, inverse_neg):
-        # Mask out counter-edges
-        tensor_directed = tensor[mask]
-        # Concatenate counter-edges after normal edges
-        sign = 1 - 2 * inverse_neg
-        tensor_cat = paddle.concat([tensor_directed, sign * tensor_directed])
-        # Reorder everything so the edges of every image are consecutive
-        tensor_ordered = tensor_cat[reorder_idx]
-        return tensor_ordered
 
     def gen_edges(self, num_atoms, frac_coords, lattices, node2graph):
         if self.edge_style == 'fc':

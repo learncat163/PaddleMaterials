@@ -18,7 +18,7 @@ import paddle
 import paddle.nn as nn
 
 from ppmat.models.miad.cspnet_complete import CSPNet
-from ppmat.models.miad.crystal_diffusion import init_diffusion
+from ppmat.models.miad.crystal_diffusion import init_diffusion, _parse_num_atoms_to_per_crystal
 
 
 class DictToAttr:
@@ -74,35 +74,27 @@ class MiAD(nn.Layer):
 
     @paddle.no_grad()
     def sample(self, batch_data, num_inference_steps=None, **kwargs):
-        # Ensure batch has all required keys for sampling
         if 'structure_array' in batch_data:
             num_atoms_data = batch_data['structure_array'].get('num_atoms', None)
         else:
             num_atoms_data = batch_data.get('num_atoms', None)
 
-        if num_atoms_data is not None:
-            # Construct batch with all required keys for sampling
-            if hasattr(num_atoms_data, 'numpy'):
-                num_atoms_np = num_atoms_data.numpy().flatten()
-            else:
-                num_atoms_np = np.array(num_atoms_data).flatten()
-
-            batch_size = len(num_atoms_np)
-            num_atoms = paddle.to_tensor(num_atoms_np.astype('int64'))
-
-            # Build batch_idx
-            batch_idx_np = np.concatenate([np.full(int(n), i) for i, n in enumerate(num_atoms_np)])
-            batch_idx = paddle.to_tensor(batch_idx_np.astype('int64'))
-
-            # For sampling, atom_types will be generated
-            atom_types = paddle.zeros([int(num_atoms_np.sum())], dtype='int64')
-
-            batch_data = {
-                'num_atoms': num_atoms,
-                'batch_idx': batch_idx,
-                'atom_types': atom_types,
-                'batch_size': batch_size,
-            }
+        if 'batch_idx' in batch_data:
+            pass
+        elif num_atoms_data is not None:
+            parsed = _parse_num_atoms_to_per_crystal(num_atoms_data)
+            if parsed is not None:
+                num_atoms, num_atoms_np = parsed
+                batch_size = len(num_atoms_np)
+                batch_idx_np = np.concatenate([np.full(int(n), i) for i, n in enumerate(num_atoms_np)])
+                batch_idx = paddle.to_tensor(batch_idx_np.astype('int64'))
+                atom_types = paddle.zeros([int(num_atoms_np.sum())], dtype='int64')
+                batch_data = {
+                    'num_atoms': num_atoms,
+                    'batch_idx': batch_idx,
+                    'atom_types': atom_types,
+                    'batch_size': batch_size,
+                }
 
         progress_printer = lambda t: None
         batch = self.diffusion.sampling_procedure(

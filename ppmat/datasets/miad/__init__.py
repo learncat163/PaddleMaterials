@@ -182,7 +182,7 @@ class MiADCollator:
         return {
             "x0": [lattices_t, frac_coords_t, atom_types_t],
             "batch_size": batch_size,
-            "num_atoms": paddle.to_tensor(int(sum(all_num_atoms)), dtype='int64'),
+            "num_atoms": num_atoms_t,
             "batch_idx": batch_idx_t,
             "atom_types": atom_types_t,
             "batch": crystal_batch,
@@ -314,7 +314,7 @@ def create_sampling_batch(
     return {
         'x0': [None, None, None],
         'batch_size': batch_size,
-        'num_atoms': paddle.to_tensor(total_atoms, dtype='int64'),
+        'num_atoms': num_atoms,
         'device': device,
         'batch': crystal_batch,
     }

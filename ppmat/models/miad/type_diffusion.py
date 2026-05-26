@@ -27,12 +27,7 @@ class DDPM_onehot(DDPM):
     """DDPM for atom types with one-hot encoding."""
 
     def __init__(self, diffusion_config):
-        # Temporarily swap lat_diffusion with type_diffusion so
-        # the parent DDPM initializes with the type diffusion scheduler.
-        ddpm_config = diffusion_config.lat_diffusion
-        diffusion_config.lat_diffusion = diffusion_config.type_diffusion
-        super().__init__(diffusion_config)
-        diffusion_config.lat_diffusion = ddpm_config
+        super().__init__(diffusion_config, scheduler_cfg=diffusion_config.type_diffusion)
 
         # Reshape coefficients from (N,1,1) to (N,1) for atom types
         _reshape_attrs = [
@@ -144,7 +139,7 @@ class D3PM:
         xt_probs = paddle.matmul(
             onehot_x0[:, None, :], self.cumprod_Q_t[t.cast('int64')]
         )[:, 0, :]
-        xt = _multinomial_sample(xt_probs)
+        xt = paddle.distribution.Categorical(logits=paddle.log(xt_probs.clip(1e-12))).sample().cast('int64')
         onehot_xt = self.to_domain(xt)
         return onehot_xt
 
@@ -175,7 +170,7 @@ class D3PM:
             return self.to_domain(
                 self.from_domain(xt_1_probs.cast('float32'))
             )
-        xt_1 = _multinomial_sample(xt_1_probs)
+        xt_1 = paddle.distribution.Categorical(logits=paddle.log(xt_1_probs.clip(1e-12))).sample().cast('int64')
         onehot_xt_1 = self.to_domain(xt_1)
         self.xt_1_probs = xt_1_probs
         return onehot_xt_1
@@ -185,7 +180,7 @@ class D3PM:
         total_atoms = int(num_atoms.sum()) if num_atoms.ndim > 0 else int(num_atoms)
         shape = [total_atoms, self.num_types]
         xT_probs = paddle.ones(shape, dtype='float32') / self.num_types
-        xT = _multinomial_sample(xT_probs)
+        xT = paddle.distribution.Categorical(logits=paddle.log(xT_probs.clip(1e-12))).sample().cast('int64')
         onehot_xT = self.to_domain(xT)
         return onehot_xT
 
@@ -219,8 +214,3 @@ class D3PM:
         return onehot_x0[:, 0]
 
 
-def _multinomial_sample(probs):
-    cum_probs = paddle.cumsum(probs, axis=-1)
-    rand = paddle.rand([probs.shape[0], 1])
-    samples = (rand > cum_probs).cast('int64').sum(axis=-1)
-    return samples.clip(0, probs.shape[1] - 1)

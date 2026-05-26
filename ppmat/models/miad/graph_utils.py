@@ -99,22 +99,7 @@ def dense_to_sparse(adj):
 
 
 def block_diag(*inputs):
-    # Get dimensions
-    sizes = [tensor.shape[0] for tensor in inputs]
-    total_size = sum(sizes)
-
-    # All inputs should be square matrices (n, n)
-    # Output should be (total_size, total_size)
-    output = paddle.zeros([total_size, total_size], dtype=inputs[0].dtype)
-
-    # Fill block diagonal
-    row_offset = 0
-    for tensor in inputs:
-        rows, cols = tensor.shape
-        output[row_offset:row_offset + rows, row_offset:row_offset + cols] = tensor
-        row_offset += rows
-
-    return output
+    return paddle.block_diag(inputs)
 
 
 def segment_csr(data, indptr, reduce="sum"):
