@@ -504,41 +504,108 @@ def create_miad_trainer_from_config(config: MiADConfig) -> MiADTrainer:
     return trainer
 
 
-# Utility function for command-line usage
+def load_yaml_config(config_path):
+    import yaml
+    with open(config_path, 'r') as f:
+        cfg = yaml.safe_load(f)
+    return cfg
+
+
+def build_config_from_yaml(yaml_cfg):
+    model_cfg = yaml_cfg.get('Model', {}).get('__init_params__', {}).get('model_cfg', {})
+    diffusion_cfg = yaml_cfg.get('Model', {}).get('__init_params__', {}).get('diffusion_cfg', {})
+
+    dataset_cfg = yaml_cfg.get('Dataset', {})
+    train_cfg = dataset_cfg.get('train', {})
+    val_cfg = dataset_cfg.get('val', {})
+
+    trainer_cfg = yaml_cfg.get('Trainer', {})
+    opt_cfg = yaml_cfg.get('Optimizer', {}).get('__init_params__', {})
+
+    data_cfg = {
+        'train_path': train_cfg.get('dataset', {}).get('__init_params__', {}).get('path', './data/mp_20/train.csv'),
+        'val_path': val_cfg.get('dataset', {}).get('__init_params__', {}).get('path', './data/mp_20/val.csv'),
+        'batch_size': train_cfg.get('sampler', {}).get('__init_params__', {}).get('batch_size', 4),
+        'num_workers': train_cfg.get('loader', {}).get('num_workers', 0),
+    }
+
+    optim_cfg = {
+        'lr': opt_cfg.get('lr', {}).get('__init_params__', {}).get('learning_rate', 0.001),
+        'weight_decay': 1e-6,
+        'beta1': opt_cfg.get('beta1', 0.9),
+        'beta2': opt_cfg.get('beta2', 0.999),
+    }
+
+    training_cfg = {
+        'n_epochs': trainer_cfg.get('max_epochs', 100),
+        'eval_freq': trainer_cfg.get('eval_freq', 10),
+        'save_freq': trainer_cfg.get('save_freq', 100),
+        'log_freq': trainer_cfg.get('log_freq', 10),
+    }
+
+    checkpoint_cfg = {
+        'save_dir': trainer_cfg.get('output_dir', './output/miad_mp20'),
+    }
+
+    config = MiADConfig(
+        model=model_cfg,
+        diffusion=diffusion_cfg,
+        data=data_cfg,
+        optimization=optim_cfg,
+        training=training_cfg,
+        checkpoints=checkpoint_cfg,
+    )
+    return config
+
+
 def main():
     """Command-line entry point."""
     import argparse
 
     parser = argparse.ArgumentParser(description='Train MiAD model')
-    parser.add_argument('--config', type=str, default=None, help='Config file path')
-    parser.add_argument('--epochs', type=int, default=100, help='Number of epochs')
-    parser.add_argument('--batch_size', type=int, default=32, help='Batch size')
-    parser.add_argument('--lr', type=float, default=1e-4, help='Learning rate')
-    parser.add_argument('--device', type=str, default='gpu', help='Device')
-    parser.add_argument('--checkpoint_dir', type=str, default='./checkpoints',
-                        help='Checkpoint directory')
+    parser.add_argument('-c', '--config', type=str, default=None,
+                        help='YAML config file path')
+    parser.add_argument('--epochs', type=int, default=None,
+                        help='Number of epochs (overrides config)')
+    parser.add_argument('--batch_size', type=int, default=None,
+                        help='Batch size (overrides config)')
+    parser.add_argument('--lr', type=float, default=None,
+                        help='Learning rate (overrides config)')
+    parser.add_argument('--device', type=str, default='gpu',
+                        help='Device: gpu or cpu')
+    parser.add_argument('--seed', type=int, default=42,
+                        help='Random seed')
+    parser.add_argument('--checkpoint_dir', type=str, default=None,
+                        help='Checkpoint directory (overrides config)')
+    parser.add_argument('--gpu', type=str, default=None,
+                        help='GPU ids, e.g. 0 or 0_1')
     args = parser.parse_args()
 
-    # Build config
-    config = MiADConfig(
-        data={
-            'batch_size': args.batch_size,
-        },
-        optimization={
-            'lr': args.lr,
-        },
-        training={
-            'n_epochs': args.epochs,
-        },
-        checkpoints={
-            'save_dir': args.checkpoint_dir,
-        },
-    )
+    paddle.seed(args.seed)
+    np.random.seed(args.seed)
 
-    # Create trainer
+    if args.config:
+        yaml_cfg = load_yaml_config(args.config)
+        config = build_config_from_yaml(yaml_cfg)
+    else:
+        config = MiADConfig()
+
+    if args.epochs is not None:
+        config.training['n_epochs'] = args.epochs
+    if args.batch_size is not None:
+        config.data['batch_size'] = args.batch_size
+    if args.lr is not None:
+        config.optimization['lr'] = args.lr
+    if args.checkpoint_dir is not None:
+        config.checkpoints['save_dir'] = args.checkpoint_dir
+
+    print("MiAD Training Configuration:")
+    print(f"  Epochs: {config.training.get('n_epochs')}")
+    print(f"  Batch size: {config.data.get('batch_size')}")
+    print(f"  Learning rate: {config.optimization.get('lr')}")
+    print(f"  Device: {args.device}")
+
     trainer = create_miad_trainer_from_config(config)
-
-    # Train
     trainer.train()
 
 
