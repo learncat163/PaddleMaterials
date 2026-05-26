@@ -70,8 +70,10 @@ class DDPM_onehot(DDPM):
         return onehot_xt_1
 
     def prior_sample(self, batch):
+        num_atoms = batch['num_atoms']
+        total_atoms = int(num_atoms.sum()) if num_atoms.ndim > 0 else int(num_atoms)
         return paddle.randn(
-            [batch['num_atoms'], self.num_types], dtype='float32'
+            [total_atoms, self.num_types], dtype='float32'
         )
 
     def loss(self, batch):
@@ -179,7 +181,9 @@ class D3PM:
         return onehot_xt_1
 
     def prior_sample(self, batch):
-        shape = [batch['num_atoms'], self.num_types]
+        num_atoms = batch['num_atoms']
+        total_atoms = int(num_atoms.sum()) if num_atoms.ndim > 0 else int(num_atoms)
+        shape = [total_atoms, self.num_types]
         xT_probs = paddle.ones(shape, dtype='float32') / self.num_types
         xT = _multinomial_sample(xT_probs)
         onehot_xT = self.to_domain(xT)

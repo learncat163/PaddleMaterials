@@ -302,8 +302,7 @@ class CSPNet(nn.Layer):
             else:
                 # Embedding expects indices
                 atom_indices = atom_types.argmax(axis=-1)
-                atom_indices = atom_indices + 1
-                node_features = self.node_embedding(atom_indices.cast('float32'))
+                node_features = self.node_embedding(atom_indices.cast('int64'))
         else:
             if self.smooth:
                 node_features = self.node_embedding(atom_types.cast('float32'))

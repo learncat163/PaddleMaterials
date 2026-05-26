@@ -121,7 +121,9 @@ class WrappedNormal:
         return xt_1
 
     def prior_sample(self, batch):
-        return paddle.rand([batch['num_atoms'], 3], dtype='float32')
+        num_atoms = batch['num_atoms']
+        total_atoms = int(num_atoms.sum()) if num_atoms.ndim > 0 else int(num_atoms)
+        return paddle.rand([total_atoms, 3], dtype='float32')
 
     def loss(self, batch):
         t_idx = batch['t'][1].cast('int64')
@@ -183,7 +185,9 @@ class PFM:
         return xt_1
 
     def prior_sample(self, batch):
-        return paddle.rand([batch['num_atoms'], 3])
+        num_atoms = batch['num_atoms']
+        total_atoms = int(num_atoms.sum()) if num_atoms.ndim > 0 else int(num_atoms)
+        return paddle.rand([total_atoms, 3])
 
     def loss(self, batch):
         vt = batch['prediction'][1]
