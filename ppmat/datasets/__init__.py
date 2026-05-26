@@ -177,7 +177,13 @@ def build_dataloader(cfg: Dict):
     # )()
     collate_fn_name = loader_config.pop("collate_fn", "DefaultCollator")
     collate_params = loader_config.pop("collate_params", {})
-    collate_cls = getattr(collate_fn, collate_fn_name)
+    if "." in collate_fn_name:
+        import importlib
+        parts = collate_fn_name.rsplit(".", 1)
+        mod = importlib.import_module(parts[0])
+        collate_cls = getattr(mod, parts[1])
+    else:
+        collate_cls = getattr(collate_fn, collate_fn_name)
     collate_obj = collate_cls(**collate_params)
 
     # build sampler

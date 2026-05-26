@@ -30,7 +30,15 @@ from ppmat.models.miad.graph_utils import (
 )
 from ppmat.models.miad.scheduler import scheduler
 
+# Pipeline classes
+from ppmat.models.miad.train import MiADConfig, MiADTrainer, create_miad_trainer_from_config
+from ppmat.models.miad.generate import GenerationConfig, MiADGenerator, create_generator_from_checkpoint
+
+# Collate classes
+from ppmat.models.miad.collate import MiADCollator, CrystalBatch, create_miad_dataloader, create_sampling_batch
+
 __all__ = [
+    # Model
     'MiAD',
     'MiadCSPNet',
     'MiadCSPNetLight',
@@ -38,6 +46,7 @@ __all__ = [
     'MiadDiffCSP',
     'init_diffusion',
     'parse_batch',
+    # Diffusion components
     'MiadDDPM',
     'MiadFM',
     'MiadFM_LenAng',
@@ -48,9 +57,22 @@ __all__ = [
     'MiadSinusoidalTimeEmbeddings',
     'MiadTimeDistribution',
     'scheduler',
+    # Graph utils
     'to_dense_adj',
     'dense_to_sparse',
     'block_diag',
     'segment_csr',
     'coalesce',
+    # Pipeline
+    'MiADConfig',
+    'MiADTrainer',
+    'create_miad_trainer_from_config',
+    'GenerationConfig',
+    'MiADGenerator',
+    'create_generator_from_checkpoint',
+    # Collate
+    'MiADCollator',
+    'CrystalBatch',
+    'create_miad_dataloader',
+    'create_sampling_batch',
 ]

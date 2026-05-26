@@ -17,7 +17,6 @@ Graph utility functions for CSPNet.
 """
 
 import paddle
-import paddle.nn.functional as F
 
 
 def to_dense_adj(edge_index, edge_attr=None, max_num_nodes=None):

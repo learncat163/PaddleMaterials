@@ -51,6 +51,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 export CUDA_VISIBLE_DEVICES=$GPUS
+export _USE_CHGNET=$USE_CHGNET
+export _NO_RELAX=$NO_RELAX
 
 echo "========================================="
 echo "MiAD S.U.N. Evaluation"
@@ -100,9 +102,9 @@ if energy_path and os.path.exists(energy_path):
     if energy_above_hull:
         print(f'Loaded {len(energy_above_hull)} energy values')
 
-# Determine if CHGNet should be used
-use_chgnet = ${USE_CHGNET}
-do_relax = not ${NO_RELAX}
+# Determine if CHGNet should be used (read from env vars)
+use_chgnet = os.environ.get('_USE_CHGNET', 'false').lower() == 'true'
+do_relax = os.environ.get('_NO_RELAX', 'true').lower() == 'true'
 
 # Run S.U.N. evaluation
 metric = SUNMetric(

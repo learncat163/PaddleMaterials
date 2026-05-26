@@ -88,7 +88,7 @@ Dataset:
     loader:
       num_workers: 0
       use_shared_memory: False
-      collate_fn: MiADCollator
+      collate_fn: ppmat.models.miad.collate.MiADCollator
     sampler:
       __class_name__: BatchSampler
       __init_params__:
@@ -110,7 +110,7 @@ Dataset:
         drop_last: False
         batch_size: 4
     loader:
-      collate_fn: MiADCollator
+      collate_fn: ppmat.models.miad.collate.MiADCollator
   test:
     dataset:
       __class_name__: MP20Dataset
@@ -126,7 +126,7 @@ Dataset:
         drop_last: False
         batch_size: 4
     loader:
-      collate_fn: MiADCollator
+      collate_fn: ppmat.models.miad.collate.MiADCollator
 
 Sample:
   data:

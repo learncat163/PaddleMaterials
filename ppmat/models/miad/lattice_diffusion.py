@@ -201,7 +201,7 @@ class FM_LenAng(nn.Layer):
 
     def _get_converters(self):
         if self._lat2lenang is None:
-            from ppmat.data.miad.crystal_utils import (
+            from ppmat.models.miad.crystal_utils import (
                 lattice_to_lengths_and_angles,
                 lengths_and_angles_to_lattice,
             )

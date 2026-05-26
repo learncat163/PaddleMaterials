@@ -26,7 +26,7 @@ import numpy as np
 import paddle
 
 from ppmat.models.miad.miad import MiAD
-from ppmat.datasets.miad import create_sampling_batch, CrystalBatch
+from ppmat.models.miad.collate import create_sampling_batch, CrystalBatch
 
 
 @dataclass

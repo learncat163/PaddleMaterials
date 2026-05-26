@@ -18,19 +18,16 @@ Integrated with PaddlePaddle training framework.
 """
 
 import os
-import time
-import math
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 
 import numpy as np
 import paddle
 import paddle.distributed as dist
 from paddle.io import DataLoader, Dataset
 
+from ppmat.models.miad.collate import MiADCollator
 from ppmat.models.miad.miad import MiAD
-from ppmat.models.miad.crystal_diffusion import init_diffusion
-from ppmat.datasets.miad import MiADCollator, create_sampling_batch
 
 
 @dataclass
