@@ -29,7 +29,7 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$PROJECT_ROOT"
 
 GPUS="0"
-CHECKPOINT=".historys/maid/2-weight/pretrained-pd/miad_mp20_epoch8000.pdparams"
+CHECKPOINT=".historys/maid/2-weight/pretrained-pd/miad_mp20_epoch8000_transposed.pdparams"
 DATA="./data/mp_20/test.csv"
 NUM_STEPS=1000
 BATCH=128
@@ -62,36 +62,20 @@ $PYTHON -c "
 import paddle
 import os
 import json
+import yaml
 from ppmat.datasets.mp20_dataset import MP20Dataset
 from ppmat.datasets.collate_fn import DefaultCollator
 from paddle.io import DataLoader
 from ppmat.models.miad.miad import MiAD
 
-# Load model
-model = MiAD(
-    model_cfg={
-        'hidden_dim': 512, 'latent_dim': 256, 'num_layers': 6,
-        'smooth': True, 'pred_type': True, 'num_freqs': 128,
-        'ln': True, 'ip': True, 'max_atoms': 100,
-    },
-    diffusion_cfg={
-        'task': 'gen_mp20', 'method': 'DiffCSP',
-        'cont_time': False, 'num_steps': 1000,
-        'lat_diffusion': {'method': 'fm', 'scheduler': 'diffcsp_cosine', 'parameterization': 'eps'},
-        'frac_diffusion': {'method': 'wrapped_normal', 'scheduler': 'default_wrapped_normal'},
-        'type_diffusion': {'method': 'ddpm_onehot', 'scheduler': 'diffcsp_cosine'},
-    },
-)
-
-# Load pretrained
-from ppmat.models.miad.cspnet_complete import CSPNet
-pretrained = CSPNet.load_pytorch_weights('$CHECKPOINT')
-decoder_state = model.decoder.state_dict()
-for key in pretrained.state_dict():
-    if key in decoder_state:
-        decoder_state[key] = pretrained.state_dict()[key]
-model.decoder.set_state_dict(decoder_state)
+# Load model from config
+with open('configs/miad/miad_cspnet.yaml') as f:
+    cfg = yaml.safe_load(f)['Model']['__init_params__']
+model = MiAD(**cfg)
+state_dict = paddle.load('$CHECKPOINT')
+model.set_state_dict(state_dict)
 model.eval()
+print('Model loaded from checkpoint')
 
 # Load data
 dataset = MP20Dataset(path='$DATA', build_structure_cfg={'format': 'cif_str', 'num_cpus': 4})
@@ -107,8 +91,16 @@ for i, batch in enumerate(loader):
     if i >= 5:
         break
 
-# Save
+# Save (convert tensors to serializable format)
+serializable = []
+for r in all_results:
+    serializable.append({
+        'num_atoms': int(r['num_atoms']),
+        'atom_types': r['atom_types'].numpy().tolist() if hasattr(r['atom_types'], 'numpy') else r['atom_types'],
+        'frac_coords': r['frac_coords'].numpy().tolist() if hasattr(r['frac_coords'], 'numpy') else r['frac_coords'],
+        'lattice': r['lattice'].numpy().tolist() if hasattr(r['lattice'], 'numpy') else r['lattice'],
+    })
 with open(os.path.join('$OUTPUT', 'generated.json'), 'w') as f:
-    json.dump(all_results, f, indent=2)
-print(f'Saved {len(all_results)} crystals to $OUTPUT/generated.json')
+    json.dump(serializable, f, indent=2)
+print(f'Saved {len(serializable)} crystals to $OUTPUT/generated.json')
 "
