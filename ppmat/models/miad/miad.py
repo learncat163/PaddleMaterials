@@ -60,6 +60,50 @@ class MiAD(nn.Layer):
         logger = _DefaultLogger()
         self.diffusion = init_diffusion(diffusion_cfg, logger)
 
+    def set_state_dict(self, state_dict, use_structured_name=True):
+        """
+        Load checkpoint with automatic legacy format detection.
+
+        MiAD wraps CSPNet as self.decoder, so all parameter keys in a native
+        Paddle checkpoint are prefixed with "decoder." (e.g. decoder.csp_layer_0.edge_mlp.0.weight).
+
+        Legacy PyTorch checkpoints have bare keys (e.g. csp_layer_0.edge_mlp.0.weight)
+        and Linear weights stored in (out_features, in_features) format.
+        This method auto-detects and converts them: adds decoder. prefix and transposes
+        all 2D weight tensors to Paddle's (in_features, out_features) format.
+        """
+        model_keys = set(self.state_dict().keys())
+        state_keys = set(state_dict.keys())
+
+        if len(state_keys) == 0:
+            return super().set_state_dict(state_dict, use_structured_name)
+
+        has_decoder_prefix = any(k.startswith('decoder.') for k in state_keys)
+        keys_native = state_keys == model_keys or state_keys.issubset(model_keys)
+
+        if keys_native and has_decoder_prefix:
+            return super().set_state_dict(state_dict, use_structured_name)
+
+        is_legacy = not has_decoder_prefix
+        processed = {}
+        for k, v in state_dict.items():
+            new_key = f"decoder.{k}" if is_legacy else k
+            if is_legacy and new_key.endswith('.weight') and len(v.shape) == 2:
+                processed[new_key] = v.T
+            else:
+                processed[new_key] = v
+
+        loaded = super().set_state_dict(processed, use_structured_name)
+        model_in_keys = set(model_keys) - set(processed.keys())
+        extra_in_ckpt = set(processed.keys()) - set(model_keys)
+        if model_in_keys:
+            print(f"  [MiAD] {len(model_in_keys)} keys in model not in checkpoint (likely buffers): {sorted(model_in_keys)[:3]}...")
+        if extra_in_ckpt:
+            print(f"  [MiAD] {len(extra_in_ckpt)} keys in checkpoint not in model (skipped): {sorted(extra_in_ckpt)[:3]}...")
+        if is_legacy:
+            print(f"  [MiAD] Converted legacy checkpoint: added decoder. prefix + transposed 2D weights")
+        return loaded
+
     def forward(self, batch, **kwargs):
         batch = self.diffusion.train_step(
             batch=batch,
