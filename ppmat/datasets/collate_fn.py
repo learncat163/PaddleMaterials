@@ -31,6 +31,11 @@ from ppmat.datasets.custom_data_type import ConcatNumpyWarper
 from ppmat.datasets.geometric_data_type.batch import Batch
 from ppmat.datasets.geometric_data_type.data import Data
 
+# Register MTCollator from matterchat trainer module so the
+# framework's build_dataloader can resolve it via
+# getattr(collate_fn, "MTCollator").
+from ppmat.models.matterchat.trainer import MTCollator
+
 
 class DefaultCollator(object):
     def __call__(self, batch: List[Any]) -> Any:

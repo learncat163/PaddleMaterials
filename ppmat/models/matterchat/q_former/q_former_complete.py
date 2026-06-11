@@ -1,0 +1,380 @@
+# Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+"""Complete MatterChat model: Blip2MistralInstruct."""
+
+import paddle
+import paddle.nn as nn
+
+from ppmat.models.matterchat.mistral.configuration_mistral import MistralConfig
+from ppmat.models.matterchat.mistral.modeling_mistral import MistralForCausalLM
+from ppmat.models.matterchat.q_former.q_former_llm import Blip2Base
+
+
+class Blip2MistralInstruct(Blip2Base):
+    def __init__(
+        self,
+        num_query_token=32,
+        prompt="test",
+        max_txt_len=512,
+        max_output_txt_len=1024,
+        qformer_text_input=False,
+        llm_tokenizer=None,
+        llm_model=None,
+    ):
+        super().__init__()
+
+        self.tokenizer = self.init_tokenizer(truncation_side="left")
+        self.material_encoder = self.init_material_encoder()
+        for param in self.material_encoder.parameters():
+            param.stop_gradient = True
+
+        self.Qformer, self.query_tokens = self.init_Qformer(num_query_token, 64)
+
+        self.qformer_text_input = qformer_text_input
+        if not qformer_text_input:
+            self.Qformer.bert.embeddings.word_embeddings = None
+            self.Qformer.bert.embeddings.position_embeddings = None
+            for layer in self.Qformer.bert.encoder.layer:
+                layer.output = None
+                layer.intermediate = None
+        else:
+            if llm_tokenizer is not None:
+                self.Qformer.resize_token_embeddings(len(llm_tokenizer))
+        self.Qformer.cls = None
+
+        self.llm_tokenizer = llm_tokenizer
+        self.llm_model = llm_model if llm_model is not None else MistralForCausalLM(
+            self._get_default_mistral_config()
+        )
+
+        for param in self.llm_model.parameters():
+            param.stop_gradient = True
+
+        self.llm_proj = nn.Linear(
+            self.Qformer.config.hidden_size, self.llm_model.config.hidden_size
+        )
+
+        self.max_txt_len = max_txt_len
+        self.max_output_txt_len = max_output_txt_len
+        self.prompt = prompt
+
+        if self.llm_tokenizer is not None:
+            prompt_tokens = self.llm_tokenizer(self.prompt, return_tensors="pt")
+            self.prompt_length = prompt_tokens.attention_mask.sum(1).item()
+        else:
+            self.prompt_length = 0
+
+    @staticmethod
+    def _get_default_mistral_config():
+        return MistralConfig()
+
+    def concat_text_input_output(self, input_ids, input_atts, output_ids, output_atts):
+        input_part_targets_len = []
+        input_ids_list, attention_mask_list = [], []
+
+        for i in range(input_ids.shape[0]):
+            this_input_len = input_atts[i].sum()
+            input_part_targets_len.append(this_input_len)
+
+            input_ids_list.append(paddle.concat([
+                input_ids[i][:this_input_len],
+                output_ids[i][1:],
+                input_ids[i][this_input_len:]
+            ]))
+
+            attention_mask_list.append(paddle.concat([
+                input_atts[i][:this_input_len],
+                output_atts[i][1:],
+                input_atts[i][this_input_len:]
+            ]))
+
+        return {
+            "input_ids": paddle.stack(input_ids_list),
+            "attention_mask": paddle.stack(attention_mask_list)
+        }, input_part_targets_len
+
+    def forward(self, samples, embedding_list, embedding_mask):
+        material_embeds = paddle.stack(embedding_list)
+        material_atts = paddle.stack(embedding_mask)
+        query_tokens = self.query_tokens.expand([material_embeds.shape[0], -1, -1])
+
+        if self.qformer_text_input:
+            text_input = self.tokenizer(
+                samples["text_input"],
+                padding="longest",
+                truncation=True,
+                max_length=self.max_txt_len,
+                return_tensors="pt",
+            )
+
+            query_atts = paddle.ones(query_tokens.shape[:-1], dtype=paddle.int64)
+            Qformer_atts = paddle.concat([query_atts, text_input.attention_mask], axis=1)
+
+            query_output = self.Qformer.bert(
+                text_input.input_ids,
+                attention_mask=Qformer_atts,
+                query_embeds=query_tokens,
+                encoder_hidden_states=material_embeds,
+                encoder_attention_mask=material_atts,
+                return_dict=True,
+            )
+        else:
+            query_output = self.Qformer.bert(
+                query_embeds=query_tokens,
+                encoder_hidden_states=material_embeds,
+                encoder_attention_mask=material_atts,
+                return_dict=True,
+            )
+
+        inputs_llm = self.llm_proj(query_output.last_hidden_state[:, :query_tokens.shape[1], :])
+        atts_llm = paddle.ones(inputs_llm.shape[:-1], dtype=paddle.int64)
+
+        self.llm_tokenizer.padding_side = "right"
+        self.llm_tokenizer.truncation_side = "left"
+
+        if "text_input" in samples:
+            text_input_tokens = self.llm_tokenizer(
+                samples["text_input"],
+                return_tensors="pt",
+                padding="longest",
+                truncation=True,
+                max_length=self.max_txt_len,
+            )
+        else:
+            bos_token = self.llm_tokenizer.bos_token
+            input_text = [bos_token] * material_embeds.shape[0]
+            text_input_tokens = self.llm_tokenizer(
+                input_text,
+                return_tensors="pt",
+                padding="longest",
+                truncation=True,
+                max_length=self.max_txt_len,
+            )
+
+        self.llm_tokenizer.truncation_side = "right"
+        text_output_tokens = self.llm_tokenizer(
+            [t + self.llm_tokenizer.eos_token for t in samples["text"]],
+            return_tensors="pt",
+            padding="longest",
+            truncation=True,
+            max_length=self.max_output_txt_len,
+        )
+
+        llm_tokens, input_target_lengths = self.concat_text_input_output(
+            text_input_tokens.input_ids,
+            text_input_tokens.attention_mask,
+            text_output_tokens.input_ids,
+            text_output_tokens.attention_mask,
+        )
+
+        targets = llm_tokens["input_ids"].masked_fill(
+            llm_tokens["input_ids"] == self.llm_tokenizer.pad_token_id, -100
+        )
+        for i, length in enumerate(input_target_lengths):
+            targets[i][:length] = -100
+
+        empty_targets = paddle.ones(atts_llm.shape, dtype=paddle.int64).fill_(-100)
+        targets = paddle.concat([empty_targets, targets], axis=1)
+
+        inputs_embeds = self.llm_model.get_input_embeddings()(llm_tokens["input_ids"])
+        inputs_embeds = paddle.concat(
+            [inputs_llm.cast(inputs_embeds.dtype), inputs_embeds], axis=1
+        )
+        attention_mask = paddle.concat([atts_llm, llm_tokens["attention_mask"]], axis=1)
+
+        with self.maybe_autocast():
+            outputs = self.llm_model(
+                inputs_embeds=inputs_embeds,
+                attention_mask=attention_mask,
+                return_dict=True,
+                labels=targets,
+            )
+
+        return {"loss": outputs.loss}
+
+    @paddle.no_grad()
+    def generate(
+        self,
+        samples,
+        use_nucleus_sampling=False,
+        num_beams=5,
+        max_length=256,
+        min_length=1,
+        top_p=0.9,
+        repetition_penalty=1.5,
+        length_penalty=1,
+        num_captions=1,
+        temperature=1,
+    ):
+        self.llm_tokenizer.padding_side = "left"
+        prompt = samples.get("prompt", self.prompt)
+        if isinstance(prompt, str):
+            prompt = [prompt]
+
+        material_embed = self.material_encoder.predict_structure_embedding(
+            samples["material_sample"]
+        ).unsqueeze(0)
+        material_att = paddle.ones(material_embed.shape[:-1], dtype=paddle.int64)
+
+        query_tokens = self.query_tokens.expand([1, -1, -1])
+        if self.qformer_text_input:
+            text_input = self.tokenizer(
+                prompt, padding="longest", truncation=True,
+                max_length=self.max_txt_len, return_tensors="pt"
+            )
+            qformer_atts = paddle.concat([
+                paddle.ones(query_tokens.shape[:-1], dtype=paddle.int64),
+                text_input.attention_mask
+            ], axis=1)
+            query_output = self.Qformer.bert(
+                text_input.input_ids,
+                attention_mask=qformer_atts,
+                query_embeds=query_tokens,
+                encoder_hidden_states=material_embed,
+                encoder_attention_mask=material_att,
+                return_dict=True,
+            )
+        else:
+            query_output = self.Qformer.bert(
+                query_embeds=query_tokens,
+                encoder_hidden_states=material_embed,
+                encoder_attention_mask=material_att,
+                return_dict=True,
+            )
+
+        inputs_llm = self.llm_proj(query_output.last_hidden_state[:, :query_tokens.shape[1], :])
+        atts_llm = paddle.ones(inputs_llm.shape[:-1], dtype=paddle.int64)
+
+        prompt_tokens = self.llm_tokenizer(
+            prompt, return_tensors="pt", padding="longest"
+        )
+
+        with self.maybe_autocast():
+            input_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)
+            input_embeds = paddle.concat([inputs_llm, input_embeds], axis=1)
+            attention_mask = paddle.concat(
+                [atts_llm, prompt_tokens.attention_mask], axis=1
+            )
+
+            outputs = self.llm_model.generate(
+                inputs_embeds=input_embeds,
+                attention_mask=attention_mask,
+                do_sample=use_nucleus_sampling,
+                top_p=top_p,
+                temperature=temperature,
+                num_beams=num_beams,
+                max_length=max_length,
+                min_length=min_length,
+                repetition_penalty=repetition_penalty,
+                length_penalty=length_penalty,
+                num_return_sequences=num_captions,
+            )
+
+        outputs[outputs == 0] = 2  # sanitize output
+        return [
+            self.llm_tokenizer.decode(o, skip_special_tokens=True).strip()
+            for o in outputs
+        ]
+
+    def generate_followup(
+        self,
+        samples,
+        use_nucleus_sampling=False,
+        num_beams=5,
+        max_length=256,
+        min_length=1,
+        top_p=0.9,
+        repetition_penalty=1.5,
+        length_penalty=1,
+        num_captions=1,
+        temperature=1,
+    ):
+        self.llm_tokenizer.padding_side = "left"
+        prompt = samples.get("prompt", self.prompt)
+        if isinstance(prompt, str):
+            prompt = [prompt]
+
+        material_embed = self.material_encoder.predict_structure_embedding(
+            samples["material_sample"]
+        ).unsqueeze(0)
+        material_att = paddle.ones(material_embed.shape[:-1], dtype=paddle.int64)
+
+        query_tokens = self.query_tokens.expand([1, -1, -1])
+
+        if self.qformer_text_input:
+            text_input = self.tokenizer(
+                prompt, padding="longest", truncation=True,
+                max_length=self.max_txt_len, return_tensors="pt"
+            )
+            qformer_atts = paddle.concat([
+                paddle.ones(query_tokens.shape[:-1], dtype=paddle.int64),
+                text_input.attention_mask
+            ], axis=1)
+            _ = self.Qformer.bert(
+                input_ids=text_input.input_ids,
+                attention_mask=qformer_atts,
+                query_embeds=query_tokens,
+                encoder_hidden_states=material_embed,
+                encoder_attention_mask=material_att,
+                return_dict=True,
+            )
+        else:
+            _ = self.Qformer.bert(
+                query_embeds=query_tokens,
+                encoder_hidden_states=material_embed,
+                encoder_attention_mask=material_att,
+                return_dict=True,
+            )
+
+        llm_input = self.llm_tokenizer(
+            prompt, return_tensors="pt", padding="longest"
+        )
+
+        with self.maybe_autocast():
+            llm_embeds = self.llm_model.get_input_embeddings()(llm_input.input_ids)
+            llm_embeds = paddle.concat(
+                [inputs_llm, llm_embeds], axis=1
+            )
+            llm_atts = paddle.concat(
+                [atts_llm, llm_input.attention_mask], axis=1
+            )
+
+            outputs = self.llm_model.generate(
+                inputs_embeds=llm_embeds,
+                attention_mask=llm_atts,
+                do_sample=use_nucleus_sampling,
+                top_p=top_p,
+                temperature=temperature,
+                num_beams=num_beams,
+                max_length=max_length,
+                min_length=min_length,
+                repetition_penalty=repetition_penalty,
+                length_penalty=length_penalty,
+                num_return_sequences=num_captions,
+            )
+
+        outputs[outputs == 0] = 2  # sanitize output
+        decoded_outputs = [
+            self.llm_tokenizer.decode(o, skip_special_tokens=True).strip()
+            for o in outputs
+        ]
+
+        cleaned_outputs = []
+        for out, p in zip(decoded_outputs, prompt * num_captions):
+            if out.lower().startswith(p.lower()):
+                out = out[len(p):].lstrip(":,.- \n")
+            cleaned_outputs.append(out)
+
+        return cleaned_outputs
