@@ -214,7 +214,12 @@ class GraphPooling(nn.Layer):
         self.average = average
 
     def forward(self, atom_feas: Tensor, atom_owner: Tensor) -> Tensor:
-        return aggregate(atom_feas, atom_owner, average=self.average)
+        output = aggregate(atom_feas, atom_owner, average=False)
+        if self.average:
+            bc = paddle.bincount(atom_owner.cast("int32"))
+            bc = paddle.where(bc != 0, bc, paddle.ones([1], dtype=bc.dtype))
+            output = (output.T / bc.cast(output.dtype)).T
+        return output
 
 
 class GraphAttentionReadOut(nn.Layer):
