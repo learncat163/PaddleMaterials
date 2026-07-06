@@ -112,7 +112,7 @@ def apply_lora_to_mistral(
     projection with that name across all decoder layers is replaced.
     """
     n_replaced = 0
-    for parent in llm_model.named_sublayers():
+    for _, parent in llm_model.named_sublayers():
         for child_name, child in list(parent.named_children()):
             if isinstance(child, nn.Linear) and child_name in target_names:
                 lora = LoRALinear(child, r=r, alpha=alpha, dropout=dropout)
