@@ -50,16 +50,17 @@ class LoRALinear(nn.Layer):
         self.base = base_linear
         in_features = base_linear.weight.shape[0]
         out_features = base_linear.weight.shape[1]
+        lora_dtype = base_linear.weight.dtype
         self.lora_A = self.create_parameter(
             shape=[in_features, r],
-            dtype="float16",
+            dtype=lora_dtype,
             default_initializer=nn.initializer.KaimingUniform(
-                negative_slope=0, fan_in=a if (a := in_features) > 0 else 1
+                negative_slope=0, fan_in=in_features if in_features > 0 else 1
             ),
         )
         self.lora_B = self.create_parameter(
             shape=[r, out_features],
-            dtype="float16",
+            dtype=lora_dtype,
             default_initializer=nn.initializer.Constant(value=0.0),
         )
         self.scaling = alpha / r
@@ -73,15 +74,12 @@ class LoRALinear(nn.Layer):
     def merge_into_base(self) -> nn.Linear:
         """Fold LoRA weights into the base linear and return a plain nn.Linear."""
         with paddle.no_grad():
-            merged_w = (
-                self.base.weight
-                + (self.lora_A @ self.lora_B * self.scaling).T
-            )
+            # lora_A: [in, r], lora_B: [r, out] -> A@B: [in, out] == base.weight shape
+            merged_w = self.base.weight + (self.lora_A @ self.lora_B) * self.scaling
             new_linear = nn.Linear(
                 self.base.weight.shape[0],
                 self.base.weight.shape[1],
                 bias_attr=self.base.bias is not None,
-                dtype=self.base.weight.dtype,
             )
             new_linear.weight.set_value(merged_w)
             if self.base.bias is not None:
@@ -108,12 +106,15 @@ def apply_lora_to_mistral(
     alpha: int = 32,
     dropout: float = 0.05,
 ) -> int:
-    """Replace targeted nn.Linear layers in the Mistral LLM with LoRALinear."""
+    """Replace targeted nn.Linear layers in the Mistral LLM with LoRALinear.
+
+    Matching is done by leaf attribute name (e.g. ``q_proj``), so every
+    projection with that name across all decoder layers is replaced.
+    """
     n_replaced = 0
-    for parent_name, parent in llm_model.named_sublayers():
+    for parent in llm_model.named_sublayers():
         for child_name, child in list(parent.named_children()):
-            full_name = child_name
-            if isinstance(child, nn.Linear) and any(t == full_name for t in target_names):
+            if isinstance(child, nn.Linear) and child_name in target_names:
                 lora = LoRALinear(child, r=r, alpha=alpha, dropout=dropout)
                 setattr(parent, child_name, lora)
                 n_replaced += 1
@@ -186,12 +187,15 @@ class MatterChatModule(nn.Layer):
 
     def _forward_stage23(self, batch_data: dict) -> dict:
         from pymatgen.core import Structure as _Structure
+
         # Reconstruct pymatgen.Structure from serialized dicts.
         # MTCollator preserves the as_dict output as opaque dicts.
-        structures = [
-            _Structure.from_dict(d) for d in batch_data["structure"]
-        ]
+        structures = [_Structure.from_dict(d) for d in batch_data["structure"]]
         # Encode each structure with the frozen CHGNet encoder.
+        # NOTE: This loops per-structure because CHGNet's
+        # predict_structure_embedding handles a single Structure. Batched
+        # encoding would require a batch graph converter and is a future
+        # optimization; the loop is wrapped in no_grad so it is cheap.
         with paddle.no_grad():
             embedding_list = []
             embedding_mask = []
@@ -219,12 +223,10 @@ class MatterChatModule(nn.Layer):
 
     def _forward_stage1(self, batch_data: dict) -> dict:
         """Stage 1: ITC + ITM + ITG on Q-Former only (not yet implemented)."""
-        logger.warning(
-            "Stage 1 (ITC+ITM+ITG) is not implemented yet; returning "
-            "zero loss. Use Stage 2 / 3 for the available training modes."
+        raise NotImplementedError(
+            "Stage 1 (ITC+ITM+ITG) is not implemented yet. "
+            "Use Stage 2 / 3 for the available training modes."
         )
-        zero = paddle.zeros([], dtype="float32")
-        return {"loss_dict": {"loss": zero}, "pred_dict": {}}
 
     def assert_all_on_gpu(self) -> tuple[int, int]:
         """Verify every parameter lives on the GPU. Returns (gpu_count, cpu_count)."""
@@ -262,10 +264,7 @@ class MatterChatTrainer(BaseTrainer):
                 f"MatterChatTrainer: {cpu} parameters are still on CPU. "
                 "Build the LLM in float16 on GPU."
             )
-        logger.info(
-            f"MatterChatTrainer: verified {gpu} parameters are on GPU, "
-            f"0 on CPU."
-        )
+        logger.info(f"MatterChatTrainer: verified {gpu} parameters are on GPU, " f"0 on CPU.")
         super().__init__(
             config=config,
             model=model,
@@ -327,6 +326,7 @@ class MTDataset(Dataset):
         task_pkl,
     ) -> None:
         import pickle
+
         with open(mat_pkl, "rb") as f:
             materials = pickle.load(f)
         questions = json.load(open(q_json)) if q_json else []
@@ -348,10 +348,9 @@ class MTDataset(Dataset):
 
     def _load_demo(self) -> None:
         from pymatgen.core import Lattice, Structure
-        si = Structure(Lattice.cubic(5.43), ["Si"] * 2,
-                       [[0, 0, 0], [0.25, 0.25, 0.25]])
-        gan = Structure(Lattice.cubic(4.5), ["Ga", "N"],
-                        [[0, 0, 0], [0.5, 0.5, 0.5]])
+
+        si = Structure(Lattice.cubic(5.43), ["Si"] * 2, [[0, 0, 0], [0.25, 0.25, 0.25]])
+        gan = Structure(Lattice.cubic(4.5), ["Ga", "N"], [[0, 0, 0], [0.5, 0.5, 0.5]])
         self.samples = [
             {
                 "structure": si,
@@ -399,10 +398,7 @@ class MTCollator:
 
     @staticmethod
     def _is_pmg_as_dict(d):
-        return (
-            isinstance(d, dict)
-            and d.get("@module", "").startswith("pymatgen.core")
-        )
+        return isinstance(d, dict) and d.get("@module", "").startswith("pymatgen.core")
 
     def __call__(self, batch):
         # Paddle's DataLoader silently drops batches with NO Tensors,
@@ -414,7 +410,9 @@ class MTCollator:
             sample_item = items[0]
             if self._is_pmg_as_dict(sample_item):
                 result[k] = items
-            elif isinstance(sample_item, (list, tuple)) and items and self._is_pmg_as_dict(items[0]):
+            elif (
+                isinstance(sample_item, (list, tuple)) and items and self._is_pmg_as_dict(items[0])
+            ):
                 if all(len(it) == 1 for it in items):
                     result[k] = [it[0] for it in items]
                 else:

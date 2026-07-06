@@ -30,7 +30,6 @@ PaddleMaterials/
 ├── spectrum_elucidation/           # 谱图解析任务(SE)
 ├── ppmatSim/                       # 分子动力学模拟工具
 ├── research/                       # 研究项目
-├── jointContribution/              # 联合贡献项目
 ├── docs/                           # 文档和资源
 ├── test/                           # 测试文件
 ├── setup.py                        # 安装配置

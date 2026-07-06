@@ -39,6 +39,7 @@ class Blip2MistralInstruct(Blip2Base):
         if llm_tokenizer is None and tokenizer_path is not None and tokenizer_path:
             from ppmat.models.matterchat.utils.tokenizer import MistralTokenizerWrapper
             import os as _os
+
             _resolved = _os.path.expanduser(tokenizer_path)
             llm_tokenizer = MistralTokenizerWrapper(_resolved)
 
@@ -62,8 +63,10 @@ class Blip2MistralInstruct(Blip2Base):
         self.Qformer.cls = None
 
         self.llm_tokenizer = llm_tokenizer
-        self.llm_model = llm_model if llm_model is not None else MistralForCausalLM(
-            self._get_default_mistral_config()
+        self.llm_model = (
+            llm_model
+            if llm_model is not None
+            else MistralForCausalLM(self._get_default_mistral_config())
         )
 
         for param in self.llm_model.parameters():
@@ -78,7 +81,7 @@ class Blip2MistralInstruct(Blip2Base):
         self.prompt = prompt
 
         if self.llm_tokenizer is not None:
-            prompt_tokens = self.llm_tokenizer(self.prompt, return_tensors="pt")
+            prompt_tokens = self.llm_tokenizer(self.prompt, return_tensors="pd")
             self.prompt_length = prompt_tokens.attention_mask.sum(1).item()
         else:
             self.prompt_length = 0
@@ -192,7 +195,7 @@ class Blip2MistralInstruct(Blip2Base):
                 padding="longest",
                 truncation=True,
                 max_length=self.max_txt_len,
-                return_tensors="pt",
+                return_tensors="pd",
             )
             query_atts = paddle.ones(query_tokens.shape[:-1], dtype=paddle.int64)
             qformer_atts = paddle.concat([query_atts, text_input.attention_mask], axis=1)
@@ -237,20 +240,14 @@ class Blip2MistralInstruct(Blip2Base):
         query_output = self._run_qformer(query_tokens, material_embed, material_att, prompt)
 
         # llm_proj mapping
-        inputs_llm = self.llm_proj(
-            query_output.last_hidden_state[:, :query_tokens.shape[1], :]
-        )
+        inputs_llm = self.llm_proj(query_output.last_hidden_state[:, : query_tokens.shape[1], :])
         atts_llm = paddle.ones(inputs_llm.shape[:-1], dtype=paddle.int64)
 
         # Tokenizer encoding + concatenation
-        prompt_tokens = self.llm_tokenizer(
-            prompt, return_tensors="pt", padding="longest"
-        )
+        prompt_tokens = self.llm_tokenizer(prompt, return_tensors="pd", padding="longest")
         input_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)
         inputs_embeds = paddle.concat([inputs_llm, input_embeds], axis=1)
-        attention_mask = paddle.concat(
-            [atts_llm, prompt_tokens.attention_mask], axis=1
-        )
+        attention_mask = paddle.concat([atts_llm, prompt_tokens.attention_mask], axis=1)
         return inputs_embeds, attention_mask, prompt
 
     def concat_text_input_output(self, input_ids, input_atts, output_ids, output_atts):
@@ -261,21 +258,29 @@ class Blip2MistralInstruct(Blip2Base):
             this_input_len = input_atts[i].sum()
             input_part_targets_len.append(this_input_len)
 
-            input_ids_list.append(paddle.concat([
-                input_ids[i][:this_input_len],
-                output_ids[i][1:],
-                input_ids[i][this_input_len:]
-            ]))
+            input_ids_list.append(
+                paddle.concat(
+                    [
+                        input_ids[i][:this_input_len],
+                        output_ids[i][1:],
+                        input_ids[i][this_input_len:],
+                    ]
+                )
+            )
 
-            attention_mask_list.append(paddle.concat([
-                input_atts[i][:this_input_len],
-                output_atts[i][1:],
-                input_atts[i][this_input_len:]
-            ]))
+            attention_mask_list.append(
+                paddle.concat(
+                    [
+                        input_atts[i][:this_input_len],
+                        output_atts[i][1:],
+                        input_atts[i][this_input_len:],
+                    ]
+                )
+            )
 
         return {
             "input_ids": paddle.stack(input_ids_list),
-            "attention_mask": paddle.stack(attention_mask_list)
+            "attention_mask": paddle.stack(attention_mask_list),
         }, input_part_targets_len
 
     def forward(self, samples, embedding_list, embedding_mask):
@@ -287,7 +292,7 @@ class Blip2MistralInstruct(Blip2Base):
         text_list = samples.get("text_input", None)
         query_output = self._run_qformer(query_tokens, material_embeds, material_atts, text_list)
 
-        inputs_llm = self.llm_proj(query_output.last_hidden_state[:, :query_tokens.shape[1], :])
+        inputs_llm = self.llm_proj(query_output.last_hidden_state[:, : query_tokens.shape[1], :])
         atts_llm = paddle.ones(inputs_llm.shape[:-1], dtype=paddle.int64)
 
         self.llm_tokenizer.padding_side = "right"
@@ -296,7 +301,7 @@ class Blip2MistralInstruct(Blip2Base):
         if "text_input" in samples:
             text_input_tokens = self.llm_tokenizer(
                 samples["text_input"],
-                return_tensors="pt",
+                return_tensors="pd",
                 padding="longest",
                 truncation=True,
                 max_length=self.max_txt_len,
@@ -306,7 +311,7 @@ class Blip2MistralInstruct(Blip2Base):
             input_text = [bos_token] * material_embeds.shape[0]
             text_input_tokens = self.llm_tokenizer(
                 input_text,
-                return_tensors="pt",
+                return_tensors="pd",
                 padding="longest",
                 truncation=True,
                 max_length=self.max_txt_len,
@@ -315,7 +320,7 @@ class Blip2MistralInstruct(Blip2Base):
         self.llm_tokenizer.truncation_side = "right"
         text_output_tokens = self.llm_tokenizer(
             [t + self.llm_tokenizer.eos_token for t in samples["text"]],
-            return_tensors="pt",
+            return_tensors="pd",
             padding="longest",
             truncation=True,
             max_length=self.max_output_txt_len,
@@ -385,10 +390,7 @@ class Blip2MistralInstruct(Blip2Base):
             )
 
         outputs[outputs == 0] = 2  # sanitize output
-        return [
-            self.llm_tokenizer.decode(o, skip_special_tokens=True).strip()
-            for o in outputs
-        ]
+        return [self.llm_tokenizer.decode(o, skip_special_tokens=True).strip() for o in outputs]
 
     def generate_followup(
         self,
@@ -422,14 +424,13 @@ class Blip2MistralInstruct(Blip2Base):
 
         outputs[outputs == 0] = 2  # sanitize output
         decoded_outputs = [
-            self.llm_tokenizer.decode(o, skip_special_tokens=True).strip()
-            for o in outputs
+            self.llm_tokenizer.decode(o, skip_special_tokens=True).strip() for o in outputs
         ]
 
         cleaned_outputs = []
         for out, p in zip(decoded_outputs, prompt * num_captions):
             if out.lower().startswith(p.lower()):
-                out = out[len(p):].lstrip(":,.- \n")
+                out = out[len(p) :].lstrip(":,.- \n")
             cleaned_outputs.append(out)
 
         return cleaned_outputs

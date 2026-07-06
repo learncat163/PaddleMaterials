@@ -26,6 +26,7 @@ from tokenizers import Tokenizer
 @dataclass
 class EncodingResult:
     """Mimics HuggingFace BatchEncoding for compatibility."""
+
     input_ids: paddle.Tensor
     attention_mask: paddle.Tensor
 
@@ -56,13 +57,18 @@ class MistralTokenizerWrapper:
     def __call__(
         self,
         text: Union[str, List[str]],
-        return_tensors: str = "pt",
+        return_tensors: str = "pd",
         padding: Union[bool, str] = False,
         truncation: bool = False,
         max_length: Optional[int] = None,
         **kwargs,
     ) -> EncodingResult:
-        """Encode text to token IDs and attention mask."""
+        """Encode text to token IDs and attention mask.
+
+        Note: ``return_tensors`` is accepted for API compatibility with
+        HuggingFace tokenizers but ignored; this wrapper always returns
+        ``paddle.Tensor`` objects.
+        """
         is_batched = isinstance(text, list)
         if not is_batched:
             text = [text]
