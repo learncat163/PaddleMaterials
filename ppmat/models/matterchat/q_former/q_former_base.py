@@ -20,6 +20,7 @@ into two parallel paths (query vs. text). These modifications are incompatible w
 standard BERT implementation.
 """
 
+import contextlib
 import math
 from dataclasses import dataclass
 from typing import Optional, Tuple
@@ -28,6 +29,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
+from ppmat.models.matterchat.chgnet.model.model_embedding import CHGNet
 from ppmat.models.matterchat.utils.activations import get_activation as _get_activation
 from ppmat.models.matterchat.utils.weight_init import default_init_weights
 
@@ -1128,3 +1130,50 @@ class BertForMaskedLM(BertPreTrainedModel):
             hidden_states=outputs.hidden_states if hasattr(outputs, "hidden_states") else None,
             attentions=outputs.attentions if hasattr(outputs, "attentions") else None,
         )
+
+
+class LayerNorm(nn.LayerNorm):
+    """Subclass of paddle LayerNorm to support mixed precision."""
+
+    def forward(self, x):
+        orig_dtype = x.dtype
+        x = super().forward(x.cast(paddle.float32))
+        return x.cast(orig_dtype)
+
+
+class Blip2Base(nn.Layer):
+    """Base class for Blip2 models."""
+
+    @classmethod
+    def init_tokenizer(cls, truncation_side="right"):
+        """Initialize tokenizer. Returns None - tokenizer is managed externally."""
+        return None
+
+    @classmethod
+    def init_Qformer(cls, num_query_token, vision_width, cross_attention_freq=2):
+        config = BertConfig()
+        config.encoder_width = vision_width
+        config.add_cross_attention = True
+        config.cross_attention_freq = cross_attention_freq
+        config.query_length = num_query_token
+
+        Qformer = BertLMHeadModel(config)
+
+        query_tokens = paddle.create_parameter(
+            shape=[1, num_query_token, config.hidden_size],
+            dtype=paddle.float32,
+            default_initializer=nn.initializer.Normal(
+                mean=0.0, std=config.initializer_range
+            ),
+        )
+        return Qformer, query_tokens
+
+    def init_material_encoder(self):
+        """Initialize CHGNet material encoder without pretrained weights."""
+        return CHGNet()
+
+    def maybe_autocast(self, dtype=paddle.float16):
+        """Context manager for mixed precision."""
+        if not paddle.is_compiled_with_cuda():
+            return contextlib.nullcontext()
+        return paddle.amp.auto_cast(dtype=dtype)

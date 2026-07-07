@@ -19,7 +19,7 @@ import paddle.nn as nn
 
 from ppmat.models.matterchat.mistral.configuration_mistral import MistralConfig
 from ppmat.models.matterchat.mistral.modeling_mistral import MistralForCausalLM
-from ppmat.models.matterchat.q_former.q_former_llm import Blip2Base
+from ppmat.models.matterchat.q_former.q_former_base import Blip2Base
 
 
 class Blip2MistralInstruct(Blip2Base):

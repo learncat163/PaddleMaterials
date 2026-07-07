@@ -39,11 +39,3 @@ def default_init_weights(module, initializer_range: float = 0.02):
     elif isinstance(module, nn.LayerNorm):
         module.bias.set_value(paddle.zeros(module.bias.shape))
         module.weight.set_value(paddle.ones(module.weight.shape))
-
-
-def get_device(model: nn.Layer):
-    """Get the device of the first parameter of a model."""
-    params = list(model.parameters())
-    if len(params) > 0:
-        return params[0].place
-    return paddle.CPUPlace()

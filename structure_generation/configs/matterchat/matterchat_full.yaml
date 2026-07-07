@@ -12,6 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# MatterChat inference config.
+# NOTE: MatterChat is a dialogue model, not a structure generator. It does NOT
+# use structure_generation/sample.py (StructureSampler). Inference is done via
+# Blip2MistralInstruct.from_pretrained() or build_model_from_name(), see
+# README.md for usage. Training configs (Stage 2/3) are in
+# .historys/matterchat/5-train/configs/.
+
 Model:
   __class_name__: Blip2MistralInstruct
   __init_params__:

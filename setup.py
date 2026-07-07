@@ -46,6 +46,7 @@ if __name__ == "__main__":
             exclude=(
                 "docs",
                 "examples",
+                "jointContribution",
                 "test",
                 "interatomic_potentials",
                 "property_prediction",

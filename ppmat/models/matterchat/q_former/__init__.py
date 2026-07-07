@@ -17,8 +17,8 @@ from ppmat.models.matterchat.q_former.q_former_base import (
     BertLMHeadModel,
     BertModel,
     BertForMaskedLM,
+    Blip2Base,
 )
-from ppmat.models.matterchat.q_former.q_former_llm import Blip2Base
 from ppmat.models.matterchat.q_former.q_former_complete import Blip2MistralInstruct
 
 __all__ = [
