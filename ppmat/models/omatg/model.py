@@ -28,12 +28,15 @@ import paddle.nn as nn
 from ppmat.datasets.omatg_dataset import LATTICE_PARAMS
 from ppmat.datasets.omatg_dataset import sample_lattice_cell
 from ppmat.losses import MSELoss
+from ppmat.models.common.runtime import RuntimeMixin
+from ppmat.models.common.runtime import runtime_boundary
 from ppmat.models.diffcsp.diffcsp import CSPNet
 from ppmat.models.omatg.si.core import BIG_TIME
 from ppmat.models.omatg.si.core import DEFAULT_MAX_ATOMS
 from ppmat.models.omatg.si.core import SMALL_TIME
 from ppmat.models.omatg.si.core import DiscreteFlowMatchingMask
 from ppmat.utils.crystal import frac_to_cart_coords_with_lattice
+from ppmat.utils.crystal import lattices_to_params_shape_paddle
 from ppmat.utils.crystal import radius_graph_pbc
 from ppmat.utils.misc import repeat_blocks
 
@@ -41,6 +44,7 @@ __all__ = [
     "OMATGCSPNet",
     "OMATGCSPNetFull",
     "IndependentSampler",
+    "build_sampler_from_cfg",
 ]
 
 
@@ -211,8 +215,17 @@ class OMATGCSPNet(CSPNet):
         )
         return edge_index_new, -edge_vector_new
 
-    def forward(self, t, atom_types, frac_coords, lattices, num_atoms, node2graph):
-        edges, frac_diff = self.gen_edges(num_atoms, frac_coords, lattices, node2graph)
+    def forward_with_edges(
+        self,
+        t,
+        atom_types,
+        frac_coords,
+        lattices,
+        num_atoms,
+        node2graph,
+        edges,
+        frac_diff,
+    ):
         edge2graph = node2graph[edges[0]]
 
         if self.smooth:
@@ -279,8 +292,40 @@ class OMATGCSPNet(CSPNet):
         return lattice_out, coord_out, lattice_out_2, coord_out_2
 
     def forward_dict(self, t, atom_types, frac_coords, lattices, num_atoms, node2graph):
-        preds = OMATGCSPNet.forward(
-            self, t, atom_types, frac_coords, lattices, num_atoms, node2graph
+        edges, frac_diff = self.gen_edges(num_atoms, frac_coords, lattices, node2graph)
+        return self._runtime_forward_dict(
+            t,
+            atom_types,
+            frac_coords,
+            lattices,
+            num_atoms,
+            node2graph,
+            edges,
+            frac_diff,
+        )
+
+    @runtime_boundary("denoise_step")
+    def _runtime_forward_dict(
+        self,
+        t,
+        atom_types,
+        frac_coords,
+        lattices,
+        num_atoms,
+        node2graph,
+        edges,
+        frac_diff,
+    ):
+        preds = OMATGCSPNet.forward_with_edges(
+            self,
+            t,
+            atom_types,
+            frac_coords,
+            lattices,
+            num_atoms,
+            node2graph,
+            edges,
+            frac_diff,
         )
         if self.pred_scalar:
             return {"scalar": preds}
@@ -301,7 +346,7 @@ class OMATGCSPNet(CSPNet):
         }
 
 
-class OMATGCSPNetFull(OMATGCSPNet):
+class OMATGCSPNetFull(RuntimeMixin, OMATGCSPNet):
     """CSPNet with time embedding, checkpoint-compatible defaults."""
 
     # Defaults match the released checkpoints so a bare OMATGCSPNetFull()
@@ -326,6 +371,8 @@ class OMATGCSPNetFull(OMATGCSPNet):
         use_si: bool = False,
         si_scheduler_cfg: dict = None,
         sampler_cfg: dict = None,
+        execution_backend: str = "eager",
+        runtime_options: dict = None,
     ):
         super().__init__(
             hidden_dim=hidden_dim,
@@ -344,6 +391,7 @@ class OMATGCSPNetFull(OMATGCSPNet):
             pred_scalar=pred_scalar,
             time_embed_dim=time_embed_dim,
         )
+        self._init_runtime(execution_backend, runtime_options)
         self.use_si = use_si
         self._si = None
         self._sampler = None
@@ -447,8 +495,6 @@ class OMATGCSPNetFull(OMATGCSPNet):
 
     @staticmethod
     def _build_sample_result(num_atoms_list, atom_types, frac_coords, lattices):
-        from ppmat.utils.crystal import lattices_to_params_shape_paddle
-
         lengths, angles = lattices_to_params_shape_paddle(lattices)
         start_idx = 0
         result = []
@@ -482,7 +528,6 @@ class OMATGCSPNetFull(OMATGCSPNet):
         )
 
     def _build_si(self, si_scheduler_cfg: dict, sampler_cfg: dict) -> None:
-        from ppmat.models.omatg.si.core import build_sampler_from_cfg
         from ppmat.models.omatg.si.core import build_si_from_cfg
 
         # Normalize OmegaConf DictConfig to plain dicts.
@@ -711,3 +756,15 @@ class IndependentSampler:
                 ]
             ),
         }
+
+
+def build_sampler_from_cfg(sampler_cfg: dict):
+    """Build an IndependentSampler from a config dict."""
+    return IndependentSampler(
+        dataset_name=sampler_cfg.get("dataset_name"),
+        lattice_means=sampler_cfg.get("lattice_means"),
+        lattice_stds=sampler_cfg.get("lattice_stds"),
+        mirror_species=sampler_cfg.get("mirror_species", True),
+        mask_species=sampler_cfg.get("mask_species", False),
+        max_atoms=sampler_cfg.get("max_atoms"),
+    )

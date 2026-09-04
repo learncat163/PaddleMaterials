@@ -20,7 +20,6 @@ from enum import Enum
 from typing import Any
 from typing import Callable
 from typing import Dict
-from typing import Iterable
 from typing import List
 from typing import Optional
 from typing import Sequence
@@ -45,6 +44,10 @@ DEFAULT_MAX_ATOMS: int = 100
 # the singular endpoints t=0/1 (gamma/epsilon derivatives) stay out of play.
 SMALL_TIME: float = 1.0e-3
 BIG_TIME: float = 1.0 - 1.0e-3
+
+# Lattice matrices are clipped elementwise during integration for numerical
+# stability; |a_ij| = 100 A is far beyond any physical cell entry.
+_CELL_CLIP_BOUND: float = 100.0
 
 
 def _clone_dict(data: Dict[str, paddle.Tensor]) -> Dict[str, paddle.Tensor]:
@@ -123,13 +126,6 @@ class SingleStochasticInterpolant(StochasticInterpolant):
         else:
             z = paddle.zeros_like(x_0)
         return interpolate, z
-
-    def loss_keys(self) -> Iterable[str]:
-        if self._differential_equation_type == "ODE":
-            yield "loss_b"
-        else:
-            yield "loss_b"
-            yield "loss_z"
 
     def loss(self, *args, **kwargs):
         raise NotImplementedError  # Overridden in __init__
@@ -327,9 +323,6 @@ class SingleStochasticInterpolantIdentity(StochasticInterpolantSpecies):
         assert bool(paddle.equal_all(x_0, x_1))
         return x_0.clone(), paddle.zeros_like(x_0)
 
-    def loss_keys(self) -> Iterable[str]:
-        yield "loss"
-
     def loss(
         self,
         model_function: Callable,
@@ -356,9 +349,6 @@ class SingleStochasticInterpolantIdentity(StochasticInterpolantSpecies):
     def get_corrector(self) -> Corrector:
         return IdentityCorrector()
 
-    def uses_masked_species(self) -> bool:
-        return False
-
 
 class DiscreteFlowMatchingMask(StochasticInterpolantSpecies):
     """Discrete flow matching between masked base p_0 and target p_1 for species."""
@@ -384,9 +374,6 @@ class DiscreteFlowMatchingMask(StochasticInterpolantSpecies):
         mask = paddle.rand(x_0.shape) < t
         x_t[mask] = x_1[mask]
         return x_t, paddle.zeros_like(x_t)
-
-    def loss_keys(self) -> Iterable[str]:
-        yield "loss"
 
     def loss(
         self,
@@ -455,9 +442,6 @@ class DiscreteFlowMatchingMask(StochasticInterpolantSpecies):
         )
         return x_t
 
-    def uses_masked_species(self) -> bool:
-        return True
-
 
 class DataField(Enum):
     """Enum for data fields in the OMatG sample dict."""
@@ -520,16 +504,6 @@ class StochasticInterpolants:
 
     def __len__(self) -> int:
         return len(self._stochastic_interpolants)
-
-    def loss_keys(self) -> List[str]:
-        loss_keys = []
-        for df, si in zip(self._data_fields, self._stochastic_interpolants):
-            for key in si.loss_keys():
-                full_key = f"{df.value}_{key}"
-                if full_key in loss_keys:
-                    raise ValueError(f"Key {full_key} is already used as a loss key.")
-                loss_keys.append(full_key)
-        return loss_keys
 
     def _interpolate(
         self,
@@ -682,7 +656,9 @@ class StochasticInterpolants:
                     )
 
                     if data_field == DataField.cell:
-                        new_value = paddle.clip(new_value, -100.0, 100.0)
+                        new_value = paddle.clip(
+                            new_value, -_CELL_CLIP_BOUND, _CELL_CLIP_BOUND
+                        )
                     new_x_t[field_name] = new_value
 
                 x_t = _clone_dict(new_x_t)
@@ -694,15 +670,6 @@ class StochasticInterpolants:
             return x_t, inter_list
         else:
             return x_t
-
-    def get_stochastic_interpolant(self, data_field: str):
-        try:
-            df = DataField[data_field.lower()]
-        except KeyError:
-            raise ValueError(f"Data field must be in {[d.value for d in DataField]}.")
-
-        index = self._data_fields.index(df)
-        return self._stochastic_interpolants[index]
 
 
 def _resolve_si_class(class_name: str, default_module: str):
@@ -803,20 +770,6 @@ def build_si_from_cfg(si_scheduler_cfg: dict) -> StochasticInterpolants:
     )
 
 
-def build_sampler_from_cfg(sampler_cfg: dict):
-    """Build IndependentSampler from a config dict."""
-    from ppmat.models.omatg.model import IndependentSampler
-
-    return IndependentSampler(
-        dataset_name=sampler_cfg.get("dataset_name"),
-        lattice_means=sampler_cfg.get("lattice_means"),
-        lattice_stds=sampler_cfg.get("lattice_stds"),
-        mirror_species=sampler_cfg.get("mirror_species", True),
-        mask_species=sampler_cfg.get("mask_species", False),
-        max_atoms=sampler_cfg.get("max_atoms"),
-    )
-
-
 __all__ = [
     "BIG_TIME",
     "SMALL_TIME",
@@ -828,5 +781,4 @@ __all__ = [
     "SingleStochasticInterpolantIdentity",
     "DiscreteFlowMatchingMask",
     "build_si_from_cfg",
-    "build_sampler_from_cfg",
 ]

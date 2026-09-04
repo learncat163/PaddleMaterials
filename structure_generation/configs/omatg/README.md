@@ -83,7 +83,7 @@ reference ground-truth set for metrics.
 
 The raw MP-20 (and the other MPTS-52 / Perov-5 / Alex-MP-20) structures can be converted into
 the expected LMDB layout from their source files before training. The LMDB record for each
-structure must contain the fields read by `StructureDataset`: `cell` (3x3), `atomic_numbers`
+structure must contain the fields read by `OMATGStructureDataset`: `cell` (3x3), `atomic_numbers`
 (1D), and `pos` (Nx3), serialized with `pickle` under a non-double-underscore key. Only after
 these files are prepared will the training / validation / sampling commands below run.
 
@@ -243,7 +243,8 @@ model, meta = build_omatg_model("mp_20_dng", "encdec_ode_gamma")  # DNG
 ### Training
 
 ```bash
-# Smoke training (1 epoch, small batch, no eval)
+# Smoke training (1 epoch, small batch; periodic in-training eval still
+# runs per eval_freq, Global.do_eval only skips the final standalone eval)
 python structure_generation/train.py \
     -c structure_generation/configs/omatg/omatg_mp20_csp.yaml \
     Trainer.max_epochs=1 \

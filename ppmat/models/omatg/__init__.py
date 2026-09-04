@@ -124,30 +124,25 @@ def build_omatg_model(
 
     is_dng = "dng" in dataset.lower()
 
-    try:
-        params = dict(model_kwargs)
-        params.setdefault("pred_type", is_dng)
-        if si_scheduler_cfg is not None:
-            params["use_si"] = True
-            params["si_scheduler_cfg"] = si_scheduler_cfg
-            params["sampler_cfg"] = sampler_cfg or {}
-        model = OMATGCSPNetFull(**params)
-        if is_dng:
-            model.enable_masked_species()
+    params = dict(model_kwargs)
+    params.setdefault("pred_type", is_dng)
+    if si_scheduler_cfg is not None:
+        params["use_si"] = True
+        params["si_scheduler_cfg"] = si_scheduler_cfg
+        params["sampler_cfg"] = sampler_cfg or {}
+    model = OMATGCSPNetFull(**params)
+    if is_dng:
+        model.enable_masked_species()
 
-        save_load.load_pretrain(model, weight_path, weights_name)
+    save_load.load_pretrain(model, weight_path, weights_name)
 
-        logger.info(f"Successfully built and loaded OMatG model: {dataset}/{variant}")
+    logger.info(f"Successfully built and loaded OMatG model: {dataset}/{variant}")
 
-        return model, {
-            "dataset": dataset,
-            "variant": variant,
-            "weights_name": weights_name,
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to build OMatG model: {e}")
-        raise
+    return model, {
+        "dataset": dataset,
+        "variant": variant,
+        "weights_name": weights_name,
+    }
 
 
 def get_omatg_model_url(dataset: str, variant: str) -> str:

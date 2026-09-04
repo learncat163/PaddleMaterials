@@ -713,9 +713,8 @@ class OMatGMetric(StreamingMetricBase):
         return self._compute(pred_data, gt_data)
 
     def reset(self):
-        """Clear accumulated predictions and gt cache."""
+        """Clear accumulated predictions; keep the loaded gt reference cache."""
         self._pred_buffer: List[dict] = []
-        self._gt_crystals = None
 
     def update_step(self, *, result: Dict[str, Any], batch: Any, stage: str):
         """Accumulate generated structures from a sampling/eval step."""

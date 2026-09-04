@@ -25,7 +25,6 @@ from abc import ABC
 from abc import abstractmethod
 from typing import Callable
 from typing import Dict
-from typing import Iterable
 from typing import Tuple
 
 import paddle
@@ -96,7 +95,7 @@ class Interpolant(ABC, TimeChecker):
         raise NotImplementedError
 
     @abstractmethod
-    def beta_dot(self, t: paddle.Tensor):
+    def beta_dot(self, t: paddle.Tensor) -> paddle.Tensor:
         raise NotImplementedError
 
 
@@ -150,7 +149,7 @@ class VanishingEpsilon(Epsilon):
         self._mu = mu
 
     def epsilon(self, t: paddle.Tensor) -> paddle.Tensor:
-        self._check_t(t)
+        assert bool(self._check_t(t))
         f1 = paddle.sigmoid((t - self._mu) / self._sigma)
         f2 = paddle.sigmoid((1 - self._mu - t) / self._sigma)
         return self._c * f1 * f2
@@ -186,11 +185,11 @@ class LatentGammaSqrt(LatentGamma):
         self._a = a
 
     def gamma(self, t: paddle.Tensor) -> paddle.Tensor:
-        self._check_t(t)
+        assert bool(self._check_t(t))
         return paddle.sqrt(self._a * t * (1.0 - t))
 
     def gamma_derivative(self, t: paddle.Tensor) -> paddle.Tensor:
-        self._check_t(t)
+        assert bool(self._check_t(t))
         return self._a * (1.0 - 2.0 * t) / (2.0 * paddle.sqrt(self._a * t * (1.0 - t)))
 
     def requires_antithetic(self) -> bool:
@@ -208,10 +207,6 @@ class StochasticInterpolant(ABC, TimeChecker):
         x_1: paddle.Tensor,
         batch_indices: paddle.Tensor,
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
-        raise NotImplementedError
-
-    @abstractmethod
-    def loss_keys(self) -> Iterable[str]:
         raise NotImplementedError
 
     @abstractmethod
@@ -250,10 +245,6 @@ class StochasticInterpolantSpecies(StochasticInterpolant, ABC):
 
     def get_corrector(self) -> Corrector:
         raise RuntimeError("Corrector not defined for StochasticInterpolantSpecies.")
-
-    @abstractmethod
-    def uses_masked_species(self) -> bool:
-        raise NotImplementedError
 
 
 __all__ = [

@@ -18,7 +18,6 @@ from .core import DiscreteFlowMatchingMask
 from .core import SingleStochasticInterpolant
 from .core import SingleStochasticInterpolantIdentity
 from .core import StochasticInterpolants
-from .core import build_sampler_from_cfg
 from .core import build_si_from_cfg
 from .interpolants import LatentGammaSqrt
 from .interpolants import LinearInterpolant
@@ -37,5 +36,4 @@ __all__ = [
     "BIG_TIME",
     "SMALL_TIME",
     "build_si_from_cfg",
-    "build_sampler_from_cfg",
 ]

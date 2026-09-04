@@ -23,8 +23,6 @@ from typing import Sequence
 import numpy as np
 import paddle
 import pandas as pd
-from ase import Atoms
-from ase.symbols import Symbols
 
 from ppmat.datasets.custom_data_type import ConcatData
 from ppmat.utils.lmdb_utils import lmdb_get
@@ -77,7 +75,6 @@ class _OMATGStructure:
         atomic_numbers: paddle.Tensor,
         pos: paddle.Tensor,
         property_dict: Optional[Dict[str, Any]] = None,
-        metadata: Optional[Dict[str, Any]] = None,
         pos_is_fractional: bool = False,
     ) -> None:
         if cell.shape != (3, 3):
@@ -91,7 +88,6 @@ class _OMATGStructure:
         self._atomic_numbers = atomic_numbers
         self._pos = pos
         self._property_dict = property_dict if property_dict is not None else {}
-        self._metadata = metadata if metadata is not None else {}
         self._fractional = pos_is_fractional
 
     @property
@@ -101,10 +97,6 @@ class _OMATGStructure:
     @property
     def atomic_numbers(self) -> paddle.Tensor:
         return self._atomic_numbers
-
-    @property
-    def symbols(self) -> list:
-        return list(Symbols(self._atomic_numbers.numpy()))
 
     @property
     def pos(self) -> paddle.Tensor:
@@ -117,46 +109,6 @@ class _OMATGStructure:
     @property
     def property_dict(self) -> Dict[str, Any]:
         return self._property_dict
-
-    @property
-    def metadata(self) -> Dict[str, Any]:
-        return self._metadata
-
-    def to(self, floating_point_precision: str) -> None:
-        valid_precisions = ["float32", "float64", "float16", "bfloat16"]
-        if floating_point_precision not in valid_precisions:
-            raise ValueError(
-                f"Unsupported floating point precision: {floating_point_precision}. "
-                f"Supported precisions are {valid_precisions}."
-            )
-        self._cell = self._cell.cast(floating_point_precision)
-        self._pos = self._pos.cast(floating_point_precision)
-        for key, value in self._property_dict.items():
-            if paddle.is_tensor(value) and value.dtype in [
-                paddle.float32,
-                paddle.float64,
-                paddle.float16,
-                paddle.bfloat16,
-            ]:
-                self._property_dict[key] = value.cast(floating_point_precision)
-
-    def get_ase_atoms(self) -> Atoms:
-        if self._fractional:
-            return Atoms(
-                numbers=self.atomic_numbers.tolist(),
-                scaled_positions=self.pos.numpy(),
-                cell=self.cell.numpy(),
-                pbc=True,
-                info=self.property_dict | self.metadata,
-            )
-        else:
-            return Atoms(
-                numbers=self.atomic_numbers.tolist(),
-                positions=self.pos.numpy(),
-                cell=self.cell.numpy(),
-                pbc=True,
-                info=self.property_dict | self.metadata,
-            )
 
     def niggli_reduce(self) -> None:
         from pymatgen.core import Element
@@ -182,12 +134,6 @@ class _OMATGStructure:
                     1.0,
                 )
             self._fractional = True
-
-    def convert_to_cartesian(self) -> None:
-        if self._fractional:
-            with paddle.no_grad():
-                self._pos = paddle.matmul(self._pos, self._cell)
-            self._fractional = False
 
 
 class OMATGStructureDataset(paddle.io.Dataset):

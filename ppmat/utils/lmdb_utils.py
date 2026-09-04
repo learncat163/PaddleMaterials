@@ -17,8 +17,7 @@
 Provides the common read-only LMDB access patterns shared by datasets:
 
 - ``open_lmdb``: open an LMDB environment with safe read-only defaults;
-- ``lmdb_keys``: list all keys, optionally filtering metadata / non-numeric
-  keys;
+- ``lmdb_keys``: list all keys, optionally filtering metadata keys;
 - ``lmdb_get``: fetch a single record by key;
 - ``decode_payload``: multi-format payload decoding (zlib -> pickle ->
   json -> ast).
@@ -75,15 +74,12 @@ def lmdb_keys(
     env: lmdb.Environment,
     *,
     skip_meta: bool = True,
-    skip_non_numeric: bool = False,
 ) -> List[str]:
     """List all keys in the environment.
 
     Args:
         env: An open LMDB environment.
         skip_meta: Whether to skip metadata keys (starting with "__").
-        skip_non_numeric: Whether to skip keys that are not integers (useful
-            for index-keyed stores; metadata like "length" is dropped).
 
     Returns:
         List of keys (decoded to str).
@@ -95,17 +91,7 @@ def lmdb_keys(
         ]
     if skip_meta:
         all_keys = [k for k in all_keys if not k.startswith("__")]
-    if skip_non_numeric:
-        all_keys = [k for k in all_keys if _is_numeric_key(k)]
     return all_keys
-
-
-def _is_numeric_key(key: str) -> bool:
-    try:
-        int(key)
-        return True
-    except ValueError:
-        return False
 
 
 def lmdb_get(

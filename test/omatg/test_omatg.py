@@ -12,8 +12,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import unittest
+from unittest import mock
 
+import numpy as np
 import paddle
 
 from ppmat.models.omatg.model import OMATGCSPNetFull
@@ -49,8 +52,6 @@ def _make_batch(batch_size=2, atoms_per_struct=(3, 4), max_z=10):
 
 def _make_concat_sample(n):
     """Build a ConcatData-wrapped sample dict (DefaultCollator-friendly)."""
-    import numpy as np
-
     from ppmat.datasets.custom_data_type import ConcatData
 
     cell = (paddle.eye(3) * 5.0).numpy()
@@ -298,6 +299,47 @@ class TestSIFactory(unittest.TestCase):
                 bool(paddle.isnan(coords).any()), "sampled frac_coords contain NaN"
             )
 
+    def test_csv_dataset_to_model_pipeline(self):
+        """CSV -> OMATGStructureDataset -> DefaultCollator -> SI forward."""
+        import tempfile
+        from pathlib import Path
+
+        import pandas as pd
+        from pymatgen.core import Lattice
+        from pymatgen.core import Structure
+
+        from ppmat.datasets.collate_fn import DefaultCollator
+        from ppmat.datasets.omatg_dataset import OMATGStructureDataset
+
+        lengths = [4.0, 4.0, 4.0]
+        angles = [90.0, 90.0, 90.0]
+        rng = np.random.RandomState(5)
+        cifs = []
+        for n, species in ((2, [3, 8]), (3, [11, 8, 3]), (4, [8, 8, 3, 11])):
+            structure = Structure(
+                lattice=Lattice.from_parameters(*(lengths + angles)),
+                species=species,
+                coords=rng.rand(n, 3),
+                coords_are_cartesian=False,
+            )
+            cifs.append(structure.to(fmt="cif"))
+
+        with tempfile.TemporaryDirectory() as tmp:
+            csv_path = Path(tmp) / "train.csv"
+            pd.DataFrame({"cif": cifs}).to_csv(csv_path, index=False)
+            dataset = OMATGStructureDataset(file_path=str(csv_path), lazy_storage=False)
+            samples = [dataset[i] for i in range(len(dataset))]
+
+        self.assertEqual(len(samples), 3)
+        batch = DefaultCollator()(samples)
+        self.assertEqual(len(batch["n_atoms"]), 3)
+        self.assertEqual(len(batch["species"]), 9)
+
+        model = _make_cinn_model("eager")
+        out = model(batch)
+        loss_val = float(out["loss_dict"]["loss"])
+        self.assertFalse(loss_val != loss_val, "dataset-pipeline loss is NaN")
+
 
 class TestSISampling(unittest.TestCase):
     """SI integrate-based sampling."""
@@ -360,6 +402,389 @@ class TestSISampling(unittest.TestCase):
             self.assertFalse(
                 bool(paddle.isnan(lengths).any()), "sampled lengths contain NaN"
             )
+
+
+def _make_cinn_model(execution_backend="eager"):
+    """Build a masked-species DNG model with a fixed seed per backend."""
+    from ppmat.models.omatg.model import IndependentSampler
+    from ppmat.models.omatg.si.core import build_si_from_cfg
+
+    cfg = _dng_si_scheduler_cfg(integration_time_steps=10)
+    with paddle.utils.unique_name.guard():
+        paddle.seed(2026)
+        si = build_si_from_cfg(cfg)
+        sampler = IndependentSampler(
+            dataset_name="mp_20", mask_species=True, mirror_species=False
+        )
+        model = OMATGCSPNetFull(
+            hidden_dim=32,
+            num_layers=1,
+            max_atoms=DEFAULT_MAX_ATOMS,
+            time_embed_dim=16,
+            pred_type=True,
+            use_si=False,
+            execution_backend=execution_backend,
+        )
+        model.enable_masked_species()
+        model._si = si
+        model._sampler = sampler
+        model._relative_si_costs = cfg["relative_si_costs"]
+        model.use_si = True
+    return model
+
+
+def _passthrough_run_runtime(self, name, function, *args, **kwargs):
+    return function(*args, **kwargs)
+
+
+def _recording_run_runtime(names):
+    def run_runtime(self, name, function, *args, **kwargs):
+        names.append(name)
+        return function(*args, **kwargs)
+
+    return run_runtime
+
+
+def _make_loader():
+    from ppmat.datasets.collate_fn import DefaultCollator
+
+    class _Samples(paddle.io.Dataset):
+        def __init__(self):
+            self.samples = [_make_concat_sample(n) for n in (3, 4)]
+
+        def __getitem__(self, idx):
+            return self.samples[idx]
+
+        def __len__(self):
+            return len(self.samples)
+
+    return paddle.io.DataLoader(
+        _Samples(), batch_size=2, shuffle=False, collate_fn=DefaultCollator()
+    )
+
+
+def _trainer_config(output_dir, max_epochs):
+    return {
+        "max_epochs": max_epochs,
+        "output_dir": str(output_dir),
+        "save_freq": 1,
+        "log_freq": 100,
+        "start_eval_epoch": 1,
+        "eval_freq": 1,
+        "seed": 2026,
+        "pretrained_model_path": None,
+        "resume_from_checkpoint": None,
+        "compute_metric_during_train": False,
+        "use_amp": False,
+        "eval_with_no_grad": True,
+        "gradient_accumulation_steps": 1,
+        "best_metric_indicator": "eval_loss",
+        "name_for_best_metric": "loss",
+        "greater_is_better": False,
+    }
+
+
+def _build_trainer(model, output_dir, max_epochs, backend):
+    from ppmat.trainer.base_trainer import BaseTrainer
+
+    optimizer = paddle.optimizer.Adam(learning_rate=1e-3, parameters=model.parameters())
+    loader = _make_loader()
+    trainer = BaseTrainer(
+        _trainer_config(output_dir, max_epochs),
+        model,
+        train_dataloader=loader,
+        val_dataloader=loader,
+        optimizer=optimizer,
+        execution_config={"backend": backend},
+    )
+    return trainer, optimizer
+
+
+class TestCINNDispatch(unittest.TestCase):
+    """CINN dispatch boundaries for the SI training and sampling paths."""
+
+    def test_si_dispatch_records_only_denoise_step(self):
+        model = _make_cinn_model("cinn")
+        names = []
+        with mock.patch.object(
+            OMATGCSPNetFull, "_run_runtime", _recording_run_runtime(names)
+        ):
+            model(_make_batch())
+            model.eval()
+            model.sample(_make_batch(), num_inference_steps=3)
+        self.assertTrue(names)
+        self.assertEqual(set(names), {"denoise_step"})
+
+    def test_dispatch_does_not_move_eager_numbers(self):
+        batch = _make_batch()
+        eager_model = _make_cinn_model("eager")
+        paddle.seed(2027)
+        expected = eager_model(batch)["loss_dict"]
+
+        dispatched = _make_cinn_model("cinn")
+        dispatched.set_state_dict(eager_model.state_dict())
+        paddle.seed(2027)
+        with mock.patch.object(
+            OMATGCSPNetFull, "_run_runtime", _passthrough_run_runtime
+        ):
+            actual = dispatched(batch)["loss_dict"]
+
+        self.assertEqual(
+            dispatched.state_dict().keys(), eager_model.state_dict().keys()
+        )
+        self.assertEqual(actual.keys(), expected.keys())
+        for key in expected:
+            np.testing.assert_array_equal(actual[key].numpy(), expected[key].numpy())
+
+
+class TestCINNTrainerOrchestration(unittest.TestCase):
+    """Trainer resume orchestration through the cinn backend (CPU)."""
+
+    def setUp(self):
+        validate_patch = mock.patch.object(
+            OMATGCSPNetFull,
+            "validate_execution_backend",
+            lambda self, **kwargs: None,
+        )
+        run_patch = mock.patch.object(
+            OMATGCSPNetFull, "_run_runtime", _passthrough_run_runtime
+        )
+        validate_patch.start()
+        run_patch.start()
+        self.addCleanup(validate_patch.stop)
+        self.addCleanup(run_patch.stop)
+
+    def test_resume_orchestration_with_cinn_backend(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            initial_state = _make_cinn_model("cinn").state_dict()
+
+            first_model = _make_cinn_model("cinn")
+            first_model.set_state_dict(initial_state)
+            first_trainer, _ = _build_trainer(
+                first_model, tmp_path / "first", 1, "cinn"
+            )
+            with paddle.utils.unique_name.guard():
+                first_trainer.train()
+
+            checkpoint_dir = tmp_path / "first" / "checkpoints"
+            for prefix in ("epoch_1", "latest", "best"):
+                for suffix in ("pdparams", "pdopt", "pdstates"):
+                    self.assertTrue((checkpoint_dir / f"{prefix}.{suffix}").is_file())
+            checkpoint_state = paddle.load(str(checkpoint_dir / "latest.pdparams"))
+            self.assertEqual(checkpoint_state.keys(), first_model.state_dict().keys())
+            self.assertTrue(
+                all(not key.startswith("model.") for key in checkpoint_state)
+            )
+
+            resumed_model = _make_cinn_model("cinn")
+            resumed_trainer, resumed_optimizer = _build_trainer(
+                resumed_model, tmp_path / "resumed", 2, "cinn"
+            )
+            with paddle.utils.unique_name.guard():
+                resumed_trainer.train(
+                    resume_from_checkpoint=str(checkpoint_dir / "latest")
+                )
+
+            straight_model = _make_cinn_model("cinn")
+            straight_model.set_state_dict(initial_state)
+            straight_trainer, straight_optimizer = _build_trainer(
+                straight_model, tmp_path / "straight", 2, "cinn"
+            )
+            with paddle.utils.unique_name.guard():
+                straight_trainer.train()
+
+            self.assertEqual(first_trainer.state.global_step, 1)
+            self.assertEqual(resumed_trainer.state.global_step, 2)
+            self.assertEqual(resumed_trainer.state.epoch, 2)
+            self.assertEqual(resumed_optimizer.get_lr(), straight_optimizer.get_lr())
+            self.assertEqual(
+                resumed_optimizer.state_dict().keys(),
+                straight_optimizer.state_dict().keys(),
+            )
+
+
+@unittest.skipUnless(
+    os.environ.get("PPMAT_RUN_CINN_WORKFLOW_TESTS") == "1",
+    "Set PPMAT_RUN_CINN_WORKFLOW_TESTS=1 to run the GPU CINN compile parity.",
+)
+class TestCINNGPUCompileParity(unittest.TestCase):
+    """Real CINN compilation parity for one training epoch and sampling."""
+
+    def _require_gpu_cinn(self):
+        if not paddle.is_compiled_with_cuda():
+            self.skipTest("Paddle was not compiled with CUDA.")
+        if not paddle.base.is_compiled_with_cinn():
+            self.skipTest("Paddle was not compiled with CINN.")
+        paddle.set_device("gpu:0")
+
+    def test_one_training_epoch_matches_eager(self):
+        import tempfile
+        from pathlib import Path
+
+        self._require_gpu_cinn()
+        initial_state = {
+            key: value.clone()
+            for key, value in _make_cinn_model("eager").state_dict().items()
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            eager_model = _make_cinn_model("eager")
+            eager_model.set_state_dict(initial_state)
+            cinn_model = _make_cinn_model("cinn")
+            cinn_model.set_state_dict(initial_state)
+
+            paddle.seed(2026)
+            np.random.seed(2026)
+            eager_trainer, _ = _build_trainer(
+                eager_model, tmp_path / "eager", 1, "eager"
+            )
+            with paddle.utils.unique_name.guard():
+                eager_trainer.train()
+
+            paddle.seed(2026)
+            np.random.seed(2026)
+            cinn_trainer, _ = _build_trainer(cinn_model, tmp_path / "cinn", 1, "cinn")
+            with paddle.utils.unique_name.guard():
+                cinn_trainer.train()
+
+            self.assertEqual(eager_trainer.state.global_step, 1)
+            self.assertEqual(cinn_trainer.state.global_step, 1)
+            for key in initial_state:
+                np.testing.assert_allclose(
+                    cinn_model.state_dict()[key].numpy(),
+                    eager_model.state_dict()[key].numpy(),
+                    atol=1e-3,
+                    rtol=1e-3,
+                )
+
+    def test_boundary_output_matches_eager_on_gpu(self):
+        """One compiled boundary call must track the eager numbers.
+
+        Full SI sampling loops cannot be compared on GPU: segment_mean uses
+        atomic scatter, so even two eager runs diverge inside the chaotic SDE
+        integration. A single boundary call has no such amplification.
+        """
+        self._require_gpu_cinn()
+        eager_model = _make_cinn_model("eager")
+        cinn_model = _make_cinn_model("cinn")
+        cinn_model.set_state_dict(eager_model.state_dict())
+        eager_model.eval()
+        cinn_model.eval()
+
+        batch = _make_batch()
+        t = paddle.full([batch["n_atoms"].shape[0]], 0.5)
+        with paddle.no_grad():
+            expected = eager_model.forward_dict(
+                t,
+                batch["species"],
+                batch["pos"],
+                batch["cell"],
+                batch["n_atoms"],
+                batch["batch"],
+            )
+            actual = cinn_model.forward_dict(
+                t,
+                batch["species"],
+                batch["pos"],
+                batch["cell"],
+                batch["n_atoms"],
+                batch["batch"],
+            )
+
+        self.assertEqual(actual.keys(), expected.keys())
+        for key in expected:
+            np.testing.assert_allclose(
+                actual[key].numpy(), expected[key].numpy(), atol=2e-5, rtol=2e-5
+            )
+
+
+def _metric_sample(num_atoms, seed, species=(3, 8, 11)):
+    """Deterministic cubic-crystal sample dict matching model.sample() output."""
+    rng = np.random.RandomState(seed)
+    return {
+        "num_atoms": num_atoms,
+        "atom_types": [species[i % len(species)] for i in range(num_atoms)],
+        "frac_coords": rng.rand(num_atoms, 3).round(4).tolist(),
+        "lengths": [4.0, 4.0, 4.0],
+        "angles": [90.0, 90.0, 90.0],
+    }
+
+
+class TestOMatGMetric(unittest.TestCase):
+    """Metric end-to-end: one-shot call matches streaming accumulation."""
+
+    @staticmethod
+    def _write_gt_csv(csv_path, ref):
+        import pandas as pd
+        from pymatgen.core import Lattice
+        from pymatgen.core import Structure
+
+        structures = [
+            Structure(
+                lattice=Lattice.from_parameters(*(item["lengths"] + item["angles"])),
+                species=item["atom_types"],
+                coords=item["frac_coords"],
+                coords_are_cartesian=False,
+            )
+            for item in ref
+        ]
+        pd.DataFrame({"cif": [s.to(fmt="cif") for s in structures]}).to_csv(
+            csv_path, index=False
+        )
+
+    def test_match_one_shot_equals_streaming(self):
+        import tempfile
+        from pathlib import Path
+
+        from ppmat.metrics.omatg_metric import OMatGMetric
+
+        ref = [_metric_sample(3, 0), _metric_sample(4, 1), _metric_sample(5, 2)]
+        gen = [dict(ref[0]), dict(ref[1]), _metric_sample(5, seed=3)]
+
+        with tempfile.TemporaryDirectory() as tmp:
+            csv_path = Path(tmp) / "gt.csv"
+            self._write_gt_csv(csv_path, ref)
+
+            one_shot = OMatGMetric(metric_type="match", gt_file_path=str(csv_path))
+            one_shot_metrics = one_shot(gen)
+
+            streaming = OMatGMetric(metric_type="match", gt_file_path=str(csv_path))
+            streaming.update_step(result={"result": gen[:2]}, batch=None, stage="eval")
+            streaming.update_step(result={"result": gen[2:]}, batch=None, stage="eval")
+            streamed_metrics = streaming.compute_epoch(stage="eval")
+
+        self.assertEqual(set(one_shot_metrics), set(streamed_metrics))
+        for key in one_shot_metrics:
+            self.assertAlmostEqual(one_shot_metrics[key], streamed_metrics[key])
+        self.assertGreater(one_shot_metrics["match_rate"], 0.0)
+
+    def test_dng_metrics_smoke(self):
+        from ppmat.metrics.omatg_metric import OMatGMetric
+
+        ref = [_metric_sample(3, 0), _metric_sample(4, 1), _metric_sample(5, 2)]
+        gen = [_metric_sample(3, 0), _metric_sample(4, 1), _metric_sample(5, 3)]
+        metrics = OMatGMetric(metric_type="dng")(gen, gt_data=ref)
+        expected_keys = {
+            "valid_rate",
+            "wdist_density",
+            "wdist_narity",
+            "wdist_coordination_numbers",
+            "metre_rate",
+            "metre_mean_rmsd",
+            "metre_corr_rmsd",
+            "metre_valid_rate",
+            "metre_valid_mean_rmsd",
+            "metre_valid_corr_rmsd",
+            "dng_eval",
+        }
+        self.assertTrue(expected_keys <= set(metrics))
+        for value in metrics.values():
+            self.assertFalse(value != value, "metric value is NaN")
 
 
 if __name__ == "__main__":
