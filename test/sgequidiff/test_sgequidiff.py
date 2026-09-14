@@ -306,7 +306,7 @@ class TestFullTrainingObjective:
             assert all(60.0 <= a <= 135.0 for a in crystal["angles"])
 
 
-def _write_synthetic_mp20_npz(root_dir, split="train", num_crystals=8):
+def _write_synthetic_mp20_npz(root_dir, split="train", num_crystals=8, name="mp_20"):
     """Write a small mp_20-style npz (packed + indices) for the dataset chain test.
 
     Field layout follows AsymmetricUnitDataset.read_data with NE=98:
@@ -349,7 +349,7 @@ def _write_synthetic_mp20_npz(root_dir, split="train", num_crystals=8):
         # np.split(packed, indices) yields exactly num_crystals segments).
         if i < num_crystals - 1:
             indices.append(offset)
-    root = Path(root_dir) / "mp_20"
+    root = Path(root_dir) / name
     root.mkdir(parents=True, exist_ok=True)
     np.savez(
         root / f"{split}.npz",
@@ -458,9 +458,19 @@ def test_dataset_downloads_via_unified_pipeline(tmp_path, monkeypatch):
     assert MPTS52ASUDataset.name == "mpts_52"
     assert MPTS52ASUDataset.url != MP20ASUDataset.url
 
+    # Each subclass owns its own default path: building MPTS52 without an
+    # explicit path must not fall back to the MP-20 default.
+    _write_synthetic_mp20_npz(extract_root, num_crystals=4, name="mpts_52")
+    calls.clear()
+    mpts_dataset = MPTS52ASUDataset()
+    assert calls == {"url": MPTS52ASUDataset.url, "md5": MPTS52ASUDataset.md5}
+    assert mpts_dataset.path == str(extract_root / "mpts_52" / "train.npz")
+
     # Instantiating the base class without an existing path must fail fast.
     with pytest.raises(ValueError):
         AsymmetricUnitDataset(path=str(tmp_path / "missing" / "train.npz"))
+    with pytest.raises(ValueError):
+        AsymmetricUnitDataset(path=None)
 
 
 def test_sgequidiff_metric(tmp_path):

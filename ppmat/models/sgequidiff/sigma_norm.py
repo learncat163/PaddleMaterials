@@ -26,7 +26,6 @@ VE-SDE scheduler only consumes the finished table.
 
 import pickle
 
-import numpy as np
 import paddle
 
 from ppmat.models.sgequidiff.asu_crystal import sample_point_in_asu_wyckoff_site
@@ -38,6 +37,7 @@ from ppmat.models.sgequidiff.wyckoff_geometry import WyckoffGeometry
 from ppmat.models.sgequidiff.wyckoff_shape_decomp import ensure_wyckoff_shape_decomp
 from ppmat.models.sgequidiff.wyckoff_shape_decomp import get_data_directory
 from ppmat.models.sgequidiff.wyckoff_shape_decomp import get_shape_decomp_dict_path
+from ppmat.schedulers.scheduling_asu_ve_sde import build_ve_sigma_grid
 from ppmat.utils import logger
 
 
@@ -64,10 +64,7 @@ def compute_sigma_norms(
         num_timesteps]``.  The caller prepends a leading ``ones`` column to
         align with the scheduler's time index.
     """
-    sigmas = paddle.to_tensor(
-        np.exp(np.linspace(np.log(sigma_min), np.log(sigma_max), num_timesteps)),
-        dtype=paddle.float32,
-    )
+    sigmas = build_ve_sigma_grid(num_timesteps, sigma_min, sigma_max)
     return _sigma_norm_asu_wrapped(
         sigmas,
         wyckoff_geometry,

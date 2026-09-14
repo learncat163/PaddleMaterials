@@ -67,18 +67,7 @@ MP-20, `MPTS52ASUDataset` for MPTS-52) and sets an explicit `path` per split
 the archive is fetched automatically through the unified download pipeline
 (MD5-verified, cached under `~/.paddlemat/datasets`). Point `path` at a custom
 location to use your own copy.
-
-Raw data sources (CSV format, before ASU preprocessing):
-| Dataset | Train | Val | Test | Download |
-| --- | --- | --- | --- | --- |
-| MP-20 | 27,136 | 9,047 | 9,046 | [mp_20.zip](https://drive.google.com/file/d/1avOCeo-OMtkKYPkDO0pz0IY36gBq8-kE/view?usp=sharing) |
-| MPTS-52 | 27,380 | 5,000 | 8,096 | [mpts_52.zip](https://drive.google.com/file/d/1rPMi0HKMtBccAczkgg-S-kCqSS63Jy1T/view?usp=sharing) |
-
 ---
-
-## Results
-
-The PaddleMaterials port implements the full SGEquiDiff pipeline: space group sampling, Bravais-constrained lattice sampling, autoregressive (element, Wyckoff) generation, and ASU score diffusion. End-to-end generation quality on MP-20 and MPTS-52 has not yet been benchmarked in this repository; refer to the [paper](https://arxiv.org/abs/2505.10994) for the reported values.
 
 | Model | Dataset | Config | Checkpoint |
 | --- | --- | --- | --- |
@@ -104,7 +93,7 @@ Note: this command reports the validation loss. Generation-quality metrics
 `SGEQuiDiffMetric`) are produced by the Generation-Quality Evaluation command
 below.
 
-### Generation
+### Sample
 ```bash
 # Mode 1: use a registered pretrained model (weights downloaded automatically)
 python structure_generation/sample.py --model_name='sgequidiff_mp20' --weights_name='best.pdparams' --mode='by_dataloader' --output_path='./sgequidiff_samples'
