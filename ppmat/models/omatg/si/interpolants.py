@@ -25,6 +25,7 @@ from abc import ABC
 from abc import abstractmethod
 from typing import Callable
 from typing import Dict
+from typing import Iterable
 from typing import Tuple
 
 import paddle
@@ -207,6 +208,10 @@ class StochasticInterpolant(ABC, TimeChecker):
         x_1: paddle.Tensor,
         batch_indices: paddle.Tensor,
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
+        raise NotImplementedError
+
+    @abstractmethod
+    def loss_keys(self) -> Iterable[str]:
         raise NotImplementedError
 
     @abstractmethod

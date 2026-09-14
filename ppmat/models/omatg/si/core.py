@@ -20,6 +20,7 @@ from enum import Enum
 from typing import Any
 from typing import Callable
 from typing import Dict
+from typing import Iterable
 from typing import List
 from typing import Optional
 from typing import Sequence
@@ -27,6 +28,7 @@ from typing import Tuple
 from typing import Union
 
 import paddle
+from scipy.optimize import linear_sum_assignment
 
 from .interpolants import Corrector
 from .interpolants import Epsilon
@@ -129,6 +131,12 @@ class SingleStochasticInterpolant(StochasticInterpolant):
 
     def loss(self, *args, **kwargs):
         raise NotImplementedError  # Overridden in __init__
+
+    def loss_keys(self) -> Iterable[str]:
+        """Yield the loss keys produced by this interpolant."""
+        yield "loss_b"
+        if self._differential_equation_type == "SDE":
+            yield "loss_z"
 
     def _ode_loss(
         self,
@@ -313,6 +321,9 @@ class SingleStochasticInterpolantIdentity(StochasticInterpolantSpecies):
     def __init__(self) -> None:
         super().__init__()
 
+    def uses_masked_species(self) -> bool:
+        return False
+
     def interpolate(
         self,
         t: paddle.Tensor,
@@ -322,6 +333,9 @@ class SingleStochasticInterpolantIdentity(StochasticInterpolantSpecies):
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
         assert bool(paddle.equal_all(x_0, x_1))
         return x_0.clone(), paddle.zeros_like(x_0)
+
+    def loss_keys(self) -> Iterable[str]:
+        yield "loss"
 
     def loss(
         self,
@@ -360,6 +374,9 @@ class DiscreteFlowMatchingMask(StochasticInterpolantSpecies):
         self._mask_index = 0
         self._noise = noise
 
+    def uses_masked_species(self) -> bool:
+        return True
+
     def interpolate(
         self,
         t: paddle.Tensor,
@@ -369,11 +386,18 @@ class DiscreteFlowMatchingMask(StochasticInterpolantSpecies):
     ) -> Tuple[paddle.Tensor, paddle.Tensor]:
         assert x_0.shape == x_1.shape
         assert paddle.all(x_0 == self._mask_index)
-        assert paddle.all(x_1 != self._mask_index)
+        if not bool(paddle.all(x_1 != self._mask_index)):
+            raise ValueError(
+                "DiscreteFlowMatchingMask target species must not contain the "
+                "mask index 0; species are 1-based atomic numbers."
+            )
         x_t = x_0.clone()
         mask = paddle.rand(x_0.shape) < t
         x_t[mask] = x_1[mask]
         return x_t, paddle.zeros_like(x_t)
+
+    def loss_keys(self) -> Iterable[str]:
+        yield "loss"
 
     def loss(
         self,
@@ -387,7 +411,11 @@ class DiscreteFlowMatchingMask(StochasticInterpolantSpecies):
     ) -> Dict[str, paddle.Tensor]:
         assert x_0.shape == x_1.shape
         assert paddle.all(x_0 == self._mask_index)
-        assert paddle.all(x_1 != self._mask_index)
+        if not bool(paddle.all(x_1 != self._mask_index)):
+            raise ValueError(
+                "DiscreteFlowMatchingMask target species must not contain the "
+                "mask index 0; species are 1-based atomic numbers."
+            )
         pred = model_function(x_t)[0]
         assert pred.shape == (x_0.shape[0], DEFAULT_MAX_ATOMS)
         return {"loss": paddle.nn.functional.cross_entropy(input=pred, label=x_1 - 1)}
@@ -451,6 +479,17 @@ class DataField(Enum):
     species = "species"
 
 
+def _resolve_data_field(data_field: str) -> DataField:
+    """Resolve a data-field name to its enum member."""
+    try:
+        return DataField[data_field.lower()]
+    except KeyError:
+        raise ValueError(
+            f"Data field '{data_field}' is unknown; "
+            f"available fields are {[item.value for item in DataField]}."
+        )
+
+
 def reshape_t(
     t: paddle.Tensor, n_atoms: paddle.Tensor, data_field: DataField
 ) -> paddle.Tensor:
@@ -489,12 +528,7 @@ class StochasticInterpolants:
                 "The number of stochastic interpolants and data fields must be equal."
             )
 
-        try:
-            self._data_fields = [DataField[df.lower()] for df in data_fields]
-        except KeyError:
-            raise ValueError(
-                f"All data fields must be in {[d.value for d in DataField]}."
-            )
+        self._data_fields = [_resolve_data_field(df) for df in data_fields]
 
         if not integration_time_steps > 0:
             raise ValueError("The number of integration time steps must be positive.")
@@ -504,6 +538,26 @@ class StochasticInterpolants:
 
     def __len__(self) -> int:
         return len(self._stochastic_interpolants)
+
+    def loss_keys(self) -> List[str]:
+        """Return the ``{data_field}_{loss_key}`` keys produced by :meth:`losses`."""
+        return [
+            f"{data_field.value}_{loss_key}"
+            for data_field, stochastic_interpolant in zip(
+                self._data_fields, self._stochastic_interpolants
+            )
+            for loss_key in stochastic_interpolant.loss_keys()
+        ]
+
+    def get_stochastic_interpolant(self, data_field: str) -> StochasticInterpolant:
+        """Return the stochastic interpolant bound to ``data_field``."""
+        field = _resolve_data_field(data_field)
+        if field not in self._data_fields:
+            raise ValueError(
+                f"Data field '{data_field}' is not part of this collection; "
+                f"available fields are {[item.value for item in self._data_fields]}."
+            )
+        return self._stochastic_interpolants[self._data_fields.index(field)]
 
     def _interpolate(
         self,
@@ -672,6 +726,44 @@ class StochasticInterpolants:
             return x_t
 
 
+def correct_for_minimum_permutation_distance(
+    x_0: Dict[str, paddle.Tensor],
+    x_1: Dict[str, paddle.Tensor],
+    corrector: Corrector,
+) -> None:
+    """Reorder the base positions of ``x_0`` in place against ``x_1``.
+
+    For every structure in the batch, the base positions are permuted by the
+    assignment that minimises the distance to the corresponding target structure, so
+    that the stochastic interpolants pair the closest atoms. Species are never
+    permuted, which keeps crystal-structure prediction pairs on the same species.
+    """
+    if not bool(paddle.all(x_0["ptr"] == x_1["ptr"])):
+        raise ValueError("x_0 and x_1 must hold the same structures in the same order.")
+    if x_0["pos"].shape != x_1["pos"].shape:
+        raise ValueError(
+            f"x_0 and x_1 must hold the same positions, got {x_0['pos'].shape} "
+            f"and {x_1['pos'].shape}."
+        )
+
+    ptr = x_0["ptr"]
+    for i in range(len(ptr) - 1):
+        start, end = int(ptr[i]), int(ptr[i + 1])
+        sources = x_0["pos"][start:end]
+        targets = x_1["pos"][start:end]
+        distances = _pairwise_periodic_distances(sources, targets, corrector)
+        _, assignment = linear_sum_assignment(distances.numpy())
+        x_0["pos"][start:end] = sources[paddle.to_tensor(assignment, dtype="int64")]
+
+
+def _pairwise_periodic_distances(
+    sources: paddle.Tensor, targets: paddle.Tensor, corrector: Corrector
+) -> paddle.Tensor:
+    """Return the ``(len(targets), len(sources))`` matrix of periodic distances."""
+    unwrapped_targets = corrector.unwrap(sources[None, :, :], targets[:, None, :])
+    return paddle.norm(unwrapped_targets - sources[None, :, :], axis=-1)
+
+
 def _resolve_si_class(class_name: str, default_module: str):
     """Resolve a class by name within the OMatG SI namespace."""
     import importlib
@@ -781,4 +873,5 @@ __all__ = [
     "SingleStochasticInterpolantIdentity",
     "DiscreteFlowMatchingMask",
     "build_si_from_cfg",
+    "correct_for_minimum_permutation_distance",
 ]

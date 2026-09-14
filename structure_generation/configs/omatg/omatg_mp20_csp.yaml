@@ -84,6 +84,8 @@ Model:
       dataset_name: mp_20
       mirror_species: True
       mask_species: False
+    # Official OMatG csp config keeps the base positions unpermuted.
+    use_min_perm_dist: False
 
 Optimizer:
   __class_name__: Adam
@@ -104,7 +106,6 @@ Dataset:
       __class_name__: OMATGStructureDataset
       __init_params__:
         file_path: "./data/mp_20/train.lmdb"
-        property_keys: []
         lazy_storage: True
         convert_to_fractional: True
         niggli_reduce: False
@@ -123,7 +124,6 @@ Dataset:
       __class_name__: OMATGStructureDataset
       __init_params__:
         file_path: "./data/mp_20/val.lmdb"
-        property_keys: []
         lazy_storage: True
         convert_to_fractional: True
         niggli_reduce: False
@@ -142,7 +142,6 @@ Dataset:
       __class_name__: OMATGStructureDataset
       __init_params__:
         file_path: "./data/mp_20/test.lmdb"
-        property_keys: []
         lazy_storage: True
         convert_to_fractional: True
         niggli_reduce: False

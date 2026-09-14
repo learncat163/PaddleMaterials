@@ -95,6 +95,9 @@ Model:
       dataset_name: mp_20
       mirror_species: False
       mask_species: True
+    # Official OMatG dng config: permute base positions to minimise the periodic
+    # distance to the target before constructing the stochastic interpolants.
+    use_min_perm_dist: True
 
 Optimizer:
   __class_name__: Adam
@@ -115,7 +118,6 @@ Dataset:
       __class_name__: OMATGStructureDataset
       __init_params__:
         file_path: "./data/mp_20/train.lmdb"
-        property_keys: []
         lazy_storage: True
         convert_to_fractional: True
         niggli_reduce: False
@@ -134,7 +136,6 @@ Dataset:
       __class_name__: OMATGStructureDataset
       __init_params__:
         file_path: "./data/mp_20/val.lmdb"
-        property_keys: []
         lazy_storage: True
         convert_to_fractional: True
         niggli_reduce: False
@@ -153,7 +154,6 @@ Dataset:
       __class_name__: OMATGStructureDataset
       __init_params__:
         file_path: "./data/mp_20/test.lmdb"
-        property_keys: []
         lazy_storage: True
         convert_to_fractional: True
         niggli_reduce: False

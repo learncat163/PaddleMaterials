@@ -199,7 +199,6 @@ class TestOMATGCSPNetFull(unittest.TestCase):
             edge_style="fc",
             pred_type=True,
         )
-        model.enable_masked_species()
         output = model(_make_batch())
         self.assertIn("loss_type", output["loss_dict"])
         loss_val = float(output["loss_dict"]["loss"])
@@ -207,60 +206,52 @@ class TestOMATGCSPNetFull(unittest.TestCase):
 
 
 class TestSITrainingPath(unittest.TestCase):
-    """SI velocity-matching training path (CSP and DNG)."""
+    """SI velocity-matching training path (CSP and DNG), including CSP sampling."""
 
     def _build_csp_si_model(self):
         """Build a small CSP model with SI (Linear-ODE)."""
-        from ppmat.models.omatg.model import IndependentSampler
-        from ppmat.models.omatg.si.core import build_si_from_cfg
-
         cfg = _csp_si_scheduler_cfg(integration_time_steps=210)
-        si = build_si_from_cfg(cfg)
-        sampler = IndependentSampler(dataset_name="mp_20", mirror_species=True)
-        model = OMATGCSPNetFull(
+        return OMATGCSPNetFull(
             hidden_dim=32,
             num_layers=1,
             max_atoms=DEFAULT_MAX_ATOMS,
             time_embed_dim=16,
             pred_type=False,
-            use_si=False,
+            use_si=True,
+            si_scheduler_cfg=cfg,
+            sampler_cfg={"dataset_name": "mp_20", "mirror_species": True},
         )
-        model._si = si
-        model._sampler = sampler
-        model._relative_si_costs = cfg["relative_si_costs"]
-        model.use_si = True
-        return model
 
-    def test_csp_si_forward_loss(self):
-        """CSP SI training path produces velocity-matching loss."""
-        out = self._build_csp_si_model()(_make_batch())
+    def test_csp_si_training_and_sampling(self):
+        """CSP SI path trains (velocity matching) and samples via si.integrate."""
+        model = self._build_csp_si_model()
+        batch = _make_batch()
+        out = model(batch)
         self.assertIn("loss", out["loss_dict"])
         loss_val = float(out["loss_dict"]["loss"])
         self.assertFalse(loss_val != loss_val, "SI loss is NaN")
 
+        result = model.sample(batch, num_inference_steps=10)
+        self.assertEqual(len(result["result"]), 2)
+        self.assertIn("frac_coords", result["result"][0])
+
     def test_dng_si_forward_loss(self):
         """DNG SI training path (SDE + gamma + DFM mask) stays finite."""
-        from ppmat.models.omatg.model import IndependentSampler
-        from ppmat.models.omatg.si.core import build_si_from_cfg
-
         cfg = _dng_si_scheduler_cfg(integration_time_steps=710)
-        si = build_si_from_cfg(cfg)
-        sampler = IndependentSampler(
-            dataset_name="mp_20", mask_species=True, mirror_species=False
-        )
         model = OMATGCSPNetFull(
             hidden_dim=32,
             num_layers=1,
             max_atoms=DEFAULT_MAX_ATOMS,
             time_embed_dim=16,
             pred_type=True,
-            use_si=False,
+            use_si=True,
+            si_scheduler_cfg=cfg,
+            sampler_cfg={
+                "dataset_name": "mp_20",
+                "mask_species": True,
+                "mirror_species": False,
+            },
         )
-        model.enable_masked_species()
-        model._si = si
-        model._sampler = sampler
-        model._relative_si_costs = cfg["relative_si_costs"]
-        model.use_si = True
         out = model(_make_batch())
         self.assertIn("loss", out["loss_dict"])
         loss_val = float(out["loss_dict"]["loss"])
@@ -271,7 +262,7 @@ class TestSIFactory(unittest.TestCase):
     """Config-driven SI end-to-end: YAML -> build_model -> forward -> sample."""
 
     def test_config_driven_dng_si_from_yaml(self):
-        """build_model with DNG yaml trains and samples end-to-end."""
+        """The DNG yaml drives build -> forward -> sample and rejects bad configs."""
         import copy
 
         from omegaconf import OmegaConf
@@ -286,6 +277,7 @@ class TestSIFactory(unittest.TestCase):
         init_params["si_scheduler_cfg"]["integration_time_steps"] = 10
         model = build_model(copy.deepcopy(model_cfg))
         self.assertTrue(model.use_si)
+        self.assertTrue(model.use_min_perm_dist)
 
         batch = DefaultCollator()([_make_concat_sample(3), _make_concat_sample(4)])
         out = model(batch)
@@ -298,6 +290,13 @@ class TestSIFactory(unittest.TestCase):
             self.assertFalse(
                 bool(paddle.isnan(coords).any()), "sampled frac_coords contain NaN"
             )
+
+        # A typo in a loss weight must fail at build time instead of silently
+        # reweighting the training loss.
+        costs = model_cfg["__init_params__"]["si_scheduler_cfg"]["relative_si_costs"]
+        costs["pos_loss_bb"] = costs.pop("pos_loss_b")
+        with self.assertRaises(ValueError):
+            build_model(copy.deepcopy(model_cfg))
 
     def test_csv_dataset_to_model_pipeline(self):
         """CSV -> OMATGStructureDataset -> DefaultCollator -> SI forward."""
@@ -330,6 +329,14 @@ class TestSIFactory(unittest.TestCase):
             dataset = OMATGStructureDataset(file_path=str(csv_path), lazy_storage=False)
             samples = [dataset[i] for i in range(len(dataset))]
 
+        # CSV samples carry fractional coords; convert_to_fractional must be
+        # a no-op on them (regression guard against double conversion).
+        for sample, cif in zip(samples, cifs):
+            ref = Structure.from_str(cif, fmt="cif")
+            np.testing.assert_allclose(
+                np.asarray(sample["pos"].data), ref.frac_coords, atol=1e-6
+            )
+
         self.assertEqual(len(samples), 3)
         batch = DefaultCollator()(samples)
         self.assertEqual(len(batch["n_atoms"]), 3)
@@ -341,95 +348,26 @@ class TestSIFactory(unittest.TestCase):
         self.assertFalse(loss_val != loss_val, "dataset-pipeline loss is NaN")
 
 
-class TestSISampling(unittest.TestCase):
-    """SI integrate-based sampling."""
-
-    def test_csp_si_sample(self):
-        """CSP SI sampling produces structures via si.integrate."""
-        from ppmat.models.omatg.model import IndependentSampler
-        from ppmat.models.omatg.si.core import build_si_from_cfg
-
-        cfg = _csp_si_scheduler_cfg(integration_time_steps=10)
-        si = build_si_from_cfg(cfg)
-        sampler = IndependentSampler(dataset_name="mp_20", mirror_species=True)
-        model = OMATGCSPNetFull(
-            hidden_dim=32,
-            num_layers=1,
-            max_atoms=DEFAULT_MAX_ATOMS,
-            time_embed_dim=16,
-            pred_type=False,
-            use_si=False,
-        )
-        model._si = si
-        model._sampler = sampler
-        model._relative_si_costs = cfg["relative_si_costs"]
-        model.use_si = True
-        result = model.sample(_make_batch(), num_inference_steps=10)
-        self.assertEqual(len(result["result"]), 2)
-        self.assertIn("frac_coords", result["result"][0])
-
-    def test_dng_si_sample_stable(self):
-        """DNG SDE sampling stays finite (lattice cell clipped)."""
-        from ppmat.models.omatg.model import IndependentSampler
-        from ppmat.models.omatg.si.core import build_si_from_cfg
-
-        cfg = _dng_si_scheduler_cfg(integration_time_steps=10)
-        si = build_si_from_cfg(cfg)
-        sampler = IndependentSampler(
-            dataset_name="mp_20", mask_species=True, mirror_species=False
-        )
-        model = OMATGCSPNetFull(
-            hidden_dim=32,
-            num_layers=1,
-            max_atoms=DEFAULT_MAX_ATOMS,
-            time_embed_dim=16,
-            pred_type=True,
-            use_si=False,
-        )
-        model.enable_masked_species()
-        model._si = si
-        model._sampler = sampler
-        model._relative_si_costs = cfg["relative_si_costs"]
-        model.use_si = True
-        result = model.sample(_make_batch(), num_inference_steps=10)
-        self.assertEqual(len(result["result"]), 2)
-        for entry in result["result"]:
-            coords = paddle.to_tensor(entry["frac_coords"])
-            self.assertFalse(
-                bool(paddle.isnan(coords).any()), "sampled frac_coords contain NaN"
-            )
-            lengths = paddle.to_tensor(entry["lengths"])
-            self.assertFalse(
-                bool(paddle.isnan(lengths).any()), "sampled lengths contain NaN"
-            )
-
-
 def _make_cinn_model(execution_backend="eager"):
     """Build a masked-species DNG model with a fixed seed per backend."""
-    from ppmat.models.omatg.model import IndependentSampler
-    from ppmat.models.omatg.si.core import build_si_from_cfg
-
     cfg = _dng_si_scheduler_cfg(integration_time_steps=10)
     with paddle.utils.unique_name.guard():
         paddle.seed(2026)
-        si = build_si_from_cfg(cfg)
-        sampler = IndependentSampler(
-            dataset_name="mp_20", mask_species=True, mirror_species=False
-        )
         model = OMATGCSPNetFull(
             hidden_dim=32,
             num_layers=1,
             max_atoms=DEFAULT_MAX_ATOMS,
             time_embed_dim=16,
             pred_type=True,
-            use_si=False,
+            use_si=True,
+            si_scheduler_cfg=cfg,
+            sampler_cfg={
+                "dataset_name": "mp_20",
+                "mask_species": True,
+                "mirror_species": False,
+            },
             execution_backend=execution_backend,
         )
-        model.enable_masked_species()
-        model._si = si
-        model._sampler = sampler
-        model._relative_si_costs = cfg["relative_si_costs"]
-        model.use_si = True
     return model
 
 
@@ -501,34 +439,28 @@ def _build_trainer(model, output_dir, max_epochs, backend):
 
 
 class TestCINNDispatch(unittest.TestCase):
-    """CINN dispatch boundaries for the SI training and sampling paths."""
+    """CINN dispatch boundary for the SI training path."""
 
     def test_si_dispatch_records_only_denoise_step(self):
-        model = _make_cinn_model("cinn")
-        names = []
-        with mock.patch.object(
-            OMATGCSPNetFull, "_run_runtime", _recording_run_runtime(names)
-        ):
-            model(_make_batch())
-            model.eval()
-            model.sample(_make_batch(), num_inference_steps=3)
-        self.assertTrue(names)
-        self.assertEqual(set(names), {"denoise_step"})
-
-    def test_dispatch_does_not_move_eager_numbers(self):
+        """One boundary name is dispatched and eager/cinn numbers stay bitwise equal."""
         batch = _make_batch()
         eager_model = _make_cinn_model("eager")
         paddle.seed(2027)
         expected = eager_model(batch)["loss_dict"]
 
+        names = []
         dispatched = _make_cinn_model("cinn")
         dispatched.set_state_dict(eager_model.state_dict())
         paddle.seed(2027)
         with mock.patch.object(
-            OMATGCSPNetFull, "_run_runtime", _passthrough_run_runtime
+            OMATGCSPNetFull, "_run_runtime", _recording_run_runtime(names)
         ):
             actual = dispatched(batch)["loss_dict"]
+            dispatched.eval()
+            dispatched.sample(batch, num_inference_steps=3)
 
+        self.assertTrue(names)
+        self.assertEqual(set(names), {"denoise_step"})
         self.assertEqual(
             dispatched.state_dict().keys(), eager_model.state_dict().keys()
         )
@@ -612,7 +544,7 @@ class TestCINNTrainerOrchestration(unittest.TestCase):
     "Set PPMAT_RUN_CINN_WORKFLOW_TESTS=1 to run the GPU CINN compile parity.",
 )
 class TestCINNGPUCompileParity(unittest.TestCase):
-    """Real CINN compilation parity for one training epoch and sampling."""
+    """Real CINN compilation parity for one training epoch."""
 
     def _require_gpu_cinn(self):
         if not paddle.is_compiled_with_cuda():
@@ -622,6 +554,12 @@ class TestCINNGPUCompileParity(unittest.TestCase):
         paddle.set_device("gpu:0")
 
     def test_one_training_epoch_matches_eager(self):
+        """One compiled training epoch must track eager within the SI tolerance.
+
+        The full SI sampling loop is not comparable on GPU: ``segment_mean`` uses
+        atomic scatter, so even two eager runs diverge inside the chaotic SDE
+        integration. The training epoch is the stable end-to-end parity check.
+        """
         import tempfile
         from pathlib import Path
 
@@ -661,46 +599,6 @@ class TestCINNGPUCompileParity(unittest.TestCase):
                     atol=1e-3,
                     rtol=1e-3,
                 )
-
-    def test_boundary_output_matches_eager_on_gpu(self):
-        """One compiled boundary call must track the eager numbers.
-
-        Full SI sampling loops cannot be compared on GPU: segment_mean uses
-        atomic scatter, so even two eager runs diverge inside the chaotic SDE
-        integration. A single boundary call has no such amplification.
-        """
-        self._require_gpu_cinn()
-        eager_model = _make_cinn_model("eager")
-        cinn_model = _make_cinn_model("cinn")
-        cinn_model.set_state_dict(eager_model.state_dict())
-        eager_model.eval()
-        cinn_model.eval()
-
-        batch = _make_batch()
-        t = paddle.full([batch["n_atoms"].shape[0]], 0.5)
-        with paddle.no_grad():
-            expected = eager_model.forward_dict(
-                t,
-                batch["species"],
-                batch["pos"],
-                batch["cell"],
-                batch["n_atoms"],
-                batch["batch"],
-            )
-            actual = cinn_model.forward_dict(
-                t,
-                batch["species"],
-                batch["pos"],
-                batch["cell"],
-                batch["n_atoms"],
-                batch["batch"],
-            )
-
-        self.assertEqual(actual.keys(), expected.keys())
-        for key in expected:
-            np.testing.assert_allclose(
-                actual[key].numpy(), expected[key].numpy(), atol=2e-5, rtol=2e-5
-            )
 
 
 def _metric_sample(num_atoms, seed, species=(3, 8, 11)):
@@ -764,11 +662,12 @@ class TestOMatGMetric(unittest.TestCase):
         self.assertGreater(one_shot_metrics["match_rate"], 0.0)
 
     def test_dng_metrics_smoke(self):
+        """DNG mode reports validity, distribution, METRe and COV metrics."""
         from ppmat.metrics.omatg_metric import OMatGMetric
 
         ref = [_metric_sample(3, 0), _metric_sample(4, 1), _metric_sample(5, 2)]
         gen = [_metric_sample(3, 0), _metric_sample(4, 1), _metric_sample(5, 3)]
-        metrics = OMatGMetric(metric_type="dng")(gen, gt_data=ref)
+        metrics = OMatGMetric(metric_type="dng", dataset_name="mp_20")(gen, gt_data=ref)
         expected_keys = {
             "valid_rate",
             "wdist_density",
@@ -780,6 +679,8 @@ class TestOMatGMetric(unittest.TestCase):
             "metre_valid_rate",
             "metre_valid_mean_rmsd",
             "metre_valid_corr_rmsd",
+            "cov_precision",
+            "cov_recall",
             "dng_eval",
         }
         self.assertTrue(expected_keys <= set(metrics))

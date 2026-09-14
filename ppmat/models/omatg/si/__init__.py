@@ -19,6 +19,7 @@ from .core import SingleStochasticInterpolant
 from .core import SingleStochasticInterpolantIdentity
 from .core import StochasticInterpolants
 from .core import build_si_from_cfg
+from .core import correct_for_minimum_permutation_distance
 from .interpolants import LatentGammaSqrt
 from .interpolants import LinearInterpolant
 from .interpolants import PeriodicLinearInterpolant
@@ -36,4 +37,5 @@ __all__ = [
     "BIG_TIME",
     "SMALL_TIME",
     "build_si_from_cfg",
+    "correct_for_minimum_permutation_distance",
 ]

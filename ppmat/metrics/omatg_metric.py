@@ -515,6 +515,11 @@ def get_cov(
     Returns:
         (cov_recall, cov_precision).
     """
+    if any(c.comp_fp is None or c.struct_fp is None for c in ref_crystals):
+        raise ValueError(
+            "Reference crystals with missing composition or structure fingerprints "
+            "cannot be scored by COV; check the ground-truth CIFs."
+        )
     ref_comp_fps = np.asarray([c.comp_fp for c in ref_crystals])
     ref_struc_fps = np.asarray([c.struct_fp for c in ref_crystals])
 
@@ -566,6 +571,24 @@ def _parse_crystals(data: Sequence[dict]) -> List[Crystal]:
     return [Crystal(item) for item in data]
 
 
+def _constructible(crystals: Sequence[Crystal], label: str) -> List[Crystal]:
+    """Return the crystals holding a parsed structure, warning about the rest.
+
+    ``Crystal.get_structure`` leaves ``structure`` unset when the lattice cannot be
+    built (``constructed`` is then False), so those crystals cannot contribute to
+    the distribution metrics.
+    """
+    constructible = [crystal for crystal in crystals if crystal.constructed]
+    dropped = len(crystals) - len(constructible)
+    if dropped:
+        logger.warning(
+            f"[OMatGMetric] {dropped} of {len(crystals)} {label} structures could not "
+            f"be constructed; they are excluded from the distribution metrics and "
+            f"counted as invalid."
+        )
+    return constructible
+
+
 class OMatGMetric(StreamingMetricBase):
     """OMatG metrics: match (per-index) or dng (validity/METRe/Wasserstein/COV).
 
@@ -611,9 +634,12 @@ class OMatGMetric(StreamingMetricBase):
                     "gt_data is None, but no gt_file_path was provided to OMatGMetric."
                 )
             import pandas as pd
+            from p_tqdm import p_map
 
             csv = pd.read_csv(self._gt_file_path)
-            self._gt_crystals = [get_crys_from_cif(cif) for cif in csv["cif"]]
+            self._gt_crystals = p_map(
+                get_crys_from_cif, csv["cif"], desc="Loading ground truth"
+            )
         return self._gt_crystals
 
     def _match_metrics(
@@ -643,17 +669,26 @@ class OMatGMetric(StreamingMetricBase):
 
         valid_rate = float(sum(c.valid for c in gen_crystals) / len(gen_crystals))
 
+        gen_measurable = _constructible(gen_crystals, "generated")
+        ref_measurable = _constructible(ref_crystals, "reference")
+        if not gen_measurable or not ref_measurable:
+            logger.warning(
+                "[OMatGMetric] Distribution metrics need at least one constructible "
+                "generated and reference structure; reporting the validity rate only."
+            )
+            return {"valid_rate": valid_rate}
+
         def wdist(key):
-            gen_values = [getattr(c.structure, key) for c in gen_crystals]
-            ref_values = [getattr(c.structure, key) for c in ref_crystals]
+            gen_values = [getattr(c.structure, key) for c in gen_measurable]
+            ref_values = [getattr(c.structure, key) for c in ref_measurable]
             return float(wasserstein_distance(gen_values, ref_values))
 
         wdist_density = wdist("density")
-        gen_narity = [len(set(c.structure.species)) for c in gen_crystals]
-        ref_narity = [len(set(c.structure.species)) for c in ref_crystals]
+        gen_narity = [len(set(c.structure.species)) for c in gen_measurable]
+        ref_narity = [len(set(c.structure.species)) for c in ref_measurable]
         wdist_narity = float(wasserstein_distance(gen_narity, ref_narity))
-        gen_cn = [_mean_coordination_number(c.structure) for c in gen_crystals]
-        ref_cn = [_mean_coordination_number(c.structure) for c in ref_crystals]
+        gen_cn = [_mean_coordination_number(c.structure) for c in gen_measurable]
+        ref_cn = [_mean_coordination_number(c.structure) for c in ref_measurable]
         wdist_coordination_numbers = float(wasserstein_distance(gen_cn, ref_cn))
         wdist_avg = float(
             np.average([wdist_density, wdist_narity, wdist_coordination_numbers])
@@ -745,8 +780,16 @@ class OMatGMetric(StreamingMetricBase):
     def _compute(
         self, pred_data: Sequence[dict], gt_data: Optional[Sequence]
     ) -> Dict[str, float]:
+        if len(pred_data) == 0:
+            logger.warning("[OMatGMetric] No generated structures to evaluate.")
+            return {}
         gen_crystals = _parse_crystals(pred_data)
         ref_crystals = self._load_reference(gt_data)
+        if len(ref_crystals) == 0:
+            logger.warning(
+                "[OMatGMetric] The reference set is empty; nothing to score."
+            )
+            return {}
         if self._metric_type == "match":
             return self._match_metrics(gen_crystals, ref_crystals)
         return self._dng_metrics(gen_crystals, ref_crystals)

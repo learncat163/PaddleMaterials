@@ -77,15 +77,36 @@ Several standard material datasets are included as LMDB files:
 
 ### Data Preparation
 
-The `omatg_mp20_*.yaml` configs reference MP-20 LMDB files at `./data/mp_20/{train,val,test}.lmdb`
-and the sampling configs expect `./data/mp_20/test.csv` (a CSV with a `cif` column) as the
-reference ground-truth set for metrics.
+`OMATGStructureDataset` reads the three input formats of the original OMatG
+release, so `Dataset.*.dataset.__init_params__.file_path` (and
+`Sample.metrics.__init_params__.gt_file_path`) can point at any of them:
 
-The raw MP-20 (and the other MPTS-52 / Perov-5 / Alex-MP-20) structures can be converted into
-the expected LMDB layout from their source files before training. The LMDB record for each
-structure must contain the fields read by `OMATGStructureDataset`: `cell` (3x3), `atomic_numbers`
-(1D), and `pos` (Nx3), serialized with `pickle` under a non-double-underscore key. Only after
-these files are prepared will the training / validation / sampling commands below run.
+| Format | Expected content | Notes |
+|--------|------------------|-------|
+| `.lmdb` | one record per structure holding `cell` (3x3), `atomic_numbers` (1D) and Cartesian `pos` (Nx3); record keys must not start with `__` | the configs' default; records are read lazily and converted to fractional coordinates when `convert_to_fractional=True` |
+| `.csv` | a `cif` column | fully materialized at init time (`lazy_storage` is ignored) |
+| `.parquet` | `cell`, `positions` (Nx3 Cartesian) and `atomic_numbers` columns | the format the OMatG release ships on HuggingFace |
+
+The MP-20 CSVs ship in the standard `mp_20` data package (`mp_20.zip`, md5
+`73371948155aa9da609436e291142d7e`, the same package used by `MP20Dataset`) —
+the only MP-20 source downloadable through this repository:
+
+```bash
+mkdir -p ./data/mp_20
+wget -O ./data/mp_20/mp_20.zip https://paddle-org.bj.bcebos.com/paddlematerial/datasets/mp_20/mp_20.zip
+unzip -j ./data/mp_20/mp_20.zip -d ./data/mp_20   # yields {train,val,test}.csv
+```
+
+For a quick start, train directly on those CSVs by pointing
+`Dataset.*.dataset.__init_params__.file_path` at `./data/mp_20/train.csv` (and
+`val.csv`, `test.csv`); `Sample.metrics` already reads `./data/mp_20/test.csv` as
+the reference ground-truth set. CSV input is materialized at init time, so for the
+full-scale splits (MP-20 45,229 structures, Alex-MP-20 675,204) provide the LMDB
+or Parquet input of the original OMatG release instead:
+`https://huggingface.co/OMatG/datasets` (Parquet, fetched by the upstream
+`omg_load` command) or the `omg/data` directory of the upstream repository (LMDB).
+The same three formats apply to the other datasets (MPTS-52 / Perov-5 /
+Alex-MP-20).
 
 
 
@@ -98,11 +119,11 @@ the `file_path` in the dataset section of the config.
 
 | Dataset | Mode | Variants | Weight Index |
 |---------|:----:|:--------:|--------------|
-| mp_20_csp | CSP | 11 | `build_omatg_model("mp_20_csp", variant)` |
-| mp_20_dng | DNG | 11 | `build_omatg_model("mp_20_dng", variant)` |
-| perov_5_csp | CSP | 11 | `build_omatg_model("perov_5_csp", variant)` |
-| mpts_52_csp | CSP | 8 | `build_omatg_model("mpts_52_csp", variant)` |
-| alex_mp_20_csp | CSP | 11 | `build_omatg_model("alex_mp_20_csp", variant)` |
+| mp_20_csp | CSP | 11 | `build_omatg_model("mp_20_csp", variant, mode="csp")` |
+| mp_20_dng | DNG | 11 | `build_omatg_model("mp_20_dng", variant, mode="dng")` |
+| perov_5_csp | CSP | 11 | `build_omatg_model("perov_5_csp", variant, mode="csp")` |
+| mpts_52_csp | CSP | 8 | `build_omatg_model("mpts_52_csp", variant, mode="csp")` |
+| alex_mp_20_csp | CSP | 11 | `build_omatg_model("alex_mp_20_csp", variant, mode="csp")` |
 
 
 ## Configuration Files
@@ -152,14 +173,21 @@ the `file_path` in the dataset section of the config.
 
 ## Pretrained Weights
 
-Pre-trained weights hosted on Baidu BOS (52 files, 5 dataset x variant tables below). Use `build_omatg_model(dataset, variant)`
+Pre-trained weights hosted on Baidu BOS (52 files, 5 dataset x variant tables below). Use `build_omatg_model(dataset, variant, mode=...)`
 for automatic download. Cached to `~/.paddlemat/weights/omatg_{dataset}/` after first download.
 
 ```python
 from ppmat.models.omatg import build_omatg_model
-model, meta = build_omatg_model("mp_20_csp", "encdec_ode_gamma")  # CSP
-model, meta = build_omatg_model("mp_20_dng", "encdec_ode_gamma")  # DNG
+model = build_omatg_model("mp_20_csp", "encdec_ode_gamma", mode="csp")  # CSP
+model = build_omatg_model("mp_20_dng", "encdec_ode_gamma", mode="dng")  # DNG
 ```
+
+The two headline weights from the Results table are also registered in
+`MODEL_REGISTRY` (standard `<key>.zip` packages with config + `best.pdparams`),
+so `build_model_from_name` and `sample.py --model_name` work out of the box:
+
+- `omatg_mp20_csp_linear_ode` (CSP / Linear-ODE)
+- `omatg_mp20_dng_linear_sde_gamma` (DNG / Linear-SDE-Gamma)
 
 ### Perov-5
 
@@ -259,6 +287,20 @@ python structure_generation/train.py \
     Trainer.output_dir=./output/omatg_mp20_csp
 ```
 
+### Fine-tuning
+
+Load the released weights (or a previous run's checkpoint) and continue
+training:
+
+```bash
+# Fine-tune from the released CSP Linear-ODE weights
+python structure_generation/train.py \
+    -c structure_generation/configs/omatg/omatg_mp20_csp.yaml \
+    Trainer.pretrained_model_path=https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/OMatG/omatg_mp_20_csp/Linear-ODE.pdparams \
+    Trainer.max_epochs=50 \
+    Trainer.output_dir=./output/omatg_mp20_csp_finetune
+```
+
 ### Validation
 
 ```bash
@@ -299,6 +341,20 @@ python -m pytest test/omatg/test_omatg.py -v
 ```
 
 ### Sample
+
+```bash
+# Sample with a registered MODEL_REGISTRY package (auto-download).
+python structure_generation/sample.py \
+    --model_name omatg_mp20_csp_linear_ode \
+    --mode by_num_atoms \
+    --num_atoms 8 \
+    --output_path ./outputs/omatg_samples
+```
+
+`--mode by_num_atoms` fixes only the atom count: without a chemical formula the
+species are drawn uniformly from the model's atomic-number range, and a CSP config
+then mirrors those sampled species. Use `--mode by_chemical_formula` to sample a
+fixed composition.
 
 ```bash
 # Sample by number of atoms (with local checkpoint)
@@ -363,8 +419,8 @@ the `--mode compute_metric` sampling config, which computes CSP `match_rate` / D
 @inproceedings{
     martirossyan2025,
     title={All that structure matches does not glitter},
-    author={Maya Martirossyan and Thomas Egg and Philipp H{\"o}llmer 
-    and George Karypis and Mark Transtrum and Adrian Roitberg 
+    author={Maya Martirossyan and Thomas Egg and Philipp H{\"o}llmer
+    and George Karypis and Mark Transtrum and Adrian Roitberg
     and Mingjie Liu and Richard Hennig and Ellad B. Tadmor and Stefano Martiniani},
     booktitle={Thirty-Ninth Annual Conference on Neural Information Processing Systems},
     year={2025},

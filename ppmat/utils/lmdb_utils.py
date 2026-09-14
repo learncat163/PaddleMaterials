@@ -23,8 +23,8 @@ Provides the common read-only LMDB access patterns shared by datasets:
   json -> ast).
 
 Only the read path is abstracted; writing/building LMDB files stays with the
-code that owns the data format, and format-specific value decoding (e.g. the
-``__ndarray__`` convention in omol25) stays in the consuming dataset.
+code that owns the data format, and format-specific value decoding (e.g. an
+``__ndarray__`` payload convention) stays in the consuming dataset.
 """
 
 import ast

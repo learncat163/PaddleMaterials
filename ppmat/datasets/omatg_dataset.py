@@ -17,8 +17,6 @@
 from pathlib import Path
 from typing import Any
 from typing import Dict
-from typing import Optional
-from typing import Sequence
 
 import numpy as np
 import paddle
@@ -29,42 +27,6 @@ from ppmat.utils.lmdb_utils import lmdb_get
 from ppmat.utils.lmdb_utils import lmdb_keys
 from ppmat.utils.lmdb_utils import open_lmdb
 
-# Lattice log-length mean/std per dataset (upstream FlowMM lattice_params_stats).
-LATTICE_PARAMS = {
-    "carbon_24": {
-        "means": [0.9852757453918457, 1.3865314722061157, 1.7068126201629639],
-        "stds": [0.14957907795906067, 0.20431114733219147, 0.2403733879327774],
-    },
-    "mp_20": {
-        "means": [1.575442910194397, 1.7017393112182617, 1.9781638383865356],
-        "stds": [0.24437622725963593, 0.26526379585266113, 0.3535512685775757],
-    },
-    "mpts_52": {
-        "means": [1.6565313339233398, 1.8407557010650635, 2.1225264072418213],
-        "stds": [0.2952289581298828, 0.3340013027191162, 0.41885802149772644],
-    },
-    "perov_5": {
-        "means": [1.419227957725525, 1.419227957725525, 1.419227957725525],
-        "stds": [0.07268335670232773, 0.07268335670232773, 0.07268335670232773],
-    },
-    "alex_mp_20": {
-        "means": [1.5808929163076058, 1.74672046352959, 2.065243388307474],
-        "stds": [0.27284015410437057, 0.2944785731740152, 0.30899526911753017],
-    },
-}
-
-
-def sample_lattice_cell(lattice_means, lattice_stds):
-    """Sample a cell from log-normal lengths and uniform angles."""
-    from ase.geometry.cell import cellpar_to_cell
-
-    lengths = paddle.exp(
-        paddle.randn([3]) * paddle.to_tensor(lattice_stds)
-        + paddle.to_tensor(lattice_means)
-    )
-    angles = paddle.rand([3]) * 60.0 + 60.0
-    return cellpar_to_cell(paddle.concat((lengths, angles)).numpy())
-
 
 class _OMATGStructure:
     """Single-crystal container with coordinate conversion, used to build samples."""
@@ -74,7 +36,6 @@ class _OMATGStructure:
         cell: paddle.Tensor,
         atomic_numbers: paddle.Tensor,
         pos: paddle.Tensor,
-        property_dict: Optional[Dict[str, Any]] = None,
         pos_is_fractional: bool = False,
     ) -> None:
         if cell.shape != (3, 3):
@@ -87,7 +48,6 @@ class _OMATGStructure:
         self._cell = cell
         self._atomic_numbers = atomic_numbers
         self._pos = pos
-        self._property_dict = property_dict if property_dict is not None else {}
         self._fractional = pos_is_fractional
 
     @property
@@ -105,10 +65,6 @@ class _OMATGStructure:
     @property
     def pos_is_fractional(self) -> bool:
         return self._fractional
-
-    @property
-    def property_dict(self) -> Dict[str, Any]:
-        return self._property_dict
 
     def niggli_reduce(self) -> None:
         from pymatgen.core import Element
@@ -130,8 +86,7 @@ class _OMATGStructure:
         if not self._fractional:
             with paddle.no_grad():
                 self._pos = paddle.remainder(
-                    paddle.linalg.solve(self._cell, self._pos.T).T,
-                    1.0,
+                    paddle.linalg.solve(self._cell, self._pos, left=False), 1.0
                 )
             self._fractional = True
 
@@ -142,13 +97,11 @@ class OMATGStructureDataset(paddle.io.Dataset):
     def __init__(
         self,
         file_path: str,
-        property_keys: Optional[Sequence[str]] = None,
         lazy_storage: bool = True,
         convert_to_fractional: bool = True,
         niggli_reduce: bool = False,
     ) -> None:
         self.file_path = file_path
-        self.property_keys = property_keys if property_keys is not None else []
         self.lazy_storage = lazy_storage
         self.convert_to_fractional = convert_to_fractional
         self.niggli_reduce = niggli_reduce
@@ -185,15 +138,6 @@ class OMATGStructureDataset(paddle.io.Dataset):
         finally:
             temp_env.close()
 
-    def _extract_property_dict(self, data) -> Dict[str, Any]:
-        property_dict = {}
-        for key in self.property_keys:
-            if key in data:
-                val = data[key]
-                if isinstance(val, (int, float, list, np.ndarray)):
-                    property_dict[key] = paddle.to_tensor(val, dtype="float32")
-        return property_dict
-
     def _apply_transforms(self, structure: _OMATGStructure) -> None:
         if self.convert_to_fractional:
             structure.convert_to_fractional()
@@ -205,14 +149,13 @@ class OMATGStructureDataset(paddle.io.Dataset):
         cell: paddle.Tensor,
         atomic_numbers: paddle.Tensor,
         pos: paddle.Tensor,
-        property_dict: Optional[dict] = None,
+        pos_is_fractional: bool = False,
     ) -> Dict[str, Any]:
         structure = _OMATGStructure(
             cell=cell,
             atomic_numbers=atomic_numbers,
             pos=pos,
-            property_dict=property_dict if property_dict else None,
-            pos_is_fractional=False,
+            pos_is_fractional=pos_is_fractional,
         )
         self._apply_transforms(structure)
 
@@ -249,9 +192,8 @@ class OMATGStructureDataset(paddle.io.Dataset):
             atomic_numbers = paddle.to_tensor(pmg.atomic_numbers, dtype="int64")
             pos = paddle.to_tensor(pmg.frac_coords, dtype="float32")
 
-            property_dict = self._extract_property_dict(row)
             self.structures.append(
-                self._build_sample(cell, atomic_numbers, pos, property_dict)
+                self._build_sample(cell, atomic_numbers, pos, pos_is_fractional=True)
             )
 
         self.keys = list(range(len(self.structures)))
@@ -275,10 +217,7 @@ class OMATGStructureDataset(paddle.io.Dataset):
             pos = paddle.to_tensor(np.stack(row["positions"]), dtype="float32")
             cell = paddle.to_tensor(np.stack(row["cell"]), dtype="float32")
 
-            property_dict = self._extract_property_dict(row)
-            self.structures.append(
-                self._build_sample(cell, atomic_numbers, pos, property_dict)
-            )
+            self.structures.append(self._build_sample(cell, atomic_numbers, pos))
 
         self.keys = list(range(len(self.structures)))
         self.lazy_storage = False
@@ -288,8 +227,7 @@ class OMATGStructureDataset(paddle.io.Dataset):
         atomic_numbers = paddle.to_tensor(data["atomic_numbers"], dtype="int64")
         pos = paddle.to_tensor(data["pos"], dtype="float32")
 
-        property_dict = self._extract_property_dict(data)
-        return self._build_sample(cell, atomic_numbers, pos, property_dict)
+        return self._build_sample(cell, atomic_numbers, pos)
 
     def __len__(self) -> int:
         if self.lazy_storage:

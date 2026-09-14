@@ -97,18 +97,33 @@ __all__ = [
 def build_omatg_model(
     dataset: str,
     variant: str,
-    weights_name: str = None,
+    mode: str,
     si_scheduler_cfg: dict = None,
     sampler_cfg: dict = None,
     **model_kwargs,
 ):
-    """Build OMatG model and download weights.
+    """Build an OMatG model, download the released weights and load them.
 
-    si_scheduler_cfg/sampler_cfg enable the SI sampling path.
+    Args:
+        dataset: Dataset key of :data:`OMATG_WEIGHTS` (e.g. "mp_20_csp").
+        variant: Interpolant variant key (e.g. "linear_ode").
+        mode: "csp" or "dng". Selects ``pred_type`` and the masked-species
+            token explicitly instead of guessing from the dataset name; it
+            must match the mode encoded in the dataset key.
+        si_scheduler_cfg / sampler_cfg: When ``si_scheduler_cfg`` is given,
+            the SI sampling path is enabled and both configs are forwarded
+            to :class:`OMATGCSPNetFull`.
+        **model_kwargs: Forwarded to :class:`OMATGCSPNetFull`.
+
+    Returns:
+        The loaded :class:`OMATGCSPNetFull` model.
     """
+    if mode not in ("csp", "dng"):
+        raise ValueError(f"mode must be 'csp' or 'dng', got {mode!r}.")
+
     weight_url = get_omatg_model_url(dataset, variant)
 
-    logger.info(f"Building OMatG model: {dataset} / {variant}")
+    logger.info(f"Building OMatG model: {dataset} / {variant} / {mode}")
     logger.info(f"Weight URL: {weight_url}")
 
     cache_dir = osp.join(download.WEIGHTS_HOME, f"omatg_{dataset}")
@@ -117,39 +132,29 @@ def build_omatg_model(
     )
     logger.info(f"Weight saved to: {weight_path}")
 
-    if weights_name is None:
-        weight_filename = weight_url.split("/")[-1]
-        weights_name = weight_filename.replace(".pdparams", "")
-        logger.info(f"Using default weights: {weights_name}")
-
-    is_dng = "dng" in dataset.lower()
-
     params = dict(model_kwargs)
-    params.setdefault("pred_type", is_dng)
+    params.setdefault("pred_type", mode == "dng")
     if si_scheduler_cfg is not None:
         params["use_si"] = True
         params["si_scheduler_cfg"] = si_scheduler_cfg
         params["sampler_cfg"] = sampler_cfg or {}
     model = OMATGCSPNetFull(**params)
-    if is_dng:
+    if mode == "dng":
         model.enable_masked_species()
 
-    save_load.load_pretrain(model, weight_path, weights_name)
+    save_load.load_pretrain(model, weight_path)
 
     logger.info(f"Successfully built and loaded OMatG model: {dataset}/{variant}")
 
-    return model, {
-        "dataset": dataset,
-        "variant": variant,
-        "weights_name": weights_name,
-    }
+    return model
 
 
 def get_omatg_model_url(dataset: str, variant: str) -> str:
     """Return the weight URL for a dataset/variant.
 
-    Not using MODEL_REGISTRY: it maps one model_name to one zip, while OMatG
-    needs a dataset x variant lookup of individual .pdparams files.
+    Resolved from :data:`OMATG_WEIGHTS`, which maps the released per-variant
+    .pdparams files; a MODEL_REGISTRY lookup cannot address the dataset x variant
+    matrix with a single model name.
     """
     if dataset not in OMATG_WEIGHTS:
         available_datasets = list(OMATG_WEIGHTS.keys())

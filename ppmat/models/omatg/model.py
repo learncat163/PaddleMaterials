@@ -25,8 +25,6 @@ from typing import Optional
 import paddle
 import paddle.nn as nn
 
-from ppmat.datasets.omatg_dataset import LATTICE_PARAMS
-from ppmat.datasets.omatg_dataset import sample_lattice_cell
 from ppmat.losses import MSELoss
 from ppmat.models.common.runtime import RuntimeMixin
 from ppmat.models.common.runtime import runtime_boundary
@@ -34,7 +32,9 @@ from ppmat.models.diffcsp.diffcsp import CSPNet
 from ppmat.models.omatg.si.core import BIG_TIME
 from ppmat.models.omatg.si.core import DEFAULT_MAX_ATOMS
 from ppmat.models.omatg.si.core import SMALL_TIME
-from ppmat.models.omatg.si.core import DiscreteFlowMatchingMask
+from ppmat.models.omatg.si.core import StochasticInterpolantSpecies
+from ppmat.models.omatg.si.core import build_si_from_cfg
+from ppmat.models.omatg.si.core import correct_for_minimum_permutation_distance
 from ppmat.utils.crystal import frac_to_cart_coords_with_lattice
 from ppmat.utils.crystal import lattices_to_params_shape_paddle
 from ppmat.utils.crystal import radius_graph_pbc
@@ -46,6 +46,51 @@ __all__ = [
     "IndependentSampler",
     "build_sampler_from_cfg",
 ]
+
+# Lattice log-length mean/std per dataset (upstream FlowMM lattice_params_stats).
+LATTICE_PARAMS = {
+    "carbon_24": {
+        "means": [0.9852757453918457, 1.3865314722061157, 1.7068126201629639],
+        "stds": [0.14957907795906067, 0.20431114733219147, 0.2403733879327774],
+    },
+    "mp_20": {
+        "means": [1.575442910194397, 1.7017393112182617, 1.9781638383865356],
+        "stds": [0.24437622725963593, 0.26526379585266113, 0.3535512685775757],
+    },
+    "mpts_52": {
+        "means": [1.6565313339233398, 1.8407557010650635, 2.1225264072418213],
+        "stds": [0.2952289581298828, 0.3340013027191162, 0.41885802149772644],
+    },
+    "perov_5": {
+        "means": [1.419227957725525, 1.419227957725525, 1.419227957725525],
+        "stds": [0.07268335670232773, 0.07268335670232773, 0.07268335670232773],
+    },
+    "alex_mp_20": {
+        "means": [1.5808929163076058, 1.74672046352959, 2.065243388307474],
+        "stds": [0.27284015410437057, 0.2944785731740152, 0.30899526911753017],
+    },
+}
+
+_SAMPLER_CFG_KEYS = {
+    "dataset_name",
+    "lattice_means",
+    "lattice_stds",
+    "mirror_species",
+    "mask_species",
+    "max_atoms",
+}
+
+
+def sample_lattice_cell(lattice_means, lattice_stds):
+    """Sample a cell from log-normal lengths and uniform angles."""
+    from ase.geometry.cell import cellpar_to_cell
+
+    lengths = paddle.exp(
+        paddle.randn([3]) * paddle.to_tensor(lattice_stds)
+        + paddle.to_tensor(lattice_means)
+    )
+    angles = paddle.rand([3]) * 60.0 + 60.0
+    return cellpar_to_cell(paddle.concat((lengths, angles)).numpy())
 
 
 def _normalize_sample_dict(data: dict) -> dict:
@@ -85,6 +130,33 @@ def _normalize_sample_dict(data: dict) -> dict:
     return out
 
 
+def _validate_relative_si_costs(relative_si_costs, loss_keys) -> dict:
+    """Validate the SI loss weights against the keys the interpolants produce.
+
+    ``relative_si_costs`` must weight every loss exactly once and sum to one, so a
+    typo or a missing entry fails at build time instead of silently reweighting or
+    dropping a loss term.
+    """
+    if relative_si_costs is None:
+        raise ValueError(
+            "si_scheduler_cfg requires 'relative_si_costs' mapping every loss key "
+            f"to its weight; expected keys are {sorted(loss_keys)}."
+        )
+    if not all(cost >= 0.0 for cost in relative_si_costs.values()):
+        raise ValueError("All relative_si_costs weights must be non-negative.")
+
+    total = sum(relative_si_costs.values())
+    if abs(total - 1.0) >= 1e-10:
+        raise ValueError(f"relative_si_costs must sum to 1.0, got {total!r}.")
+    if set(relative_si_costs) != set(loss_keys):
+        raise ValueError(
+            "relative_si_costs keys must match the SI loss keys exactly; got "
+            f"{sorted(relative_si_costs)} while the interpolants produce "
+            f"{sorted(loss_keys)}."
+        )
+    return dict(relative_si_costs)
+
+
 class OMATGCSPNet(CSPNet):
     """OMATG-specific CSPNet extending diffcsp backbone."""
 
@@ -106,6 +178,11 @@ class OMATGCSPNet(CSPNet):
         pred_scalar=False,
         time_embed_dim=None,
     ):
+        if pred_scalar:
+            raise ValueError(
+                "OMatG does not support pred_scalar: it always trains the "
+                "dual b/eta heads required by stochastic interpolants."
+            )
         super().__init__(
             hidden_dim=hidden_dim,
             latent_dim=time_embed_dim if time_embed_dim is not None else 1,
@@ -264,9 +341,6 @@ class OMATGCSPNet(CSPNet):
 
         graph_features = paddle.geometric.segment_mean(node_features, node2graph)
 
-        if self.pred_scalar:
-            return self.scalar_out(graph_features)
-
         lattice_out = self.lattice_out(graph_features)
         lattice_out = lattice_out.reshape([-1, 3, 3])
         if self.ip:
@@ -327,8 +401,6 @@ class OMATGCSPNet(CSPNet):
             edges,
             frac_diff,
         )
-        if self.pred_scalar:
-            return {"scalar": preds}
         if self.pred_type:
             return {
                 "pos_b": preds[1],
@@ -371,6 +443,7 @@ class OMATGCSPNetFull(RuntimeMixin, OMATGCSPNet):
         use_si: bool = False,
         si_scheduler_cfg: dict = None,
         sampler_cfg: dict = None,
+        use_min_perm_dist: bool = False,
         execution_backend: str = "eager",
         runtime_options: dict = None,
     ):
@@ -393,10 +466,17 @@ class OMATGCSPNetFull(RuntimeMixin, OMATGCSPNet):
         )
         self._init_runtime(execution_backend, runtime_options)
         self.use_si = use_si
+        self.use_min_perm_dist = use_min_perm_dist
         self._si = None
         self._sampler = None
         self._relative_si_costs = {}
+        self._min_perm_dist_corrector = None
         self.mse_loss = MSELoss()
+        if use_min_perm_dist and not use_si:
+            raise ValueError(
+                "use_min_perm_dist requires use_si=True: the correction reuses the "
+                "position corrector of the stochastic interpolants."
+            )
         if use_si:
             self._build_si(si_scheduler_cfg or {}, sampler_cfg or {})
 
@@ -441,7 +521,7 @@ class OMATGCSPNetFull(RuntimeMixin, OMATGCSPNet):
             loss_lattice = self.mse_loss(predictions["cell_b"], lattices_gt)
             loss_coord = self.mse_loss(predictions["pos_b"], frac_coords_gt)
             loss_type = paddle.nn.functional.cross_entropy(
-                input=predictions["species_b"], label=atom_types - self.species_shift
+                input=predictions["species_b"], label=atom_types - 1
             )
             loss = loss_lattice + loss_coord + loss_type
             return {
@@ -528,18 +608,11 @@ class OMATGCSPNetFull(RuntimeMixin, OMATGCSPNet):
         )
 
     def _build_si(self, si_scheduler_cfg: dict, sampler_cfg: dict) -> None:
-        from ppmat.models.omatg.si.core import build_si_from_cfg
+        # Normalize an OmegaConf DictConfig (direct build_omatg_model use) to a dict.
+        if not isinstance(si_scheduler_cfg, dict):
+            from omegaconf import OmegaConf
 
-        # Normalize OmegaConf DictConfig to plain dicts.
-        if hasattr(si_scheduler_cfg, "__dict__") and hasattr(si_scheduler_cfg, "get"):
-            try:
-                from omegaconf import OmegaConf
-
-                si_scheduler_cfg = OmegaConf.to_container(
-                    si_scheduler_cfg, resolve=True
-                )
-            except Exception:
-                pass
+            si_scheduler_cfg = OmegaConf.to_container(si_scheduler_cfg, resolve=True)
 
         if not si_scheduler_cfg:
             raise ValueError(
@@ -550,27 +623,37 @@ class OMATGCSPNetFull(RuntimeMixin, OMATGCSPNet):
             )
 
         self._si = build_si_from_cfg(si_scheduler_cfg)
-        self._relative_si_costs = si_scheduler_cfg.get("relative_si_costs", {})
+        self._relative_si_costs = _validate_relative_si_costs(
+            si_scheduler_cfg.get("relative_si_costs"), self._si.loss_keys()
+        )
 
-        # DFM masked species need an extra embedding token (species 0).
-        if any(
-            isinstance(si, DiscreteFlowMatchingMask)
-            for si in self._si._stochastic_interpolants
-        ):
+        # Masked-species schemes (DNG) need an extra embedding token (species 0).
+        species_interpolant = self._si.get_stochastic_interpolant("species")
+        if not isinstance(species_interpolant, StochasticInterpolantSpecies):
+            raise ValueError(
+                "The 'species' data field must be a StochasticInterpolantSpecies "
+                f"interpolant, got {type(species_interpolant).__name__}."
+            )
+        if species_interpolant.uses_masked_species():
             self.enable_masked_species()
 
         if sampler_cfg:
             self._sampler = build_sampler_from_cfg(sampler_cfg)
-            # Bind the parent model so IndependentSampler resolves max_atoms
-            # from the model's species embedding width. Must run after the DFM
-            # enable_masked_species step above so node_embedding reflects the
-            # +1 token expansion for masked-species DNG.
+            # Bind the parent model so a sampler without an explicit max_atoms
+            # resolves the atomic-number range from the model itself.
             if isinstance(self._sampler, IndependentSampler):
                 self._sampler.bind_model(self)
 
+        if self.use_min_perm_dist:
+            self._min_perm_dist_corrector = self._si.get_stochastic_interpolant(
+                "pos"
+            ).get_corrector()
+
     def _data_to_omatg(self, data):
         if isinstance(data, dict) and "structure_array" in data:
-            # StructureSampler input; sample random species when none given.
+            # StructureSampler input. Without atom_types the species are drawn
+            # uniformly from the model's atomic-number range (a CSP model then
+            # mirrors them); use --mode by_chemical_formula to fix the species.
             sa = data["structure_array"]
             num_atoms = paddle.to_tensor(sa["num_atoms"], dtype="int64")
             if "atom_types" in sa:
@@ -593,12 +676,22 @@ class OMATGCSPNetFull(RuntimeMixin, OMATGCSPNet):
             for k, v in data.items()
             if v is not None
         }
-        return _normalize_sample_dict(data)
+        sample = _normalize_sample_dict(data)
+        if not bool(paddle.all(sample["pos_is_fractional"])):
+            raise ValueError(
+                "OMatG evolves fractional coordinates, but the batch carries "
+                "Cartesian positions; keep convert_to_fractional=True on the dataset."
+            )
+        return sample
 
     def _si_forward(self, data: dict) -> dict:
         """SI velocity-matching loss step."""
         x_1 = self._data_to_omatg(data)
         x_0 = self._sampler.sample_p_0(x_1)
+        if self._min_perm_dist_corrector is not None:
+            correct_for_minimum_permutation_distance(
+                x_0, x_1, self._min_perm_dist_corrector
+            )
         batch_size = len(x_1["n_atoms"])
         t = paddle.rand([batch_size]) * (BIG_TIME - SMALL_TIME) + SMALL_TIME
 
@@ -606,9 +699,8 @@ class OMATGCSPNetFull(RuntimeMixin, OMATGCSPNet):
         total_loss = paddle.to_tensor(0.0)
         loss_dict = {}
         for key, val in losses.items():
-            cost = self._relative_si_costs.get(key, 1.0)
-            weighted = cost * val
-            loss_dict[key] = val
+            weighted = self._relative_si_costs[key] * val
+            loss_dict[key] = weighted
             total_loss = total_loss + weighted
         loss_dict["loss"] = total_loss
         return {"loss_dict": loss_dict}
@@ -625,8 +717,6 @@ class IndependentSampler:
     without a model and no explicit value, falls back to ``DEFAULT_MAX_ATOMS``
     (the released-checkpoint default).
     """
-
-    _DEFAULT_MAX_ATOMS: int = DEFAULT_MAX_ATOMS
 
     def __init__(
         self,
@@ -662,42 +752,24 @@ class IndependentSampler:
         self._max_atoms = max_atoms
         self._bound_model: Optional["OMATGCSPNetFull"] = None
 
-    @staticmethod
-    def _model_species_cardinality(model: "OMATGCSPNetFull") -> int:
-        """Read the species cardinality from the model's node_embedding.
-
-        Paddle's ``nn.Embedding`` exposes the width as ``_num_embeddings``;
-        fall back to ``num_classes`` if the attribute is missing.
-        """
-        emb = model.node_embedding
-        return int(
-            getattr(emb, "_num_embeddings", None)
-            or getattr(emb, "num_embeddings", None)
-            or model.num_classes
-        )
-
     def bind_model(self, model: "OMATGCSPNetFull") -> None:
-        """Bind the parent OMatG model so that max_atoms is resolved from it.
+        """Bind the parent OMatG model so that the species range resolves to it.
 
         When ``max_atoms`` was not provided explicitly, the bound model's
-        species ``node_embedding`` width is used as the upper bound. This
-        tracks the actual species cardinality (``max_atoms`` for CSP, or
-        ``max_atoms + 1`` after ``enable_masked_species`` for DNG mask-token
-        schemes), so the sampler stays in sync without a separate
-        ``max_atoms`` argument. An explicit constructor ``max_atoms`` is
-        not overridden.
+        ``num_classes`` (the atomic-number cardinality of the released
+        checkpoints) becomes the inclusive upper bound of the uniform species
+        distribution. An explicit constructor ``max_atoms`` is not overridden.
         """
         self._bound_model = model
         if self._max_atoms is None:
-            self._max_atoms = self._model_species_cardinality(model)
+            self._max_atoms = int(model.num_classes)
 
     def _resolve_max_atoms(self) -> int:
-        if self._max_atoms is not None:
-            return int(self._max_atoms)
-        if self._bound_model is not None:
-            self._max_atoms = self._model_species_cardinality(self._bound_model)
-            return self._max_atoms
-        return self._DEFAULT_MAX_ATOMS
+        if self._max_atoms is None and self._bound_model is not None:
+            self._max_atoms = int(self._bound_model.num_classes)
+        if self._max_atoms is None:
+            return DEFAULT_MAX_ATOMS
+        return int(self._max_atoms)
 
     def sample_p_0(self, x_1: Dict[str, paddle.Tensor]) -> Dict[str, paddle.Tensor]:
         batch_size = len(x_1["n_atoms"])
@@ -759,7 +831,17 @@ class IndependentSampler:
 
 
 def build_sampler_from_cfg(sampler_cfg: dict):
-    """Build an IndependentSampler from a config dict."""
+    """Build an IndependentSampler from a config dict.
+
+    Unknown keys are rejected so that an unsupported or misspelled sampler option
+    fails loudly instead of being silently ignored.
+    """
+    unknown_keys = sorted(set(sampler_cfg) - _SAMPLER_CFG_KEYS)
+    if unknown_keys:
+        raise ValueError(
+            f"sampler_cfg has unknown keys {unknown_keys}; allowed keys are "
+            f"{sorted(_SAMPLER_CFG_KEYS)}."
+        )
     return IndependentSampler(
         dataset_name=sampler_cfg.get("dataset_name"),
         lattice_means=sampler_cfg.get("lattice_means"),
