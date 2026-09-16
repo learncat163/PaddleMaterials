@@ -83,7 +83,7 @@ class D3PMUniformScheduler:
 
 
 class D3PMScheduler:
-    """D3PM Scheduler with absorbing-state transition
+    """D3PM Scheduler
 
     Args:
         num_train_timesteps (int, optional): Number of training timesteps. Defaults to
