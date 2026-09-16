@@ -44,20 +44,16 @@ Model:
       smooth: true
       pred_type: true
     diffusion_cfg:
-      method: DiffCSP
-      task: gen_mp20
       cont_time: false
       num_steps: 1000
       eps: 1e-3
       lat_diffusion:
-        method: ddpm
         scheduler_cfg:
           __class_name__: DDPMScheduler
           __init_params__:
             num_train_timesteps: 1000
             beta_schedule: clipped_cosine
       frac_diffusion:
-        method: wrapped_normal
         step_lr: 0.00001
         scheduler_cfg:
           __class_name__: ScoreSdeVeSchedulerWrapped

@@ -18,9 +18,11 @@ import paddle.nn as nn
 
 from ppmat.models.common.runtime import RuntimeMixin
 from ppmat.models.common.runtime import runtime_boundary
+from ppmat.models.common.time_embedding import SinusoidalTimeEmbeddings
+from ppmat.models.common.time_embedding import UniformTimestepSampler
 from ppmat.models.diffcsp.diffcsp import CSPNet
-from ppmat.models.miad.crystal_diffusion import CrystalGen
-from ppmat.models.miad.crystal_diffusion import parse_num_atoms_to_per_crystal
+from ppmat.schedulers import build_scheduler
+from ppmat.schedulers.scheduling_sde_ve import d_log_p_wrapped_normal
 from ppmat.utils import logger
 from ppmat.utils.crystal import lattices_to_params_shape_numpy
 
@@ -55,6 +57,12 @@ def _build_batch_idx(num_atoms_np):
         [np.full(int(n), i) for i, n in enumerate(num_atoms_np)]
     ).astype("int64")
     return batch_idx_np, len(num_atoms_np)
+
+
+def _parse_num_atoms_to_per_crystal(num_atoms_data):
+    """Convert per-crystal atom counts to an int64 tensor and numpy array."""
+    num_atoms_np = num_atoms_data.numpy().flatten().astype("int64")
+    return paddle.to_tensor(num_atoms_np), num_atoms_np
 
 
 def _extract_x0(batch, mirage_num_atoms=None):
@@ -167,7 +175,30 @@ class MiAD(RuntimeMixin, paddle.nn.Layer):
         }
         cspnet_kwargs = {k: v for k, v in model_cfg.items() if k in _cspnet_keys}
         self.decoder = MiADCSPNet(**cspnet_kwargs)
-        self.diffusion = CrystalGen(diffusion_cfg)
+
+        self.config = diffusion_cfg
+        self.cont_time = self.config["cont_time"]
+        self.num_steps = self.config["num_steps"]
+        # Official default eps=1e-3.
+        self.eps = float(self.config.get("eps", 1e-3))
+        self.time_embedding = SinusoidalTimeEmbeddings(
+            self.config.get("time_embed_dim", 256)
+        )
+        self.timestep_sampler = UniformTimestepSampler(
+            min_t=self.eps, max_t=self.num_steps - 1
+        )
+
+        lat_cfg = self.config["lat_diffusion"]
+        self.lat_scheduler = build_scheduler(lat_cfg["scheduler_cfg"])
+
+        frac_cfg = self.config["frac_diffusion"]
+        self.frac_scheduler = build_scheduler(frac_cfg["scheduler_cfg"])
+        self.step_lr = frac_cfg["step_lr"]
+        self.sigmas_t = self.frac_scheduler.discrete_sigmas[:, None]
+        self.sigmas_norm_t = self.frac_scheduler.discrete_sigmas_norm[:, None]
+        self.sb = self.frac_scheduler.sigma_min
+
+        self.type_diffusion = build_scheduler(self.config["type_diffusion"])
 
     def set_state_dict(self, state_dict, use_structured_name=True):
         # Official checkpoints: no "decoder." prefix and PyTorch (out, in)
@@ -263,10 +294,116 @@ class MiAD(RuntimeMixin, paddle.nn.Layer):
             frac_diff,
         )
 
+    def _time_sample(self, batch):
+        t = self.timestep_sampler(batch["batch_size"])
+        if not self.cont_time:
+            t = t.round().cast("int64")
+        t_per_atom = t.repeat_interleave(batch["num_atoms"])
+        return [t, t_per_atom]
+
+    def _forward_step_sample(self, x0, t, batch):
+        l0, f0, a0 = x0
+        t0_idx = t[0].cast("int64")
+        t1_idx = t[1].cast("int64")
+
+        lat_noise = paddle.randn(l0.shape)
+        batch["lat_noise"] = lat_noise
+        lt = self.lat_scheduler.add_noise(l0, lat_noise, t0_idx)
+
+        frac_noise = paddle.randn(f0.shape)
+        batch["frac_noise"] = frac_noise
+        ft = (f0 + self.sigmas_t[t1_idx] * frac_noise) % 1.0
+
+        at = self.type_diffusion.forward_step_sample(a0, t[1], batch)
+
+        return [lt, ft, at]
+
+    def _reverse_step_sample(self, xt, t, batch):
+        lt, ft, at = xt
+        _, f_pred, _ = self._model_prediction(xt, t, batch)
+        ft_05 = self._frac_reverse_part1(f_pred, ft, t[1])
+        xt_05 = [lt, ft_05, at]
+        l_pred, f_pred, a_pred = self._model_prediction(xt_05, t, batch)
+        lt_1 = self._lat_reverse(l_pred, lt, t[0])
+        ft_1 = self._frac_reverse_part2(f_pred, ft_05, t[1])
+
+        at_1 = self.type_diffusion.reverse_step_sample(a_pred, at, t[1], batch)
+        return [lt_1, ft_1, at_1]
+
+    def _lat_reverse(self, pred, xt, t):
+        t_idx = t.cast("int64")
+        return self.lat_scheduler.step(pred, t_idx[0], xt).prev_sample
+
+    def _frac_reverse_part1(self, pred, xt, t):
+        t_idx = t.cast("int64")
+        st = self.sigmas_t[t_idx]
+        snt = self.sigmas_norm_t[t_idx]
+        step_size = self.step_lr * (st / self.sb) ** 2
+        drift = -step_size * pred * paddle.sqrt(snt)
+        diffusion = paddle.sqrt(2 * step_size) * paddle.randn(xt.shape)
+        return xt + drift + diffusion
+
+    def _frac_reverse_part2(self, pred, xt, t):
+        t_idx = t.cast("int64")
+        st = self.sigmas_t[t_idx]
+        st_1 = self.sigmas_t[paddle.maximum(t_idx - 1, paddle.to_tensor(0))]
+        snt = self.sigmas_norm_t[t_idx]
+        step_size = st**2 - st_1**2
+        drift = -step_size * pred * paddle.sqrt(snt)
+        diffusion = paddle.sqrt(
+            st_1**2 * (st**2 - st_1**2) / (st**2)
+        ) * paddle.randn(xt.shape)
+        return (xt + drift + diffusion) % 1.0
+
+    def _model_prediction(self, xt, t, batch):
+        lt, ft, at = xt
+        time_emb = self.time_embedding(1000 * (t[0] / self.num_steps) + 1)
+        return self._decode(
+            time_emb, at, ft, lt, batch["num_atoms"], batch["batch_idx"]
+        )
+
+    def _output_transform(self, x0, batch):
+        return [x0[0], x0[1], self.type_diffusion.output_transform(x0[2], batch)]
+
     def forward(self, batch, **kwargs):
         batch = _extract_x0(batch, mirage_num_atoms=self.mirage_num_atoms)
-        batch = self.diffusion.train_step(batch, self._decode)
-        return {"loss_dict": {"loss": batch["loss"]}}
+        batch["t"] = self._time_sample(batch)
+        batch["xt"] = self._forward_step_sample(batch["x0"], batch["t"], batch)
+        batch["prediction"] = self._model_prediction(batch["xt"], batch["t"], batch)
+
+        lat_noise = batch["lat_noise"]
+        loss_lat = (
+            ((batch["prediction"][0] - lat_noise) ** 2)
+            .reshape([-1, 9])
+            .mean(axis=1)
+            .mean()
+        )
+
+        t_idx = batch["t"][1].cast("int64")
+        st = self.sigmas_t[t_idx]
+        snt = self.sigmas_norm_t[t_idx]
+        frac_noise = batch["frac_noise"]
+        normed_score = d_log_p_wrapped_normal(st * frac_noise, st) / paddle.sqrt(snt)
+        loss_frac = (
+            ((batch["prediction"][1] - normed_score) ** 2).reshape([-1, 3]).mean(axis=1)
+        )
+        # Mask type-0 mirage atoms from the coordinate loss and rescale.
+        mask = (batch["x0"][2] != 0).cast(loss_frac.dtype)
+        coef = mask.shape[0] / mask.sum().clip(min=1)
+        loss_frac = loss_frac * mask * coef
+        loss_frac = loss_frac.mean()
+
+        loss = loss_lat + loss_frac
+
+        loss_type = self.type_diffusion.loss(
+            batch["prediction"][2],
+            batch["xt"][2],
+            self.type_diffusion.to_domain(batch["x0"][2]),
+            batch["t"][1],
+        ).mean()
+        loss = loss + loss_type
+
+        return {"loss_dict": {"loss": loss}}
 
     @paddle.no_grad()
     def sample(self, batch_data, num_inference_steps=None):
@@ -276,36 +413,43 @@ class MiAD(RuntimeMixin, paddle.nn.Layer):
             num_atoms_data = batch_data.get("num_atoms", None)
 
         if "batch_idx" in batch_data:
-            for key in ("num_atoms", "atom_types", "batch_size"):
+            for key in ("num_atoms", "batch_size"):
                 if key not in batch_data:
                     raise ValueError(
                         f"batch_idx provided but missing required key '{key}'"
                     )
         elif num_atoms_data is not None:
-            num_atoms, num_atoms_np = parse_num_atoms_to_per_crystal(num_atoms_data)
+            num_atoms, num_atoms_np = _parse_num_atoms_to_per_crystal(num_atoms_data)
             batch_idx_np, batch_size = _build_batch_idx(num_atoms_np)
             batch_data = {
                 **batch_data,
                 "num_atoms": num_atoms,
                 "batch_idx": paddle.to_tensor(batch_idx_np),
-                "atom_types": paddle.zeros([int(num_atoms_np.sum())], dtype="int64"),
                 "batch_size": batch_size,
             }
 
+        original_steps = self.num_steps
         if num_inference_steps is not None:
-            original_steps = self.diffusion.num_steps
-            self.diffusion.num_steps = num_inference_steps
-        else:
-            original_steps = None
+            self.num_steps = num_inference_steps
 
         try:
-            batch = self.diffusion.sampling_procedure(
-                model=self._decode,
-                batch=batch_data,
-            )
+            batch = batch_data
+            prior_at = self.type_diffusion.prior_sample(batch)
+            na = batch["num_atoms"]
+            total = int(na.sum()) if na.ndim > 0 else int(na)
+            batch["xt"] = [
+                paddle.randn([batch["batch_size"], 3, 3], dtype="float32"),
+                paddle.rand([total, 3], dtype="float32"),
+                prior_at,
+            ]
+            for t_val in range(self.num_steps - 1, -1, -1):
+                t = paddle.full([batch["batch_size"]], t_val, dtype="float32")
+                batch["t"] = [t, t.repeat_interleave(batch["num_atoms"])]
+                batch["xt"] = self._reverse_step_sample(batch["xt"], batch["t"], batch)
+            batch["xt"] = self._output_transform(batch["xt"], batch)
+            batch["x0_prediction"] = batch["xt"]
         finally:
-            if original_steps is not None:
-                self.diffusion.num_steps = original_steps
+            self.num_steps = original_steps
 
         lattices, frac_coords, atom_types = batch["x0_prediction"]
 

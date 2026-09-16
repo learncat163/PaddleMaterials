@@ -64,14 +64,11 @@ TINY_MODEL_CFG = {
 }
 
 TINY_DIFFUSION_CFG = {
-    "method": "DiffCSP",
-    "task": "gen_mp20",
     "cont_time": False,
     "num_steps": 10,
     "time_embed_dim": 32,
     "eps": 1e-3,
     "lat_diffusion": {
-        "method": "ddpm",
         "scheduler_cfg": {
             "__class_name__": "DDPMScheduler",
             "__init_params__": {
@@ -81,7 +78,6 @@ TINY_DIFFUSION_CFG = {
         },
     },
     "frac_diffusion": {
-        "method": "wrapped_normal",
         "step_lr": 1e-5,
         "scheduler_cfg": {
             "__class_name__": "ScoreSdeVeSchedulerWrapped",
