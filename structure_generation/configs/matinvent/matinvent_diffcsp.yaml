@@ -3,6 +3,8 @@ Global:
   do_eval: False
   do_test: False
   num_train_timesteps: 1000
+  num_inference_steps: 1000
+  rl_num_inference_steps: 100
 
 Dataset:
   train:
@@ -51,28 +53,64 @@ Model:
   __class_name__: MatinventRL
   __init_params__:
     model_type: diffcsp
-    num_inference_steps: 1000
-    patch_gemnet: false
+    num_inference_steps: ${Global.num_inference_steps}
+    backbone_cfg:
+      __class_name__: DiffCSP
+      __init_params__:
+        decoder_cfg:
+          hidden_dim: 512
+          latent_dim: 256
+          num_layers: 6
+          act_fn: silu
+          dis_emb: sin
+          num_freqs: 128
+          edge_style: fc
+          ln: True
+          ip: True
+          smooth: False
+          pred_type: False
+          prop_dim: 512
+          pred_scalar: False
+          num_classes: 100
+        lattice_noise_scheduler_cfg:
+          __class_name__: DDPMScheduler
+          __init_params__:
+            beta_schedule: squaredcos_cap_v2
+            num_train_timesteps: ${Global.num_train_timesteps}
+            clip_sample: False
+        coord_noise_scheduler_cfg:
+          __class_name__: ScoreSdeVeSchedulerWrapped
+          __init_params__:
+            num_train_timesteps: ${Global.num_train_timesteps}
+            sigma_min: 0.005
+            sigma_max: 0.5
+            snr: 1e-5
+        num_train_timesteps: ${Global.num_train_timesteps}
+        time_dim: 256
+        lattice_loss_weight: 1.0
+        coord_loss_weight: 1.0
 
 # RL configuration
 RL:
   enabled: true
+  pretrained_model_name: matinvent_diffcsp_mp20
   rl_epoch: 50
   topk_ratio: 0.5
   save_freq: 10
   sample_cfg:
     batch_size: 1
     num_batches: 1
-    num_samples: 16
-    # DiffCSP default inference steps is 1000; use smaller value for faster RL sampling
-    num_inference_steps: 100
+    num_inference_steps: ${Global.rl_num_inference_steps}
   finetune_cfg:
     batch_size: 4
-    lr: 0.0005
     epochs: 2
     timesteps: 100
     accum_steps: 4
     sigma: 1.0
+    optimizer_cfg:
+      __class_name__: Adam
+      __init_params__:
+        lr: 0.0005
   reward_cfg:
     reward_threshold: 0.5
     reduce: mean
@@ -96,8 +134,6 @@ RL:
     buff: 20
     method: composition
 
-pretrained_model_path: https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/MatInvert/matinvent_diffcsp_mp20.pdparams
-
 Sample:
   data:
     dataset:
@@ -115,5 +151,4 @@ Sample:
     niggli: False
 
   model_sample_params:
-    num_inference_steps: 1000
-
+    num_inference_steps: ${Global.num_inference_steps}

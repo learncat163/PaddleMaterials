@@ -60,14 +60,13 @@ class LongTimeMem:
 
     def calc_metrics(self, threshold: float, budget: int = 3000,
                      num_candidate: int = 100) -> Tuple[float, float]:
+        if len(self.memory) == 0:
+            return None, None
         _df = self.memory.sort_values("reward", ascending=False).drop_duplicates(subset=["comp"])
         candidates = (_df["reward"] > threshold).sum()
         burden = len(self.memory) / candidates if candidates >= num_candidate else None
         div_ratio = len(self.unique_comps) / len(self.memory) if len(self.memory) <= budget else None
         return burden, div_ratio
-
-    def get_baseline(self, step: int, prev: int = 3):
-        return self.memory[self.memory["RL_step"] > step - prev]["reward"].mean()
 
     def save(self, save_path: str):
         df = self.memory.copy()

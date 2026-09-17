@@ -36,11 +36,16 @@ class FairChem(Calculator):
 
         out_path = os.path.abspath(os.path.join(self.root_dir, f"{label}.txt"))
         if not os.path.isfile(out_path):
-            np.savetxt(out_path, np.full(len(samples[0]), np.nan), fmt="%.6f")
-
+            raise FileNotFoundError(
+                f"FairChem results are missing: {out_path}. Run the external ML "
+                f"potential computation and write one value per structure to "
+                f"{out_path} before rerunning."
+            )
         results = np.loadtxt(out_path, dtype=float, ndmin=1)
-        if len(results) != len(samples[0]):
-            results = np.full(len(samples[0]), np.nan)
+        if results.shape[0] != len(samples[0]):
+            raise ValueError(
+                f"{out_path} holds {results.shape[0]} values, expected {len(samples[0])}"
+            )
         return results
 
 

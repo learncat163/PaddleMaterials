@@ -3,6 +3,8 @@ Global:
   do_eval: False
   do_test: False
   num_train_timesteps: 1000
+  num_inference_steps: 50
+  rl_num_inference_steps: 50
 
 Dataset:
   train:
@@ -51,27 +53,59 @@ Model:
   __class_name__: MatinventRL
   __init_params__:
     model_type: mattergen
-    num_inference_steps: 50
-    patch_gemnet: true
+    num_inference_steps: ${Global.num_inference_steps}
+    backbone_cfg:
+      __class_name__: MatterGen
+      __init_params__:
+        decoder_cfg:
+          gemnet_cfg:
+            num_targets: 1
+            latent_dim: 512
+            atom_embedding_cfg:
+              emb_size: 512
+              with_mask_type: True
+            max_neighbors: 50
+            max_cell_images_per_dim: 5
+            cutoff: 7.0
+            num_blocks: 4
+            otf_graph: True
+        lattice_noise_scheduler_cfg:
+          __class_name__: LatticeVPSDEScheduler
+          limit_density: 0.05771451654022283
+          __init_params__: {}
+        coord_noise_scheduler_cfg:
+          __class_name__: NumAtomsVarianceAdjustedWrappedVESDE
+          __init_params__: {}
+        atom_noise_scheduler_cfg:
+          __class_name__: D3PMScheduler
+          __init_params__: {}
+        num_train_timesteps: ${Global.num_train_timesteps}
+        time_dim: 256
+        lattice_loss_weight: 1.0
+        coord_loss_weight: 0.1
+        atom_loss_weight: 1.0
 
 # RL configuration
 RL:
   enabled: true
+  pretrained_model_name: matinvent_mattergen_mp20
   rl_epoch: 50
   topk_ratio: 0.5
   save_freq: 10
   sample_cfg:
     batch_size: 1
     num_batches: 1
-    num_samples: 16
-    num_inference_steps: 50
+    num_inference_steps: ${Global.rl_num_inference_steps}
   finetune_cfg:
     batch_size: 4
-    lr: 0.0005
     epochs: 2
     timesteps: 100
     accum_steps: 4
     sigma: 1.0
+    optimizer_cfg:
+      __class_name__: Adam
+      __init_params__:
+        lr: 0.0005
   reward_cfg:
     reward_threshold: 0.5
     reduce: mean
@@ -95,8 +129,6 @@ RL:
     buff: 20
     method: composition
 
-pretrained_model_path: https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/MatInvert/matinvent_mattergen_mp20.pdparams
-
 Sample:
   data:
     dataset:
@@ -114,4 +146,4 @@ Sample:
     niggli: False
 
   model_sample_params:
-    num_inference_steps: 50
+    num_inference_steps: ${Global.num_inference_steps}

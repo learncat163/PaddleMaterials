@@ -39,11 +39,16 @@ class DFTCalc(Calculator):
 
         out_path = os.path.abspath(os.path.join(self.root_dir, f"{label}.txt"))
         if not os.path.isfile(out_path):
-            np.savetxt(out_path, np.full(len(struc_list), np.nan), fmt="%.6f")
-
+            raise FileNotFoundError(
+                f"DFT results are missing: {out_path}. CIF files for the external DFT "
+                f"run were written to {cif_dir}; write one value per structure to "
+                f"{out_path} and rerun."
+            )
         results = np.loadtxt(out_path, dtype=float, ndmin=1)
-        if len(results) != len(struc_list):
-            results = np.full(len(struc_list), np.nan)
+        if results.shape[0] != len(struc_list):
+            raise ValueError(
+                f"{out_path} holds {results.shape[0]} values, expected {len(struc_list)}"
+            )
         return results
 
 

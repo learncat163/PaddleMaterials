@@ -12,154 +12,112 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import os
 
-import paddle
 import paddle.nn as nn
-from omegaconf import OmegaConf
 
-import ppmat
 from ppmat.models.matinvent.rl_loop import MatInvent
-from ppmat.models.matinvent.suites import ModelSuite
 from ppmat.models.matinvent.rewards.reward import Reward
-from ppmat.utils import logger as ppmat_logger
-
-_CONFIG_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(ppmat.__file__)),
-    "structure_generation", "configs",
-)
+from ppmat.models.matinvent.suites import ModelSuite
+from ppmat.models.matinvent.suites import build_backbone
+from ppmat.utils import logger
 
 
 class MatinventRL(nn.Layer):
-    def __init__(self, model_type="mattergen", num_inference_steps=None,
-                 sample_config=None, config_candidates=None, patch_gemnet=True):
+    """Expose the MatInvent backbone to the framework Sample flow.
+
+    RL fine-tuning itself is driven by the task entry through
+    `run_rl_training`; this layer only builds the backbone from
+    `backbone_cfg` and delegates sampling and weight loading to it.
+    """
+
+    def __init__(self, model_type, num_inference_steps, backbone_cfg):
         super().__init__()
         self.model_type = model_type
-        self.num_inference_steps = num_inference_steps or (50 if model_type == "mattergen" else 1000)
-        self.patch_gemnet = patch_gemnet
-        self._model = None
-        self._dummy = self.create_parameter(shape=[1], default_initializer=nn.initializer.Constant(0.0))
+        self.num_inference_steps = num_inference_steps
+        self.backbone_cfg = backbone_cfg
+        self._backbone = None
 
-        self._sample_cfg = sample_config or os.path.join(
-            _CONFIG_DIR, model_type, f"{model_type}_mp20.yaml")
-        self._cfg_candidates = config_candidates or (
-            [os.path.join(_CONFIG_DIR, "matinvent", f"matinvent_{model_type}.yaml"),
-             os.path.join(_CONFIG_DIR, model_type, f"{model_type}_mp20.yaml")]
-            if model_type == "mattergen"
-            else [os.path.join(_CONFIG_DIR, "matinvent", f"matinvent_{model_type}.yaml")]
-        )
-
-    def _resolve_config(self):
-        for src in (os.environ.get("MATINVENT_SAMPLE_MODEL_CONFIG"),
-                    os.environ.get("CONFIG_PATH")):
-            if src and os.path.exists(src):
-                return src
-        for c in self._cfg_candidates:
-            if os.path.exists(c):
-                return c
-        if os.path.exists(self._sample_cfg):
-            return self._sample_cfg
-        raise FileNotFoundError(
-            f"No config found. Set MATINVENT_SAMPLE_MODEL_CONFIG or CONFIG_PATH. "
-            f"Candidates: {self._cfg_candidates}")
-
-    def _ensure_model(self):
-        if self._model is None:
-            cfg = OmegaConf.to_container(OmegaConf.load(self._resolve_config()), resolve=True)
-            model_cfg = cfg.get("Model")
-            if model_cfg is None:
-                raise ValueError(f"Model section not found in config")
-            if model_cfg.get("__class_name__") == "MatinventRL":
-                from ppmat.models.matinvent.suites import _DIFFCSP_DEFAULT, _MATTERGEN_DEFAULT, MatterGenAdapter
-                if self.model_type == "diffcsp":
-                    from ppmat.models.diffcsp.diffcsp import DiffCSP
-                    model = DiffCSP(**_DIFFCSP_DEFAULT)
-                else:
-                    from ppmat.models.matinvent.mattergen_compat import MatinventMatterGen
-                    model = MatinventMatterGen(**_MATTERGEN_DEFAULT)
-                    model = MatterGenAdapter(model)
-            else:
-                from ppmat.models import build_model
-                model = build_model(model_cfg)
-            if self.patch_gemnet:
-                from ppmat.models.mattergen.mattergen import MatterGen, GemNetT, GemNetTCtrl
-                if isinstance(model, MatterGen):
-                    from ppmat.models.matinvent.mattergen_compat import MatinventGemNetT, MatinventGemNetTCtrl
-                    g = model.model.gemnet
-                    if isinstance(g, GemNetTCtrl):
-                        g.__class__ = MatinventGemNetTCtrl
-                    elif isinstance(g, GemNetT):
-                        g.__class__ = MatinventGemNetT
-            self._model = model
-        return self._model
+    def backbone(self):
+        if self._backbone is None:
+            self._backbone = build_backbone(self.backbone_cfg)
+        return self._backbone
 
     def sample(self, data, **sample_params):
-        model = self._ensure_model()
-        if "num_inference_steps" not in sample_params:
-            sample_params["num_inference_steps"] = int(
-                os.environ.get("MATINVENT_NUM_INFERENCE_STEPS", str(self.num_inference_steps)))
-        return model.sample(data, **sample_params)
+        sample_params.setdefault("num_inference_steps", self.num_inference_steps)
+        return self.backbone().sample(data, **sample_params)
 
     def set_state_dict(self, state_dict, **kwargs):
-        return self._ensure_model().set_state_dict(state_dict, **kwargs)
+        return self.backbone().set_state_dict(state_dict, **kwargs)
 
     def state_dict(self, *args, **kwargs):
-        return self._model.state_dict(*args, **kwargs) if self._model else super().state_dict(*args, **kwargs)
+        return self.backbone().state_dict(*args, **kwargs)
 
     def eval(self):
         super().eval()
-        if self._model:
-            self._model.eval()
+        if self._backbone is not None:
+            self._backbone.eval()
         return self
 
     def train(self, mode=True):
         super().train(mode)
-        if self._model:
-            self._model.train(mode)
+        if self._backbone is not None:
+            self._backbone.train(mode)
         return self
 
-    def forward(self, batch_data):
-        _run_rl_training(self._resolve_config(), self.model_type)
-        return {"loss_dict": {"loss": self._dummy * 0.0}}
 
+def run_rl_training(config, model):
+    """Run MatInvent RL fine-tuning, driven by the task training entry.
 
-def _run_rl_training(config_path: str, model_type: str):
-    config = OmegaConf.load(config_path)
-    output_dir = config.get("Trainer", {}).get("output_dir", config.get("Global", {}).get("output_dir", "./output/matinvent"))
+    Args:
+        config (dict): Resolved task config containing the `RL` section. The
+            RL agent and prior start from the registered weight package named
+            by `RL.pretrained_model_name`.
+        model (MatinventRL): Model built by the entry; supplies the backbone
+            config shared with the RL agent and prior.
+    """
+    rl_cfg = config["RL"]
+    output_dir = config["Trainer"]["output_dir"]
     os.makedirs(output_dir, exist_ok=True)
-    log_file = os.path.join(output_dir, "training.log")
-    ppmat_logger.init_logger(name="matinvent_rl", log_file=log_file, log_level=20)
-    logger = ppmat_logger._logger
-    logger.info(f"Config: {config_path}, output: {output_dir}")
+
+    from ppmat.models import MODEL_REGISTRY
+    from ppmat.utils import download
+    from ppmat.utils.model_package import resolve_model_package_dir
+
+    model_name = rl_cfg["pretrained_model_name"]
+    if model_name not in MODEL_REGISTRY:
+        raise ValueError(
+            f"pretrained_model_name {model_name} is not registered in MODEL_REGISTRY, "
+            f"available: {sorted(MODEL_REGISTRY)}")
+    extracted_path = download.get_weights_path_from_url(MODEL_REGISTRY[model_name])
+    package_dir = resolve_model_package_dir(model_name, extracted_path)
 
     model_suite = ModelSuite(
-        model_name=model_type, sample_cfg=config.RL.sample_cfg,
-        finetune_cfg=config.RL.finetune_cfg,
-        pretrained_model_path=config.get("pretrained_model_path"),
-        device=config.get("Global", {}).get("device"),
+        model_name=model.model_type,
+        backbone_cfg=model.backbone_cfg,
+        sample_cfg=rl_cfg["sample_cfg"],
+        finetune_cfg=rl_cfg["finetune_cfg"],
+        pretrained_model_path=package_dir,
+        build_structure_cfg=config["Sample"]["build_structure_cfg"],
     )
-    reward = Reward(root_dir=os.path.join(output_dir, "rewards"),
-                    prop_cfg=config.RL.reward_cfg.prop_cfg,
-                    reward_threshold=config.RL.reward_cfg.reward_threshold,
-                    reduce=config.RL.reward_cfg.reduce)
-
-    mat_invent = MatInvent(rl_epoch=config.RL.rl_epoch, model_suite=model_suite,
-                           reward=reward, sample_cfg={}, finetune_cfg={},
-                           topk_ratio=config.RL.topk_ratio, save_dir=output_dir,
-                           save_freq=config.RL.save_freq, device=str(paddle.get_device()),
-                           logger=logger,
-                           replay=config.RL.get("replay_cfg") is not None,
-                           replay_args=config.RL.get("replay_cfg", {}),
-                           div_filter=config.RL.div_filter_cfg.enabled,
-                           df_args=config.RL.div_filter_cfg)
+    reward = Reward(
+        root_dir=os.path.join(output_dir, "rewards"),
+        prop_cfg=rl_cfg["reward_cfg"]["prop_cfg"],
+        reward_threshold=rl_cfg["reward_cfg"]["reward_threshold"],
+        reduce=rl_cfg["reward_cfg"]["reduce"],
+    )
+    mat_invent = MatInvent(
+        rl_epoch=rl_cfg["rl_epoch"],
+        model_suite=model_suite,
+        reward=reward,
+        topk_ratio=rl_cfg["topk_ratio"],
+        save_dir=output_dir,
+        save_freq=rl_cfg["save_freq"],
+        replay=rl_cfg.get("replay_cfg") is not None,
+        replay_args=rl_cfg.get("replay_cfg", {}),
+        div_filter=rl_cfg["div_filter_cfg"]["enabled"],
+        df_args=rl_cfg["div_filter_cfg"],
+    )
+    logger.info(f"Start MatInvent RL fine-tuning on {model.model_type}")
     mat_invent.run_rl()
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--config", type=str, required=True)
-    parser.add_argument("--model", type=str, default="mattergen", choices=["mattergen", "diffcsp"])
-    parser.add_argument("--output_dir", type=str, default=None)
-    args = parser.parse_args()
-    _run_rl_training(args.config, args.model)
+    logger.info(f"MatInvent RL fine-tuning finished, results saved to {output_dir}")

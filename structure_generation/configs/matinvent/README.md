@@ -15,7 +15,7 @@ MatInvent is a general and efficient reinforcement learning workflow that optimi
 The framework operates in three alternating phases:
 
 1. **Sample** -- The diffusion backbone generates a batch of crystal structures.
-2. **Score** -- Property calculators (density, HHI, band gap, synthesizability, etc.) evaluate each structure; a scalar reward is computed from the multi-property profile.
+2. **Score** -- Property calculators (density, HHI, band gap, etc.) evaluate each structure; a scalar reward is computed from the multi-property profile.
 3. **Fine-tune** -- The generator is updated with a reward-weighted diffusion loss plus a KL regularizer that prevents the agent from drifting too far from the pretrained prior.
 
 After each iteration, high-reward structures are stored in a replay buffer and a long-term memory for diversity filtering.
@@ -32,11 +32,10 @@ After each iteration, high-reward structures are stored in a replay buffer and a
 | Calculator | Tasks | Description |
 |------------|-------|-------------|
 | **PyMatGen** | `density`, `hhi`, `price`, `abundance`, `log_abundance`, `mcia`, `num_atoms`, `num_elements`, `volume` | On-the-fly property computation via pymatgen |
-| **SynScore** | `synthesizability` | ML-based synthesizability prediction |
-| **DFTCalc** | (external VASP) | DFT property calculator interface (exports CIFs for external computation) |
-| **FairChem** | `bulk_modulus`, `heat_capacity` | ML potential-based property calculator interface |
+| **DFTCalc** | any task name | Exports CIF files for an external DFT run and reads the values back from `{root_dir}/{label}.txt` |
+| **FairChem** | `bulk_modulus`, `heat_capacity` | Reads precomputed values from `{root_dir}/{label}.txt` produced by an external ML-potential run |
 
-Reward configuration files are located in `configs/reward/` (see original [MatInvent](https://github.com/jwchen25/MatInvent) repository for full reward configurations).
+Each entry of `RL.reward_cfg.prop_cfg` selects a calculator through `calculator.__class_name__` and is scaled by `target` / `minv` / `maxv`. `DFTCalc` and `FairChem` raise `FileNotFoundError` until the external results file exists, so they never silently return placeholder rewards. See the original [MatInvent](https://github.com/jwchen25/MatInvent) repository for full reward configurations.
 
 ---
 
@@ -111,7 +110,11 @@ python structure_generation/train.py \
     -c structure_generation/configs/matinvent/matinvent_diffcsp.yaml
 ```
 
-RL training hyperparameters (epochs, reward targets, etc.) are configured in the `RL:` section of the YAML config. Modify the `reward_cfg.prop_cfg` list to change optimization targets.
+The task entry runs the MatInvent RL procedure (sample -> score -> fine-tune) instead of
+`BaseTrainer`: the `RL:` section of the YAML configures the RL loop, and the RL agent and
+prior start from the weight package named by `RL.pretrained_model_name` (`MODEL_REGISTRY`).
+Modify the `reward_cfg.prop_cfg` list to change optimization targets. Checkpoints and
+generated structures are written to `Trainer.output_dir`.
 
 ### Sample
 
@@ -121,23 +124,23 @@ Generate structures using an RL-fine-tuned checkpoint.
 # Mode 1: Use a pre-trained model (downloads automatically)
 python structure_generation/sample.py \
     --model_name='matinvent_mattergen_mp20' \
-    --weights_name='matinvent_mattergen_mp20.pdparams' \
-    --save_path='result_matinvent_mattergen/' \
+    --output_path='result_matinvent_mattergen/' \
     --mode='by_dataloader'
 
 # Mode 2: Use a custom configuration and checkpoint
 python structure_generation/sample.py \
     --config_path='structure_generation/configs/matinvent/matinvent_mattergen.yaml' \
     --checkpoint_path='./output/matinvent_mattergen/models/final/model.pdparams' \
-    --save_path='result_matinvent_mattergen/' \
+    --output_path='result_matinvent_mattergen/' \
     --mode='by_dataloader'
 
-# DiffCSP backbone
+# DiffCSP backbone: the chemical formula provides the atom types
 python structure_generation/sample.py \
     --config_path='structure_generation/configs/matinvent/matinvent_diffcsp.yaml' \
     --checkpoint_path='./output/matinvent_diffcsp/models/final/model.pdparams' \
-    --save_path='result_matinvent_diffcsp/' \
-    --mode='by_dataloader'
+    --output_path='result_matinvent_diffcsp/' \
+    --mode='by_chemical_formula' \
+    --chemical_formula='LiMnO2'
 ```
 
 ---

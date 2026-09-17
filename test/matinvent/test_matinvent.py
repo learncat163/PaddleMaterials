@@ -12,614 +12,197 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Integration tests for MatInvent, run from the repository root."""
+
 import os
+import shutil
 import tempfile
 
 import numpy as np
+import paddle
 import pytest
 from omegaconf import OmegaConf
 from pymatgen.core.structure import Lattice
 from pymatgen.core.structure import Structure
 
-
-@pytest.fixture(autouse=True)
-def seed_random_state(seed: int = 42):
-    np.random.seed(seed)
-    yield
-
-
-def _make_structure(a=5.0, b=5.0, c=5.0, species=("Si",), frac_coords=((0.0, 0.0, 0.0),)):
-    lattice = Lattice.from_parameters(a, b, c, 90, 90, 90)
-    return Structure(lattice=lattice, species=species, coords=frac_coords)
-
-
-def _make_si_structure(a=5.43, b=None, c=None):
-    _b = b if b is not None else a
-    _c = c if c is not None else a
-    return _make_structure(a, _b, _c, species=("Si", "Si"), frac_coords=((0.0, 0.0, 0.0), (0.25, 0.25, 0.25)))
-
-
-class TestImports:
-    def test_import_matinvent(self):
-        from ppmat.models.matinvent import MatInvent, MatinventRL
-        assert MatInvent is not None
-        assert MatinventRL is not None
-
-    def test_import_memory(self):
-        from ppmat.models.matinvent.memory import LongTimeMem, ReplayBuffer
-        assert LongTimeMem is not None
-        assert ReplayBuffer is not None
-
-    def test_import_reward(self):
-        from ppmat.models.matinvent.rewards import Reward, Calculator
-        assert Reward is not None
-        assert Calculator is not None
-
-    def test_import_dataset(self):
-        from ppmat.models.matinvent.dataset import RLDataset, create_rl_dataloader, is_valid_structure, save_structures
-        assert RLDataset is not None
-        assert create_rl_dataloader is not None
-        assert is_valid_structure is not None
-        assert save_structures is not None
-
-    def test_import_suites(self):
-        from ppmat.models.matinvent.suites import ModelSuite, MatterGenAdapter
-        assert ModelSuite is not None
-        assert MatterGenAdapter is not None
-
-    def test_import_sampler(self):
-        from ppmat.sampler.matinvent import BaseSampler, MatterGenSampler, DiffCSPSampler
-        assert BaseSampler is not None
-        assert MatterGenSampler is not None
-        assert DiffCSPSampler is not None
-
-
-class TestDataset:
-    def test_is_valid_structure_none(self):
-        from ppmat.models.matinvent.dataset import is_valid_structure
-        assert not is_valid_structure(None)
-
-    def test_is_valid_structure_empty(self):
-        from ppmat.models.matinvent.dataset import is_valid_structure
-        lattice = Lattice.from_parameters(3.0, 3.0, 3.0, 90, 90, 90)
-        empty_s = Structure(lattice=lattice, species=[], coords=[])
-        assert not is_valid_structure(empty_s)
-
-    def test_is_valid_structure_normal(self):
-        from ppmat.models.matinvent.dataset import is_valid_structure
-        s = _make_si_structure()
-        assert is_valid_structure(s)
-
-    def test_is_valid_structure_small_volume(self):
-        from ppmat.models.matinvent.dataset import is_valid_structure
-        s = _make_structure(a=0.1, b=0.1, c=0.1, species=("Si",), frac_coords=((0.0, 0.0, 0.0),))
-        assert not is_valid_structure(s, min_volume=1.0)
-
-    def test_is_valid_structure_large_lattice(self):
-        from ppmat.models.matinvent.dataset import is_valid_structure
-        s = _make_structure(a=30.0, b=5.0, c=5.0, species=("Si",), frac_coords=((0.0, 0.0, 0.0),))
-        assert not is_valid_structure(s, max_lattice_param=20.0)
-
-    def test_rl_dataset_construction(self):
-        from ppmat.models.matinvent.dataset import RLDataset
-        structures = [_make_si_structure(), _make_structure(a=4.0, b=4.0, c=4.0, species=("C",),
-                       frac_coords=((0.0, 0.0, 0.0),))]
-        rewards = np.array([0.8, 0.3], dtype=np.float32)
-        ds = RLDataset(structures, rewards)
-        assert len(ds) == 2
-
-    def test_rl_dataset_length_mismatch(self):
-        from ppmat.models.matinvent.dataset import RLDataset
-        structures = [_make_si_structure()]
-        rewards = np.array([0.8, 0.3], dtype=np.float32)
-        with pytest.raises(AssertionError):
-            RLDataset(structures, rewards)
-
-    def test_rl_dataset_getitem(self):
-        from ppmat.models.matinvent.dataset import RLDataset
-        s = _make_si_structure()
-        ds = RLDataset([s], np.array([0.5], dtype=np.float32))
-        item = ds[0]
-        assert "structure_array" in item
-        sa = item["structure_array"]
-        assert "frac_coords" in sa
-        assert "atom_types" in sa
-        assert "lattice" in sa
-        assert "num_atoms" in sa
-        assert "reward" in sa
-        assert sa["num_atoms"] == 2
-
-    def test_save_structures(self):
-        from ppmat.models.matinvent.dataset import save_structures
-        s = _make_si_structure()
-        with tempfile.TemporaryDirectory() as tmp:
-            path = save_structures([s], tmp, "test.extxyz")
-            assert os.path.exists(path)
-
-    def test_create_rl_dataloader(self):
-        from ppmat.models.matinvent.dataset import create_rl_dataloader
-        structures = [_make_si_structure() for _ in range(4)]
-        rewards = np.array([0.5, 0.6, 0.7, 0.8], dtype=np.float32)
-        dl = create_rl_dataloader(structures, rewards, batch_size=2)
-        assert len(dl.dataset) == 4
-
-    def test_rl_dataloader_collate(self):
-        from ppmat.models.matinvent.dataset import RLDataset
-        s = _make_si_structure()
-        ds = RLDataset([s, s], np.array([0.5, 0.6], dtype=np.float32))
-        batch = [ds[0], ds[1]]
-        collated = RLDataset.collate_fn(batch)
-        assert "structure_array" in collated
-        sa = collated["structure_array"]
-        assert "batch" in sa
-
-
-class TestMemory:
-    def test_long_term_mem_init(self):
-        from ppmat.models.matinvent.memory import LongTimeMem
-        ltm = LongTimeMem()
-        assert len(ltm) == 0
-        assert ltm.unique_comps == []
-
-    def test_long_term_mem_extend(self):
-        from ppmat.models.matinvent.memory import LongTimeMem
-        ltm = LongTimeMem()
-        s1 = _make_si_structure()
-        s2 = _make_structure(a=4.0, b=4.0, c=4.0, species=("C",), frac_coords=((0.0, 0.0, 0.0),))
-        ltm.extend([s1, s2], np.array([0.8, 0.3]), step=0)
-        assert len(ltm) == 2
-        assert len(ltm.unique_comps) == 2
-
-    def test_long_term_mem_accumulate(self):
-        from ppmat.models.matinvent.memory import LongTimeMem
-        ltm = LongTimeMem()
-        s1 = _make_si_structure()
-        ltm.extend([s1], np.array([0.8]), step=0)
-        ltm.extend([s1], np.array([0.9]), step=1)
-        assert len(ltm) == 2
-
-    def test_long_term_mem_calc_metrics(self):
-        from ppmat.models.matinvent.memory import LongTimeMem
-        ltm = LongTimeMem()
-        structures = []
-        rewards = []
-        for i in range(5):
-            species = (f"X{i}",)
-            s = _make_structure(a=3.0 + i * 0.1, b=3.0, c=3.0, species=species, frac_coords=((0.0, 0.0, 0.0),))
-            structures.append(s)
-            rewards.append(0.5 + i * 0.1)
-        ltm.extend(structures, np.array(rewards), step=0)
-        burden, div_ratio = ltm.calc_metrics(threshold=0.5, budget=100, num_candidate=3)
-        assert isinstance(burden, (float, type(None)))
-        assert isinstance(div_ratio, (float, type(None)))
-
-    def test_long_term_mem_get_baseline(self):
-        from ppmat.models.matinvent.memory import LongTimeMem
-        ltm = LongTimeMem()
-        s1 = _make_si_structure()
-        ltm.extend([s1], np.array([0.8]), step=0)
-        ltm.extend([s1], np.array([0.9]), step=1)
-        ltm.extend([s1], np.array([0.7]), step=2)
-        baseline = ltm.get_baseline(step=3, prev=3)
-        assert baseline is not None and not np.isnan(baseline)
-
-    def test_long_term_mem_save(self):
-        from ppmat.models.matinvent.memory import LongTimeMem
-        ltm = LongTimeMem()
-        s1 = _make_si_structure()
-        ltm.extend([s1], np.array([0.8]), step=0)
-        with tempfile.TemporaryDirectory() as tmp:
-            csv_path = os.path.join(tmp, "ltm.csv")
-            ltm.save(csv_path)
-            assert os.path.exists(csv_path)
-
-    def test_div_filter(self):
-        from ppmat.models.matinvent.memory import LongTimeMem
-        ltm = LongTimeMem()
-        s_si = _make_si_structure()
-        ltm.extend([s_si, s_si], np.array([0.8, 0.9]), step=0)
-        s_new = _make_structure(a=4.0, b=4.0, c=4.0, species=("C",), frac_coords=((0.0, 0.0, 0.0),))
-        new_rewards = np.array([0.7, 0.6])
-        result, penalty_idx, tol_n, buff_n = ltm.div_filter(
-            [s_si, s_new], new_rewards, tol=3, buff=10, method="composition")
-        assert isinstance(result, np.ndarray)
-        assert isinstance(penalty_idx, list)
-        assert isinstance(tol_n, int)
-        assert isinstance(buff_n, int)
-
-    def test_replay_buffer_init(self):
-        from ppmat.models.matinvent.memory import ReplayBuffer
-        rb = ReplayBuffer(buffer_size=50, sample_size=4, reward_cutoff=0.0)
-        assert len(rb) == 0
-
-    def test_replay_buffer_extend_and_sample(self):
-        from ppmat.models.matinvent.memory import ReplayBuffer
-        rb = ReplayBuffer(buffer_size=20, sample_size=4)
-        s1 = _make_si_structure()
-        s2 = _make_structure(a=4.0, b=4.0, c=4.0, species=("C",), frac_coords=((0.0, 0.0, 0.0),))
-        rb.extend([{"id": 0}, {"id": 1}], [s1, s2], np.array([0.8, 0.3]))
-        assert len(rb) == 2
-        data, rewards = rb.sample()
-        assert isinstance(data, list)
-        assert isinstance(rewards, np.ndarray)
-        assert len(data) <= 4
-        assert len(rewards) == len(data)
-
-    def test_replay_buffer_memory_purge(self):
-        from ppmat.models.matinvent.memory import ReplayBuffer
-        rb = ReplayBuffer(buffer_size=20, sample_size=4)
-        s1 = _make_si_structure()
-        s2 = _make_structure(a=4.0, b=4.0, c=4.0, species=("C",), frac_coords=((0.0, 0.0, 0.0),))
-        rb.extend([{"id": 0}, {"id": 1}], [s1, s2], np.array([0.8, 0.3]))
-        rb.memory_purge([s1])
-        assert len(rb) == 1
-
-    def test_replay_buffer_empty_sample(self):
-        from ppmat.models.matinvent.memory import ReplayBuffer
-        rb = ReplayBuffer(buffer_size=20, sample_size=4)
-        data, rewards = rb.sample()
-        assert data == []
-        assert len(rewards) == 0
-
-
-
-
-def _cfg_density(tmp_dir=None):
-    d = OmegaConf.create({
-        "name": "density",
-        "calculator": {"__class_name__": "PyMatGen", "task": "density"},
-        "target": "ascending",
-        "minv": 1.0,
-        "maxv": 10.0,
-    })
-    if tmp_dir:
-        d.calculator["root_dir"] = tmp_dir
-    return d
-
-
-def _cfg_num_atoms(tmp_dir=None):
-    d = OmegaConf.create({
-        "name": "num_atoms",
-        "calculator": {"__class_name__": "PyMatGen", "task": "num_atoms"},
-        "target": "ascending",
-        "minv": 0.0,
-        "maxv": 20.0,
-        "weight": 0.4,
-    })
-    if tmp_dir:
-        d.calculator["root_dir"] = tmp_dir
-    return d
-
-
-def _cfg_hhi(tmp_dir=None):
-    d = OmegaConf.create({
-        "name": "hhi",
-        "calculator": {"__class_name__": "PyMatGen", "task": "hhi"},
-        "target": "descending",
-        "minv": 0.0,
-        "maxv": 100.0,
-    })
-    if tmp_dir:
-        d.calculator["root_dir"] = tmp_dir
-    return d
-
-
-def _cfg_nonexistent(tmp_dir=None):
-    d = OmegaConf.create({
-        "name": "test",
-        "calculator": {"__class_name__": "NonExistent"},
-        "target": "ascending",
-        "minv": 0.0,
-        "maxv": 1.0,
-    })
-    if tmp_dir:
-        d.calculator["root_dir"] = tmp_dir
-    return d
-
-
-class TestReward:
-    def test_linear_scale(self):
-        from ppmat.models.matinvent.rewards.reward import _linear_scale
-        values = np.array([0.0, 3.0, 6.0, -1.0, 7.0])
-        result = _linear_scale(values, minv=0.0, maxv=6.0)
-        expected = np.array([0.0, 0.5, 1.0, 0.0, 1.0])
-        np.testing.assert_allclose(result, expected, atol=1e-6)
-
-    def test_reward_init(self):
-        from ppmat.models.matinvent.rewards.reward import Reward
-        with tempfile.TemporaryDirectory() as tmp:
-            prop_cfg = [_cfg_density(tmp)]
-            r = Reward(root_dir=tmp, prop_cfg=prop_cfg, reward_threshold=0.5, reduce="mean")
-            assert r.threshold == 0.5
-            assert r.reduce == "mean"
-
-    def test_reward_scoring(self):
-        from ppmat.models.matinvent.rewards.reward import Reward
-        s1 = _make_si_structure()
-        s2 = _make_structure(a=4.0, b=4.0, c=4.0, species=("C",), frac_coords=((0.0, 0.0, 0.0),))
-        with tempfile.TemporaryDirectory() as tmp:
-            calc_dir = os.path.join(tmp, "calcs")
-            prop_cfg = [_cfg_density(calc_dir)]
-            r = Reward(root_dir=calc_dir, prop_cfg=prop_cfg, reward_threshold=0.5, reduce="mean")
-            rewards, prop_dict, failed_mask = r.scoring(([s1, s2], tmp), "test")
-            assert isinstance(rewards, np.ndarray)
-            assert len(rewards) == 2
-            assert "density" in prop_dict
-            assert isinstance(failed_mask, np.ndarray)
-
-    def test_reward_scoring_weight_reduce(self):
-        from ppmat.models.matinvent.rewards.reward import Reward
-        s1 = _make_si_structure()
-        with tempfile.TemporaryDirectory() as tmp:
-            calc_dir = os.path.join(tmp, "calcs")
-            density_cfg = _cfg_density(calc_dir)
-            density_cfg.weight = 0.6
-            num_atoms_cfg = _cfg_num_atoms(calc_dir)
-            prop_cfg = [density_cfg, num_atoms_cfg]
-            r = Reward(root_dir=calc_dir, prop_cfg=prop_cfg, reward_threshold=0.5, reduce="weight")
-            rewards, prop_dict, failed_mask = r.scoring(([s1], tmp), "test")
-            assert len(rewards) == 1
-
-    def test_reward_scoring_descending(self):
-        from ppmat.models.matinvent.rewards.reward import Reward
-        s1 = _make_si_structure()
-        with tempfile.TemporaryDirectory() as tmp:
-            calc_dir = os.path.join(tmp, "calcs")
-            prop_cfg = [_cfg_hhi(calc_dir)]
-            r = Reward(root_dir=calc_dir, prop_cfg=prop_cfg, reward_threshold=0.0, reduce="mean")
-            rewards, _, _ = r.scoring(([s1], tmp), "test")
-            assert len(rewards) == 1
-
-    def test_unknown_calculator_raises(self):
-        from ppmat.models.matinvent.rewards.reward import Reward
-        s1 = _make_si_structure()
-        with tempfile.TemporaryDirectory() as tmp:
-            calc_dir = os.path.join(tmp, "calcs")
-            prop_cfg = [_cfg_nonexistent(calc_dir)]
-            r = Reward(root_dir=calc_dir, prop_cfg=prop_cfg, reward_threshold=0.5)
-            with pytest.raises(ValueError, match="Unknown calculator"):
-                r.scoring(([s1], tmp), "test")
-
-
-class TestSampler:
-    def test_base_sampler_abstract(self):
-        from ppmat.sampler.matinvent import BaseSampler
-        sampler = BaseSampler(batch_size=4, num_batches=2, num_inference_steps=100)
-        assert sampler.batch_size == 4
-        assert sampler.num_batches == 2
-        assert sampler.num_inference_steps == 100
-        with pytest.raises(NotImplementedError):
-            sampler.generate(None)
-
-    def test_mattergen_sampler_init(self):
-        from ppmat.sampler.matinvent import MatterGenSampler
-        sampler = MatterGenSampler(batch_size=8, num_batches=2, num_inference_steps=50)
-        assert sampler.batch_size == 8
-        assert sampler.num_batches == 2
-        assert sampler.num_inference_steps == 50
-
-    def test_diffcsp_sampler_init(self):
-        from ppmat.sampler.matinvent import DiffCSPSampler
-        sampler = DiffCSPSampler(batch_size=8, num_batches=2, num_inference_steps=500)
-        assert sampler.batch_size == 8
-        assert sampler.num_batches == 2
-        assert sampler.num_inference_steps == 500
-
-    def test_process_result_dict(self):
-        from ppmat.sampler.matinvent import _process_result_dict
-        r = {
-            "num_atoms": 2,
-            "frac_coords": np.array([[0.0, 0.0, 0.0], [0.25, 0.25, 0.25]], dtype=np.float32),
-            "atom_types": np.array([14, 14], dtype=np.int32),
-            "lattice": np.eye(3, dtype=np.float32) * 5.43,
-        }
-        sd, pmg = _process_result_dict(r)
-        assert isinstance(sd, dict)
-        assert pmg is not None
-
-    def test_process_result_dict_invalid(self):
-        from ppmat.sampler.matinvent import _process_result_dict
-        r = {
-            "num_atoms": 2,
-            "frac_coords": np.array([[0.0, 0.0, 0.0], [0.25, 0.25, 0.25]], dtype=np.float32),
-            "atom_types": np.array([0, 0], dtype=np.int32),
-            "lattice": np.eye(3, dtype=np.float32) * 5.43,
-        }
-        sd, pmg = _process_result_dict(r)
-        assert isinstance(sd, dict)
-        assert pmg is None
-
-
-class TestPyMatGenCalculator:
-    def test_pymatgen_calc_density(self):
-        from ppmat.models.matinvent.rewards.calculators.pymatgen import PyMatGen
-        s1 = _make_si_structure()
-        s2 = _make_structure(a=4.0, b=4.0, c=4.0, species=("C",), frac_coords=((0.0, 0.0, 0.0),))
-        with tempfile.TemporaryDirectory() as tmp:
-            c = PyMatGen(root_dir=tmp, task="density")
-            results = c.calc(([s1, s2], tmp), label="test")
-            assert len(results) == 2
-            assert results[0] > 0
-
-    def test_pymatgen_calc_num_atoms(self):
-        from ppmat.models.matinvent.rewards.calculators.pymatgen import PyMatGen
-        s1 = _make_si_structure()
-        with tempfile.TemporaryDirectory() as tmp:
-            c = PyMatGen(root_dir=tmp, task="num_atoms")
-            results = c.calc(([s1], tmp), label="test")
-            assert len(results) == 1
-            assert results[0] == 2
-
-    def test_pymatgen_calc_num_elements(self):
-        from ppmat.models.matinvent.rewards.calculators.pymatgen import PyMatGen
-        s1 = _make_si_structure()
-        with tempfile.TemporaryDirectory() as tmp:
-            c = PyMatGen(root_dir=tmp, task="num_elements")
-            results = c.calc(([s1], tmp), label="test")
-            assert len(results) == 1
-            assert results[0] == 1
-
-    def test_pymatgen_calc_volume(self):
-        from ppmat.models.matinvent.rewards.calculators.pymatgen import PyMatGen
-        s1 = _make_si_structure(a=5.0, b=5.0, c=5.0)
-        with tempfile.TemporaryDirectory() as tmp:
-            c = PyMatGen(root_dir=tmp, task="volume")
-            results = c.calc(([s1], tmp), label="test")
-            assert len(results) == 1
-            assert results[0] > 0
-
-    def test_pymatgen_calc_unknown_task(self):
-        from ppmat.models.matinvent.rewards.calculators.pymatgen import PyMatGen
-        s1 = _make_si_structure()
-        with tempfile.TemporaryDirectory() as tmp:
-            c = PyMatGen(root_dir=tmp, task="unknown_task")
-            with pytest.raises(ValueError, match="Unknown task"):
-                c.calc(([s1], tmp), label="test")
-
-
-class TestMatterGenAdapter:
-    def test_adapter_passthrough(self):
-        from ppmat.models.matinvent.suites import MatterGenAdapter
-        import paddle.nn as nn
-
-        class DummyModel(nn.Layer):
-            def __init__(self):
-                super().__init__()
-                self.time_dim = 256
-                self.lattice_loss_weight = 0.5
-                self.coord_loss_weight = 0.1
-                self.atom_loss_weight = 1.0
-                self.param0 = self.create_parameter(shape=[1], default_initializer=nn.initializer.Constant(1.0))
-
-            def forward(self, x):
-                return x
-
-        model = DummyModel()
-        adapted = MatterGenAdapter(model)
-        assert adapted.time_dim == 256
-        assert adapted.lattice_loss_weight == 0.5
-        assert adapted.coord_loss_weight == 0.1
-        assert adapted.atom_loss_weight == 1.0
-        assert adapted.d3pm_hybrid_lambda is None
-
-    @pytest.mark.skip(reason="requires paddle compiled with cuda or pretrained weight files")
-    def test_model_suite_load_model(self):
-        from ppmat.models.matinvent.suites import ModelSuite
-        with tempfile.TemporaryDirectory() as tmp:
-            from ppmat.models.matinvent.suites import _DIFFCSP_DEFAULT
-            from ppmat.models.diffcsp.diffcsp import DiffCSP
-            import paddle
-            model = DiffCSP(**_DIFFCSP_DEFAULT)
-            model.eval()
-            weight_path = os.path.join(tmp, "dummy.pdparams")
-            paddle.save(model.state_dict(), weight_path)
-            suite = ModelSuite(
-                model_name="diffcsp",
-                sample_cfg={"batch_size": 2, "num_batches": 1, "num_inference_steps": 10},
-                finetune_cfg={"batch_size": 2, "epochs": 1, "lr": 1e-4, "accum_steps": 1, "timesteps": 1},
-                pretrained_model_path=weight_path,
-                device="cpu",
-            )
-            loaded = suite.load_model()
-            assert loaded is not None
-
-    @pytest.mark.skip(reason="requires pretrained weight files")
-    def test_model_suite_get_sampler_diffcsp(self):
-        from ppmat.models.matinvent.suites import ModelSuite
-        suite = ModelSuite(
-            model_name="diffcsp",
-            sample_cfg={"batch_size": 4, "num_batches": 2, "num_inference_steps": 100},
-            finetune_cfg={"batch_size": 4, "epochs": 1, "lr": 1e-4, "accum_steps": 1, "timesteps": 1},
-            pretrained_model_path="dummy",
+from ppmat.models import MODEL_REGISTRY
+from ppmat.models import build_model
+from ppmat.models.matinvent import rl_finetune
+from ppmat.models.matinvent.dataset import create_rl_dataloader
+from ppmat.models.matinvent.rewards.reward import CALCULATOR_REGISTRY
+from ppmat.models.matinvent.rewards.reward import Reward
+from ppmat.models.matinvent.rl_finetune import MatinventRL
+from ppmat.models.matinvent.rl_finetune import run_rl_training
+from ppmat.utils import download
+
+_CONFIG_PATH = {
+    "mattergen": "structure_generation/configs/matinvent/matinvent_mattergen.yaml",
+    "diffcsp": "structure_generation/configs/matinvent/matinvent_diffcsp.yaml",
+}
+_BACKBONE_CLASS = {"mattergen": "MatterGen", "diffcsp": "DiffCSP"}
+
+
+def _load_config(model_type):
+    config = OmegaConf.load(_CONFIG_PATH[model_type])
+    return OmegaConf.to_container(config, resolve=True)
+
+
+def _make_structure(species, coords, a=5.43):
+    return Structure(lattice=Lattice.cubic(a), species=species, coords=coords)
+
+
+def _tiny_sampling_config(config, output_dir, package_name):
+    config["Trainer"]["output_dir"] = output_dir
+    config["RL"]["pretrained_model_name"] = package_name
+    config["RL"]["rl_epoch"] = 1
+    config["RL"]["save_freq"] = 1
+    config["RL"]["replay_cfg"] = None
+    config["RL"]["div_filter_cfg"]["enabled"] = False
+    config["RL"]["sample_cfg"].update(
+        {"batch_size": 1, "num_batches": 1, "num_inference_steps": 2}
+    )
+    config["RL"]["finetune_cfg"].update(
+        {"batch_size": 2, "epochs": 1, "timesteps": 1, "accum_steps": 1}
+    )
+    return config
+
+
+class TestConfigToModel:
+    @pytest.mark.parametrize("model_type", ["mattergen", "diffcsp"])
+    def test_config_builds_matinvent_backbone(self, model_type):
+        config = _load_config(model_type)
+        model = build_model(config["Model"])
+
+        assert isinstance(model, MatinventRL)
+        assert type(model.backbone()).__name__ == _BACKBONE_CLASS[model_type]
+        expected_steps = config["Global"]["num_inference_steps"]
+        assert model.num_inference_steps == expected_steps
+        assert (
+            config["Sample"]["model_sample_params"]["num_inference_steps"]
+            == expected_steps
         )
-        sampler = suite.get_sampler()
-        assert sampler.batch_size == 4
-        assert sampler.num_batches == 2
 
-    @pytest.mark.skip(reason="requires pretrained weight files")
-    def test_model_suite_get_sampler_mattergen(self):
-        from ppmat.models.matinvent.suites import ModelSuite
-        suite = ModelSuite(
-            model_name="mattergen",
-            sample_cfg={"batch_size": 4, "num_batches": 2, "num_inference_steps": 100},
-            finetune_cfg={"batch_size": 4, "epochs": 1, "lr": 1e-4, "accum_steps": 1, "timesteps": 1},
-            pretrained_model_path="dummy",
+
+class TestSampling:
+    def test_sample_delegates_to_backbone(self, monkeypatch):
+        calls = {}
+
+        class StubBackbone:
+            def sample(self, data, **sample_params):
+                calls.update(sample_params)
+                return {"result": ["sampled"]}
+
+        monkeypatch.setattr(
+            rl_finetune, "build_backbone", lambda backbone_cfg: StubBackbone()
         )
-        sampler = suite.get_sampler()
-        assert sampler.batch_size == 4
-        assert sampler.num_batches == 2
+        model = MatinventRL(
+            model_type="mattergen", num_inference_steps=7, backbone_cfg={"dummy": True}
+        )
+        result = model.sample({"structure_array": {}})
 
-    def test_model_suite_get_dataloader(self):
-        from ppmat.models.matinvent.suites import ModelSuite
-        structures = [_make_si_structure() for _ in range(4)]
-        rewards = np.array([0.5, 0.6, 0.7, 0.8], dtype=np.float32)
-        dl = ModelSuite.get_dataloader(structures, rewards, batch_size=2)
-        assert len(dl.dataset) == 4
+        assert result == {"result": ["sampled"]}
+        assert calls == {"num_inference_steps": 7}
 
-    def test_model_suite_save_model(self):
-        from ppmat.models.matinvent.suites import ModelSuite
-        import paddle.nn as nn
 
-        class DummyModel(nn.Layer):
-            def __init__(self):
-                super().__init__()
-                self.param = self.create_parameter(shape=[1], default_initializer=nn.initializer.Constant(1.0))
+class TestDataFlow:
+    def test_dataset_to_forward_loss(self):
+        backbone = build_model(_load_config("diffcsp")["Model"]).backbone()
+        structures = [
+            _make_structure(["Si", "Si"], [[0.0, 0.0, 0.0], [0.25, 0.25, 0.25]]),
+            _make_structure(
+                ["C", "O", "O"],
+                [[0.0, 0.0, 0.0], [0.25, 0.25, 0.25], [0.5, 0.5, 0.5]],
+                a=4.0,
+            ),
+        ]
+        loader = create_rl_dataloader(
+            structures, np.array([0.8, 0.3], dtype="float32"), batch_size=2, shuffle=False
+        )
+        batch = next(iter(loader))
+        structure_array = batch["structure_array"]
+
+        assert structure_array["num_atoms"].numpy().tolist() == [2, 3]
+        assert tuple(structure_array["frac_coords"].shape) == (5, 3)
+        assert tuple(structure_array["reward"].shape) == (2,)
+
+        result = backbone.forward(batch)
+        loss = result["loss_dict"]["loss"]
+        assert np.isfinite(float(loss))
+        loss.backward()
+
+
+class TestRewardScoring:
+    def test_reward_scoring_marks_failed_structures(self, monkeypatch):
+        structures = [
+            _make_structure(["Si", "Si"], [[0.0, 0.0, 0.0], [0.25, 0.25, 0.25]])
+        ]
+
+        class FailingCalculator:
+            def __init__(self, root_dir, task=None):
+                self.root_dir = root_dir
+
+            def calc(self, samples, label="tmp"):
+                return np.full(len(samples[0]), np.nan)
 
         with tempfile.TemporaryDirectory() as tmp:
-            ckpt = os.path.join(tmp, "checkpoint")
-            model = DummyModel()
-            ModelSuite.save_model(model, ckpt)
-            assert os.path.exists(os.path.join(ckpt, "model.pdparams"))
-
-
-class TestRLDatasetCollate:
-    def test_to_tensor(self):
-        from ppmat.models.matinvent.dataset import _to_tensor
-        import paddle
-        result = _to_tensor(np.array([1.0, 2.0]))
-        assert isinstance(result, paddle.Tensor)
-        result_dict = _to_tensor({"a": np.array([1.0])})
-        assert isinstance(result_dict["a"], paddle.Tensor)
-
-
-class TestMatInventInit:
-    def test_matinvent_init_without_pretrained(self):
-        from ppmat.models.matinvent import MatInvent
-        from ppmat.models.matinvent.suites import ModelSuite
-        from ppmat.models.matinvent.rewards.reward import Reward
-        from ppmat.models.matinvent.suites import _DIFFCSP_DEFAULT
-        from ppmat.models.diffcsp.diffcsp import DiffCSP
-        import paddle
-        with tempfile.TemporaryDirectory() as tmp:
-            model = DiffCSP(**_DIFFCSP_DEFAULT)
-            model.eval()
-            weight_path = os.path.join(tmp, "dummy.pdparams")
-            paddle.save(model.state_dict(), weight_path)
-            suite = ModelSuite(
-                model_name="diffcsp",
-                sample_cfg={"batch_size": 2, "num_batches": 1, "num_inference_steps": 10},
-                finetune_cfg={"batch_size": 2, "epochs": 1, "lr": 1e-4, "accum_steps": 1, "timesteps": 1},
-                pretrained_model_path=weight_path,
-                device="cpu",
+            prop_cfg = [
+                {
+                    "name": "density",
+                    "target": "ascending",
+                    "minv": 0.0,
+                    "maxv": 10.0,
+                    "calculator": {
+                        "__class_name__": "PyMatGen",
+                        "root_dir": tmp,
+                        "task": "density",
+                    },
+                }
+            ]
+            reward = Reward(
+                root_dir=tmp, prop_cfg=prop_cfg, reward_threshold=0.5, reduce="mean"
             )
-            reward_dir = os.path.join(tmp, "rewards")
-            prop_cfg = [_cfg_num_atoms(reward_dir)]
-            prop_cfg[0].target = "ascending"
-            prop_cfg[0].minv = 1.0
-            prop_cfg[0].maxv = 20.0
-            reward = Reward(root_dir=reward_dir, prop_cfg=prop_cfg, reward_threshold=0.5, reduce="mean")
-            mat_invent = MatInvent(
-                rl_epoch=1,
-                model_suite=suite,
-                reward=reward,
-                sample_cfg={},
-                finetune_cfg={},
-                topk_ratio=0.5,
-                save_dir=tmp,
-                save_freq=50,
-                device="cpu",
+            rewards, prop_dict, failed = reward.scoring((structures, "valid"))
+            assert not failed.any()
+            assert 0.0 <= float(rewards[0]) <= 1.0
+            assert np.isfinite(prop_dict["density"][0])
+
+            monkeypatch.setitem(CALCULATOR_REGISTRY, "Failing", FailingCalculator)
+            prop_cfg[0]["calculator"]["__class_name__"] = "Failing"
+            failing_reward = Reward(
+                root_dir=tmp, prop_cfg=prop_cfg, reward_threshold=0.5, reduce="mean"
             )
-            assert mat_invent.rl_epoch == 1
-            assert mat_invent.step == 0
-            assert mat_invent.agent is not None
-            assert mat_invent.prior is not None
+            rewards, _, failed = failing_reward.scoring((structures, "failed"))
+            assert failed.tolist() == [True]
+            assert float(rewards[0]) == 0.0
+
+
+class TestUnifiedEntry:
+    def test_run_rl_training_writes_checkpoints(self, monkeypatch, tmp_path):
+        package_name = "test_matinvent_diffcsp"
+        package_dir = tmp_path / package_name
+        (package_dir / "checkpoints").mkdir(parents=True)
+        shutil.copyfile(_CONFIG_PATH["diffcsp"], package_dir / f"{package_name}.yaml")
+
+        config = _load_config("diffcsp")
+        model = build_model(config["Model"])
+        paddle.save(
+            model.backbone().state_dict(),
+            str(package_dir / "checkpoints" / "best.pdparams"),
+        )
+        monkeypatch.setitem(
+            MODEL_REGISTRY, package_name, "http://localhost/package.zip"
+        )
+        monkeypatch.setattr(
+            download, "get_weights_path_from_url", lambda url: str(tmp_path)
+        )
+
+        output_dir = str(tmp_path / "output")
+        config = _tiny_sampling_config(config, output_dir, package_name)
+        run_rl_training(config, model)
+
+        model_dir = os.path.join(output_dir, "models")
+        assert os.path.isfile(os.path.join(model_dir, "final", "model.pdparams"))
+        assert os.path.isfile(os.path.join(model_dir, "loop_0000", "model.pdparams"))
+        assert os.path.isfile(
+            os.path.join(output_dir, "samples", "long_term_memory.csv")
+        )

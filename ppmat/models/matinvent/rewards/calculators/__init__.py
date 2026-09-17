@@ -15,6 +15,5 @@
 from ppmat.models.matinvent.rewards.calculators.dft import DFTCalc
 from ppmat.models.matinvent.rewards.calculators.fairchem import FairChem
 from ppmat.models.matinvent.rewards.calculators.pymatgen import PyMatGen
-from ppmat.models.matinvent.rewards.calculators.syn_score import SynScore
 
-__all__ = ["PyMatGen", "SynScore", "DFTCalc", "FairChem"]
+__all__ = ["PyMatGen", "DFTCalc", "FairChem"]

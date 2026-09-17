@@ -12,7 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import logging
 import os
 import time
 from typing import Dict
@@ -21,33 +20,42 @@ from typing import Tuple
 
 import numpy as np
 import paddle
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import OmegaConf
 from pymatgen.core.structure import Structure
 
-from ppmat.models.matinvent.rewards.reward import Reward
-from ppmat.models.matinvent.memory import LongTimeMem
-from ppmat.models.matinvent.memory import ReplayBuffer
 from ppmat.models.matinvent.dataset import is_valid_structure
 from ppmat.models.matinvent.dataset import save_structures
+from ppmat.models.matinvent.memory import LongTimeMem
+from ppmat.models.matinvent.memory import ReplayBuffer
+from ppmat.models.matinvent.rewards.reward import Reward
+from ppmat.optimizer import build_optimizer
+from ppmat.utils import logger
 from ppmat.utils.scatter import scatter
 
 
 class MatInvent:
-    def __init__(self, rl_epoch: int, model_suite, reward: Reward, sample_cfg: DictConfig,
-                 finetune_cfg: DictConfig, topk_ratio: float, save_dir: str,
-                 save_freq: int = 50, device: str = None, logger=None,
+    def __init__(self, rl_epoch: int, model_suite, reward: Reward,
+                 topk_ratio: float, save_dir: str, save_freq: int = 50,
                  replay: bool = False, replay_args: Dict = None,
                  div_filter: bool = False, df_args: Dict = None):
+        if not 0.0 < topk_ratio <= 1.0:
+            raise ValueError(f"topk_ratio must be in (0.0, 1.0], but got {topk_ratio}")
+        topk_num = int(model_suite.finetune_cfg["batch_size"] * topk_ratio)
+        if topk_num < 1:
+            raise ValueError(
+                f"finetune_cfg.batch_size * topk_ratio must select at least one "
+                f"structure, but got batch_size="
+                f"{model_suite.finetune_cfg['batch_size']} and topk_ratio={topk_ratio}")
+        self.topk_num = topk_num
         self.rl_epoch = rl_epoch
         self.model_suite = model_suite
         self.reward = reward
         self.save_dir = save_dir
         self.save_freq = save_freq
-        self.logger = logger
         self.step = 0
         self.cost = 0
-        self.sample_cfg = OmegaConf.merge(model_suite.sample_cfg, sample_cfg)
-        self.finetune_cfg = OmegaConf.merge(model_suite.finetune_cfg, finetune_cfg)
+        self.sample_cfg = OmegaConf.create(model_suite.sample_cfg)
+        self.finetune_cfg = OmegaConf.create(model_suite.finetune_cfg)
         self.sampler = model_suite.get_sampler()
         self.ltm = LongTimeMem()
         self.models_dir = os.path.join(save_dir, "models")
@@ -55,8 +63,6 @@ class MatInvent:
         os.makedirs(self.models_dir, exist_ok=True)
         os.makedirs(self.sample_dir, exist_ok=True)
         self.replay = ReplayBuffer(**replay_args) if replay else None
-        assert topk_ratio > 0.0 and topk_ratio <= 1.0
-        self.topk_ratio = topk_ratio
         self.div_filter = div_filter
         self.df_args = df_args
         self.load_model()
@@ -65,9 +71,11 @@ class MatInvent:
         self.agent = self.model_suite.load_model()
         self.prior = self.model_suite.load_model()
         for param in self.agent.parameters():
-            param.trainable = True
+            param.stop_gradient = False
         for param in self.prior.parameters():
             param.stop_gradient = True
+        self.agent.train()
+        self.prior.eval()
 
     def reward_step(self, sample_data, sample_struc, xyz_path, label="tmp"):
         rewards, prop_dict, failed_mask = self.reward.scoring((sample_struc, xyz_path), label)
@@ -76,16 +84,17 @@ class MatInvent:
         sr, sp = rewards[success].astype(float), {k: v[success] for k, v in prop_dict.items()}
         sd, ss = [sample_data[i] for i in range(len(failed_mask)) if success[i]], \
                  [sample_struc[i] for i in range(len(failed_mask)) if success[i]]
-        logging.info(f"Evaluation costs to date: {self.cost}")
-        logging.info(f"Number of samples that successfully obtained rewards: {len(ss)}")
+        logger.info(f"Evaluation costs to date: {self.cost}")
+        logger.info(f"Number of samples that successfully obtained rewards: {len(ss)}")
         if len(sr) > 0:
-            logging.info(f"reward mean={sr.mean():.4f} std={sr.std():.4f}")
-            logging.info(" | ".join(f"{k} mean={v.mean():.4f} std={v.std():.4f}" for k, v in sp.items()))
+            logger.info(f"reward mean={sr.mean():.4f} std={sr.std():.4f}")
+            logger.info(" | ".join(f"{k} mean={v.mean():.4f} std={v.std():.4f}" for k, v in sp.items()))
         else:
-            logging.info("reward mean=nan std=nan")
+            logger.info("reward mean=nan std=nan")
         return sd, ss, sr, sp
 
     def sample_step(self) -> Tuple[List, List[Structure], str, Dict]:
+        self.agent.eval()
         max_retry = int(self.sample_cfg.get("max_retry", 3))
         for attempt in range(max_retry):
             sample_data, sample_struc = self.sampler.generate(model=self.agent)
@@ -96,15 +105,15 @@ class MatInvent:
                     valid_struc.append(struc)
             if len(valid_struc) > 0:
                 break
-            logging.warning(f"No valid structures generated on attempt {attempt + 1}/{max_retry}.")
+            logger.warning(f"No valid structures generated on attempt {attempt + 1}/{max_retry}.")
         if len(valid_struc) == 0:
-            logging.warning("No valid structures generated after retries!")
+            logger.warning("No valid structures generated after retries!")
             return [], [], "", {}
         save_structures(structures=valid_struc, save_dir=self.sample_dir,
                         filename=f"step_{self.step:0>4d}_valid.extxyz")
         if self.sample_cfg.get("filter"):
             valid_data, valid_struc, metrics = self.sample_cfg.filter(valid_data, valid_struc, None)
-            logging.info(f"Number of filtered samples: {len(valid_struc)}")
+            logger.info(f"Number of filtered samples: {len(valid_struc)}")
         else:
             metrics = {}
         max_num = self.sample_cfg.get("max_num")
@@ -114,10 +123,11 @@ class MatInvent:
                                         filename=f"step_{self.step:0>4d}_eval.extxyz")
         return valid_data, valid_struc, eval_xyz_path, metrics
 
-    def ft_step(self, data_list: List, rewards: np.ndarray, baseline: float):
+    def ft_step(self, data_list: List, rewards: np.ndarray):
         cfg = self.finetune_cfg
         loader = self.model_suite.get_dataloader(samples=data_list, rewards=rewards, batch_size=cfg.batch_size)
-        optimizer = paddle.optimizer.Adam(learning_rate=cfg.lr, parameters=self.agent.parameters())
+        optimizer, _ = build_optimizer(
+            cfg.optimizer_cfg, (self.agent,), cfg.epochs, len(loader))
         accum_steps = cfg.accum_steps
         for epoch in range(cfg.epochs):
             self.agent.train()
@@ -151,16 +161,16 @@ class MatInvent:
                 loss_all += loss * n_graphs
                 loss_diff_all += loss_diff
                 loss_kl_all += loss_kl
-            logging.info(f"Epoch {epoch}: loss={loss_all / len(data_list):.4f}, "
+            logger.info(f"Epoch {epoch}: loss={loss_all / len(data_list):.4f}, "
                          f"loss_diff={loss_diff_all / len(data_list):.4f}, "
                          f"loss_kl={loss_kl_all / len(data_list):.4f}")
 
     def rl_step(self):
-        logging.info(f"*****   LOOP {self.step} START   *****")
+        logger.info(f"*****   LOOP {self.step} START   *****")
         start_time = time.time()
-        logging.info("SAMPLE:")
+        logger.info("SAMPLE:")
         sample_list, sample_struc, xyz_path, sample_metrics = self.sample_step()
-        logging.info("SCORE:")
+        logger.info("SCORE:")
         sample_list, sample_struc, rewards, prop_dict = self.reward_step(
             sample_list, sample_struc, xyz_path, f"step_{self.step:0>4d}")
         if len(rewards) > 0:
@@ -175,36 +185,30 @@ class MatInvent:
         if len(rewards) > 0:
             self.ltm.extend(sample_struc, rewards, self.step)
         else:
-            logging.warning("No successful rewards, skip memory/replay/finetune updates.")
+            logger.warning("No successful rewards, skip memory/replay/finetune updates.")
         metrics = self.ltm.calc_metrics(self.reward.threshold)
         self.ltm.save(os.path.join(self.sample_dir, "long_term_memory.csv"))
-        logging.info(f"{len(self.ltm)} crystals, {len(self.ltm.unique_comps)} unique. "
+        logger.info(f"{len(self.ltm)} crystals, {len(self.ltm.unique_comps)} unique. "
                      f"Burden: {metrics[0]}, Div.Ratio: {metrics[1]}.")
         log_dict.update({"crystal_num": len(self.ltm), "unique_comps": len(self.ltm.unique_comps),
                          "burden": metrics[0], "div_ratio": metrics[1], "cost": self.cost})
-        if self.logger is not None:
-            try:
-                self.logger.log(log_dict, step=self.step)
-            except TypeError:
-                if hasattr(self.logger, "info"):
-                    self.logger.info(f"step={self.step} metrics={log_dict}")
+        logger.info(f"step={self.step} metrics={log_dict}")
         if len(rewards) == 0:
             if self.replay is not None and len(self.replay) > 0:
-                logging.info("FINETUNE (replay fallback):")
+                logger.info("FINETUNE (replay fallback):")
                 data_replay, reward_replay = self.replay.sample()
                 if len(data_replay) > 0:
                     reward_replay = np.asarray(reward_replay, dtype=float)
-                    baseline = min(self.ltm.get_baseline(self.step), reward_replay.min())
-                    self.ft_step(data_replay, reward_replay, baseline)
-            logging.info(f"*****   LOOP {self.step} FINISH   *****")
-            logging.info(f"Total time: {(time.time() - start_time) / 60:.2f} min.\n")
+                    self.ft_step(data_replay, reward_replay)
+            logger.info(f"*****   LOOP {self.step} FINISH   *****")
+            logger.info(f"Total time: {(time.time() - start_time) / 60:.2f} min.\n")
             return
         if self.div_filter:
             rewards, penalty_idx, tol_n, buff_n = self.ltm.div_filter(sample_struc, rewards, **self.df_args)
             penalty_strucs = [sample_struc[p] for p in penalty_idx]
-            logging.info(f"Diversity filter: tol_n={tol_n}, buff_n={buff_n}")
+            logger.info(f"Diversity filter: tol_n={tol_n}, buff_n={buff_n}")
         sort_idx = np.argsort(rewards)[::-1]
-        topk_idx = sort_idx[:int(self.finetune_cfg.batch_size * self.topk_ratio)]
+        topk_idx = sort_idx[: self.topk_num]
         strucs_topk = [sample_struc[_i] for _i in topk_idx]
         reward_topk = rewards[topk_idx]
         if self.replay is not None:
@@ -214,17 +218,16 @@ class MatInvent:
             ft_data = strucs_topk + data_replay
             ft_reward = np.concatenate((reward_topk, reward_replay))
             self.replay.extend(strucs_topk, strucs_topk, reward_topk)
-            logging.info(f"replay buffer size={len(self.replay)}")
+            logger.info(f"replay buffer size={len(self.replay)}")
         else:
             ft_data, ft_reward = strucs_topk, reward_topk
-        logging.info("FINETUNE:")
-        baseline = min(self.ltm.get_baseline(self.step), ft_reward.min())
-        self.ft_step(ft_data, ft_reward, baseline)
-        logging.info(f"*****   LOOP {self.step} FINISH   *****")
-        logging.info(f"Total time: {(time.time() - start_time) / 60:.2f} min.\n")
+        logger.info("FINETUNE:")
+        self.ft_step(ft_data, ft_reward)
+        logger.info(f"*****   LOOP {self.step} FINISH   *****")
+        logger.info(f"Total time: {(time.time() - start_time) / 60:.2f} min.\n")
 
     def run_rl(self):
-        logging.info("*****   RL START   *****")
+        logger.info("*****   RL START   *****")
         start_time = time.time()
         for step in range(self.rl_epoch):
             self.step = step
@@ -232,7 +235,7 @@ class MatInvent:
             if (step + 1) % self.save_freq == 0:
                 self.model_suite.save_model(self.agent, os.path.join(self.models_dir, f"loop_{step:0>4d}"))
         self.model_suite.save_model(self.agent, os.path.join(self.models_dir, "final"))
-        logging.info(f"*****   RL END   ***** Total time: {int(time.time() - start_time)} s.")
+        logger.info(f"*****   RL END   ***** Total time: {int(time.time() - start_time)} s.")
 
     def _add_noise_to_model(self, model, batch, timestep: int):
         sa = batch["structure_array"]
@@ -242,7 +245,7 @@ class MatInvent:
         has_atom = hasattr(model, "atom_scheduler")
         if has_atom:
             t = paddle.full([batch_size], paddle.linspace(
-                model.max_t if hasattr(model, "max_t") else 1.0, 1.0 / N, N)[timestep])
+                model.max_t, 1.0 / N, N)[timestep])
         else:
             t = paddle.full([batch_size], timestep, dtype="int64")
         frac_coords = sa["frac_coords"] % 1.0
@@ -311,17 +314,20 @@ class MatInvent:
                 score_model_output=o["atom_types"], t=t, batch_idx=batch_idx,
                 batch_size=num_atoms.shape[0], x=noisy_batch["atom_type_zero_based"],
                 noisy_x=noisy_batch["input_atom_type_zero_based"], reduce="sum",
-                d3pm_hybrid_lambda=getattr(model, "d3pm_hybrid_lambda", None))
-            cw = getattr(model, "coord_loss_weight", 0.1)
-            lw = getattr(model, "lattice_loss_weight", 1.0)
-            aw = getattr(model, "atom_loss_weight", 1.0)
+                d3pm_hybrid_lambda=model.d3pm_hybrid_lambda)
+            cw = model.coord_loss_weight
+            lw = model.lattice_loss_weight
+            aw = model.atom_loss_weight
             total_loss = cw * loss_coord + lw * loss_lattice + aw * loss_atom_type
             prediction_dict = {"pos": eps_pos, "cell": lattice_update, "atomic_numbers": o["atom_types"]}
         else:
             loss_lattice = (lattice_update - rand_l).square().mean(axis=[1, 2])
             loss_coord = paddle.pow(eps_pos - clean_frac_coords, 2).mean(axis=1)
             loss_coord = scatter(loss_coord, batch_idx, dim=0, reduce="mean")
-            total_loss = getattr(model, "coord_loss_weight", 1.0) * loss_coord + getattr(model, "lattice_loss_weight", 1.0) * loss_lattice
+            total_loss = (
+                model.coord_loss_weight * loss_coord
+                + model.lattice_loss_weight * loss_lattice
+            )
             prediction_dict = {"coords": eps_pos, "lattice": lattice_update}
         return total_loss, prediction_dict
 

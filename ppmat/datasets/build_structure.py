@@ -49,7 +49,13 @@ class BuildStructure:
     def __init__(
         self,
         format: Literal[
-            "cif_str", "array", "cif_file", "dict", "cif_str_by_CifParser", "jarvis"
+            "cif_str",
+            "array",
+            "cif_file",
+            "dict",
+            "cif_str_by_CifParser",
+            "jarvis",
+            "ase_atoms",
         ],
         primitive: bool = False,
         niggli: bool = True,
@@ -76,10 +82,8 @@ class BuildStructure:
                 lengths = crystal_data["lengths"]
                 angles = crystal_data["angles"]
             else:
-                lattice = crystal_data["lattice"]
-                if isinstance(lattice, list):
-                    lattice = np.asarray(lattice)
-                    lengths, angles = lattices_to_params_shape_numpy(lattice)
+                lattice = np.asarray(crystal_data["lattice"])
+                lengths, angles = lattices_to_params_shape_numpy(lattice)
 
             if isinstance(lengths, np.ndarray):
                 lengths = lengths.tolist()
@@ -139,5 +143,4 @@ class BuildStructure:
                 self.primitive,
                 self.niggli,
                 self.canocial,
-                num_cpus=self.num_cpus,
             )

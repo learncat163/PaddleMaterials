@@ -15,6 +15,7 @@
 import argparse
 import os
 import os.path as osp
+import sys
 
 import paddle.distributed as dist
 import paddle.distributed.fleet as fleet
@@ -28,6 +29,7 @@ from ppmat.optimizer import build_optimizer
 from ppmat.trainer.base_trainer import BaseTrainer
 from ppmat.utils import logger
 from ppmat.utils import misc
+from ppmat.utils.io import append_timestamp_to_output_dir
 
 if dist.get_world_size() > 1:
     fleet.init(is_collective=True)
@@ -49,6 +51,9 @@ if __name__ == "__main__":
     cli_config = OmegaConf.from_dotlist(dynamic_args)
     config = OmegaConf.merge(config, cli_config)
 
+    seed = config["Trainer"].get("seed", 42)
+    append_timestamp_to_output_dir(config)
+
     # save config to output_dir, only rank 0 process will do this
     if dist.get_rank() == 0:
         os.makedirs(config["Trainer"]["output_dir"], exist_ok=True)
@@ -63,13 +68,20 @@ if __name__ == "__main__":
     logger.info(f"Logger saved to {logger_path}")
 
     # set random seed
-    seed = config["Trainer"].get("seed", 42)
     misc.set_random_seed(seed)
     logger.info(f"Set random seed to {seed}")
 
     # build model from config
     model_cfg = config["Model"]
     model = build_model(model_cfg)
+
+    # RL fine-tuning is driven from this task entry instead of BaseTrainer, because
+    # the RL procedure samples and scores structures between gradient steps.
+    if config.get("RL") is not None:
+        from ppmat.models.matinvent.rl_finetune import run_rl_training
+
+        run_rl_training(config, model)
+        sys.exit(0)
 
     # build dataloader from config
     set_signal_handlers()
@@ -134,6 +146,7 @@ if __name__ == "__main__":
         optimizer=optimizer,
         lr_scheduler=lr_scheduler,
         compute_metric_func_dict=metric_func,
+        execution_config=config.get("Execution"),
     )
 
     if config["Global"].get("do_train", True):

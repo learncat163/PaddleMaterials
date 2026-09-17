@@ -54,12 +54,13 @@ def save_structures(structures: List[Structure], save_dir: str, filename: str) -
 
 
 class RLDataset(io.Dataset):
-    def __init__(self, structures: List[Structure], rewards: np.ndarray,
-                 transform: Optional[callable] = None):
-        assert len(structures) == len(rewards)
+    def __init__(self, structures: List[Structure], rewards: np.ndarray):
+        if len(structures) != len(rewards):
+            raise ValueError(
+                f"structures and rewards must have the same length, but got "
+                f"{len(structures)} and {len(rewards)}")
         self.structures = structures
         self.rewards = rewards
-        self.transform = transform
         ppmat_logger.info(f"Created RLDataset with {len(structures)} samples")
 
     def __len__(self):
@@ -79,19 +80,22 @@ class RLDataset(io.Dataset):
 
     @staticmethod
     def collate_fn(batch):
-        out = DefaultCollator()(batch)
-        na = out["structure_array"]["num_atoms"]
-        out["structure_array"]["batch"] = np.concatenate(
-            [np.full(n, i, dtype=np.int64) for i, n in enumerate(na)])
-        return {k: _to_tensor(v) for k, v in out.items()}
+        """Collate RL samples and move them onto Paddle tensors.
+
+        `DefaultCollator` yields numpy arrays, while the diffusion backbones index
+        with `paddle.repeat_interleave`, whose `repeats` argument rejects numpy.
+        """
+        return {
+            key: _to_tensor(value) for key, value in DefaultCollator()(batch).items()
+        }
 
 
-def _to_tensor(v):
-    if isinstance(v, np.ndarray):
-        return paddle.to_tensor(v)
-    if isinstance(v, dict):
-        return {k: _to_tensor(vv) for k, vv in v.items()}
-    return v
+def _to_tensor(value):
+    if isinstance(value, np.ndarray):
+        return paddle.to_tensor(value)
+    if isinstance(value, dict):
+        return {key: _to_tensor(item) for key, item in value.items()}
+    return value
 
 
 def create_rl_dataloader(structures: List[Structure], rewards: np.ndarray,

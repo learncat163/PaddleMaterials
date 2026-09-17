@@ -1,4 +1,4 @@
-# Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ppmat.sampler.matinvent import BaseSampler
-from ppmat.sampler.matinvent import DiffCSPSampler
-from ppmat.sampler.matinvent import MatterGenSampler
+from ppmat.sampler.molecular_sampler import MolecularSampler
+from ppmat.sampler.structure_sampler import StructureSampler
 
-__all__ = ["BaseSampler", "DiffCSPSampler", "MatterGenSampler"]
+__all__ = ["MolecularSampler", "StructureSampler"]
