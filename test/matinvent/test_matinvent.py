@@ -40,9 +40,9 @@ from ppmat.models.matinvent.mattergen import MatinventMatterGen
 from ppmat.models.matinvent.rewards.reward import CALCULATOR_REGISTRY
 from ppmat.models.matinvent.rewards.reward import Reward
 from ppmat.models.matinvent.rl_finetune import MatinventRL
-from ppmat.models.matinvent.rl_finetune import run_rl_training
 from ppmat.utils import download
 from ppmat.utils import save_load
+from ppmat.utils.execution import configure_execution_backend
 from ppmat.utils.model_package import resolve_model_package_dir
 
 _REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -51,6 +51,20 @@ _CONFIG_PATH = {
     "mattergen": str(_CONFIG_DIR / "matinvent_mattergen.yaml"),
     "diffcsp": str(_CONFIG_DIR / "matinvent_diffcsp.yaml"),
 }
+# Canonical backbone architecture lives in the reference task configs.
+_REFERENCE_CONFIG = {
+    "mattergen": _REPO_ROOT
+    / "structure_generation"
+    / "configs"
+    / "mattergen"
+    / "mattergen_mp20.yaml",
+    "diffcsp": _REPO_ROOT
+    / "structure_generation"
+    / "configs"
+    / "diffcsp"
+    / "diffcsp_mp20.yaml",
+}
+_BACKBONE_NAME = {"mattergen": "MatinventMatterGen", "diffcsp": "DiffCSP"}
 _BACKBONE_CLASS = {"mattergen": MatinventMatterGen, "diffcsp": DiffCSP}
 _BACKBONE_METHOD = {"mattergen": "_denoise", "diffcsp": "_decode"}
 _WEIGHTS_NAME = "best.pdparams"
@@ -66,11 +80,16 @@ def _make_structure(species, coords, a=5.43):
     return Structure(lattice=Lattice.cubic(a), species=species, coords=coords)
 
 
+def _reference_params(model_type):
+    config = OmegaConf.to_container(
+        OmegaConf.load(str(_REFERENCE_CONFIG[model_type])), resolve=True
+    )
+    return copy.deepcopy(config["Model"]["__init_params__"])
+
+
 def _tiny_backbone_cfg(model_type):
     """Shrunk copy of the released backbone: same code path, fast numerics."""
-    config = _load_config(model_type)
-    params = config["Model"]["__init_params__"]["backbone_cfg"]["__init_params__"]
-    settings = copy.deepcopy(params)
+    settings = _reference_params(model_type)
     if model_type == "mattergen":
         # Hidden/latent widths must stay coupled for the denoiser concat.
         settings["decoder_cfg"]["hidden_dim"] = 32
@@ -89,9 +108,10 @@ def _tiny_backbone_cfg(model_type):
         decoder["latent_dim"] = 32
         decoder["num_layers"] = 1
         decoder["num_freqs"] = 6
-    backbone_cfg = config["Model"]["__init_params__"]["backbone_cfg"]
-    backbone_cfg["__init_params__"] = settings
-    return backbone_cfg
+    return {
+        "__class_name__": _BACKBONE_NAME[model_type],
+        "__init_params__": settings,
+    }
 
 
 def _write_model_package(directory, model_type, backbone_cfg=None, package_name=None):
@@ -184,12 +204,22 @@ def _flatten_result(output):
 
 
 def _make_adapter(model_type, execution_backend="eager"):
+    params = _load_config(model_type)["Model"]["__init_params__"]
     return MatinventRL(
         model_type=model_type,
         num_inference_steps=3,
         backbone_cfg=_tiny_backbone_cfg(model_type),
+        rl_cfg=params["rl_cfg"],
+        build_structure_cfg=params["build_structure_cfg"],
         execution_backend=execution_backend,
     )
+
+
+class _FakeTrainer:
+    """Minimal stand-in for BaseTrainer: ``before_train`` reads output_dir."""
+
+    def __init__(self, output_dir):
+        self.output_dir = str(output_dir)
 
 
 def _patched_rl_environment(monkeypatch, tmp_path, model_type, execution):
@@ -197,8 +227,9 @@ def _patched_rl_environment(monkeypatch, tmp_path, model_type, execution):
     backbone_cfg = _tiny_backbone_cfg(model_type)
     package_name, _ = _write_model_package(tmp_path, model_type, backbone_cfg)
     config = _load_config(model_type)
-    config["RL"]["pretrained_model_name"] = package_name
-    config["RL"]["replay_cfg"] = None
+    rl_cfg = config["Model"]["__init_params__"]["rl_cfg"]
+    rl_cfg["pretrained_model_name"] = package_name
+    rl_cfg["replay_cfg"] = None
     config["Model"]["__init_params__"]["backbone_cfg"] = backbone_cfg
     config["Execution"] = {"backend": execution, "__init_params__": {}}
     config["Trainer"]["output_dir"] = str(tmp_path / "output")
@@ -217,7 +248,10 @@ class TestModelPackage:
 
     @pytest.mark.parametrize("model_type", ["mattergen", "diffcsp"])
     def test_package_yaml_builds_and_loads(self, model_type, tmp_path):
-        package_name, package_dir = _write_model_package(tmp_path, model_type)
+        small_cfg = _tiny_backbone_cfg(model_type)
+        package_name, package_dir = _write_model_package(
+            tmp_path, model_type, small_cfg
+        )
         resolved = resolve_model_package_dir(package_name, str(tmp_path))
         assert resolved == str(package_dir)
 
@@ -236,7 +270,9 @@ class TestModelPackage:
         assert np.allclose(saved[key].numpy(), loaded[key].numpy())
 
     def test_sampled_structures_from_package_model(self, tmp_path):
-        package_name, package_dir = _write_model_package(tmp_path, "diffcsp")
+        package_name, package_dir = _write_model_package(
+            tmp_path, "diffcsp", _tiny_backbone_cfg("diffcsp")
+        )
         config = OmegaConf.to_container(
             OmegaConf.load(str(package_dir / f"{package_name}.yaml")), resolve=True
         )
@@ -364,22 +400,26 @@ class TestRewardScoring:
 
 
 class TestRLTraining:
-    """The RL entry point: checkpointing and execution-backend orchestration."""
+    """The unified-entry hook: checkpointing and backend orchestration."""
 
-    def test_run_rl_training_writes_checkpoints(self, monkeypatch, tmp_path):
-        package_name, _ = _write_model_package(tmp_path, "diffcsp")
+    def test_before_train_writes_checkpoints(self, monkeypatch, tmp_path):
+        small_cfg = _tiny_backbone_cfg("diffcsp")
+        package_name, _ = _write_model_package(tmp_path, "diffcsp", small_cfg)
 
         config = _load_config("diffcsp")
-        config["Trainer"]["output_dir"] = str(tmp_path / "output")
-        config["RL"]["pretrained_model_name"] = package_name
-        config["RL"]["rl_epoch"] = 1
-        config["RL"]["save_freq"] = 1
-        config["RL"]["replay_cfg"] = None
-        config["RL"]["div_filter_cfg"]["enabled"] = False
-        config["RL"]["sample_cfg"].update(
+        config["Model"]["__init_params__"]["backbone_cfg"] = small_cfg
+        output_dir = str(tmp_path / "output")
+        config["Trainer"]["output_dir"] = output_dir
+        rl_cfg = config["Model"]["__init_params__"]["rl_cfg"]
+        rl_cfg["pretrained_model_name"] = package_name
+        rl_cfg["rl_epoch"] = 1
+        rl_cfg["save_freq"] = 1
+        rl_cfg["replay_cfg"] = None
+        rl_cfg["div_filter_cfg"]["enabled"] = False
+        rl_cfg["sample_cfg"].update(
             {"batch_size": 1, "num_batches": 1, "num_inference_steps": 2}
         )
-        config["RL"]["finetune_cfg"].update(
+        rl_cfg["finetune_cfg"].update(
             {"batch_size": 2, "epochs": 1, "timesteps": 1, "accum_steps": 1}
         )
 
@@ -391,9 +431,8 @@ class TestRLTraining:
         )
 
         model = build_model(config["Model"])
-        run_rl_training(config, model)
+        model.before_train(_FakeTrainer(output_dir))
 
-        output_dir = config["Trainer"]["output_dir"]
         model_dir = os.path.join(output_dir, "models")
         assert os.path.isfile(os.path.join(model_dir, "final", "model.pdparams"))
         assert os.path.isfile(os.path.join(model_dir, "loop_0000", "model.pdparams"))
@@ -401,7 +440,7 @@ class TestRLTraining:
             os.path.join(output_dir, "samples", "long_term_memory.csv")
         )
 
-    def test_run_rl_training_applies_execution_backend(self, monkeypatch, tmp_path):
+    def test_before_train_applies_execution_backend(self, monkeypatch, tmp_path):
         config = _patched_rl_environment(monkeypatch, tmp_path, "diffcsp", "cinn")
 
         # Orchestration test only: no GPU compiler is involved.
@@ -412,7 +451,14 @@ class TestRLTraining:
         monkeypatch.setattr(DiffCSP, "_run_runtime", _record_boundaries(names))
 
         model = build_model(config["Model"])
-        run_rl_training(config, model)
+        # Mirror what BaseTrainer does with the task ``Execution`` section.
+        configure_execution_backend(
+            model,
+            config["Execution"]["backend"],
+            init_params=config["Execution"]["__init_params__"],
+            owner="test",
+        )
+        model.before_train(_FakeTrainer(config["Trainer"]["output_dir"]))
 
         model_dir = os.path.join(config["Trainer"]["output_dir"], "models")
         final_state = paddle.load(os.path.join(model_dir, "final", "model.pdparams"))
@@ -496,14 +542,14 @@ def test_gpu_cinn_rl_loop_matches_eager(monkeypatch):
         final_states = {}
         for execution in ("eager", "cinn"):
             config = _patched_rl_environment(monkeypatch, tmp_dir, "diffcsp", execution)
-            config["Trainer"]["output_dir"] = os.path.join(tmp_dir, "output", execution)
+            output_dir = os.path.join(tmp_dir, "output", execution)
+            config["Trainer"]["output_dir"] = output_dir
             paddle.seed(_DISPATCH_SEED)
             np.random.seed(_DISPATCH_SEED)
             model = build_model(config["Model"])
-            run_rl_training(config, model)
-            checkpoint = os.path.join(
-                config["Trainer"]["output_dir"], "models", "final", "model.pdparams"
-            )
+            configure_execution_backend(model, execution, owner="test")
+            model.before_train(_FakeTrainer(output_dir))
+            checkpoint = os.path.join(output_dir, "models", "final", "model.pdparams")
             final_states[execution] = paddle.load(checkpoint)
 
         for key, value in final_states["cinn"].items():

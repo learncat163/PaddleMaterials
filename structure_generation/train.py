@@ -33,8 +33,47 @@ from ppmat.utils.io import append_timestamp_to_output_dir
 if dist.get_world_size() > 1:
     fleet.init(is_collective=True)
 
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "-c",
+        "--config",
+        type=str,
+        default="./structure_generation/configs/diffcsp/diffcsp_mp20.yaml",
+        help="Path to config file",
+    )
 
-def _run_base_trainer(config, model):
+    args, dynamic_args = parser.parse_known_args()
+
+    # load config and merge with cli args
+    config = OmegaConf.load(args.config)
+    cli_config = OmegaConf.from_dotlist(dynamic_args)
+    config = OmegaConf.merge(config, cli_config)
+
+    seed = config["Trainer"].get("seed", 42)
+    append_timestamp_to_output_dir(config)
+
+    # save config to output_dir, only rank 0 process will do this
+    if dist.get_rank() == 0:
+        os.makedirs(config["Trainer"]["output_dir"], exist_ok=True)
+        config_name = os.path.basename(args.config)
+        OmegaConf.save(config, osp.join(config["Trainer"]["output_dir"], config_name))
+    # convert to dict
+    config = OmegaConf.to_container(config, resolve=True)
+
+    # init logger
+    logger_path = osp.join(config["Trainer"]["output_dir"], "run.log")
+    logger.init_logger(log_file=logger_path)
+    logger.info(f"Logger saved to {logger_path}")
+
+    # set random seed
+    misc.set_random_seed(seed)
+    logger.info(f"Set random seed to {seed}")
+
+    # build model from config
+    model_cfg = config["Model"]
+    model = build_model(model_cfg)
+
     # build dataloader from config
     set_signal_handlers()
     if config["Global"].get("do_train", True):
@@ -109,52 +148,3 @@ def _run_base_trainer(config, model):
     if config["Global"].get("do_test", False):
         logger.info("Evaluating on test set")
         time_info, loss_info, metric_info = trainer.eval(test_loader)
-
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        "-c",
-        "--config",
-        type=str,
-        default="./structure_generation/configs/diffcsp/diffcsp_mp20.yaml",
-        help="Path to config file",
-    )
-
-    args, dynamic_args = parser.parse_known_args()
-
-    # load config and merge with cli args
-    config = OmegaConf.load(args.config)
-    cli_config = OmegaConf.from_dotlist(dynamic_args)
-    config = OmegaConf.merge(config, cli_config)
-
-    seed = config["Trainer"].get("seed", 42)
-    append_timestamp_to_output_dir(config)
-
-    # save config to output_dir, only rank 0 process will do this
-    if dist.get_rank() == 0:
-        os.makedirs(config["Trainer"]["output_dir"], exist_ok=True)
-        config_name = os.path.basename(args.config)
-        OmegaConf.save(config, osp.join(config["Trainer"]["output_dir"], config_name))
-    # convert to dict
-    config = OmegaConf.to_container(config, resolve=True)
-
-    # init logger
-    logger_path = osp.join(config["Trainer"]["output_dir"], "run.log")
-    logger.init_logger(log_file=logger_path)
-    logger.info(f"Logger saved to {logger_path}")
-
-    # set random seed
-    misc.set_random_seed(seed)
-    logger.info(f"Set random seed to {seed}")
-
-    # build model from config
-    model_cfg = config["Model"]
-    model = build_model(model_cfg)
-
-    # A model exposing `run_training` drives its own training procedure (e.g. the
-    # MatInvent RL loop, which samples and scores structures between gradient steps).
-    if hasattr(model, "run_training"):
-        model.run_training(config)
-    else:
-        _run_base_trainer(config, model)

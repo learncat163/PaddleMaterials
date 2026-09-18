@@ -6,87 +6,63 @@ Global:
 Trainer:
   seed: 42
   output_dir: ./output/matinvent_diffcsp
+  max_epochs: 0
+  save_freq: 1
+  log_freq: 1
+  start_eval_epoch: 1
+  eval_freq: 1
+  compute_metric_during_train: false
+
+Dataset:
+  train: ${Sample.data}
 
 Model:
   __class_name__: MatinventRL
   __init_params__:
     model_type: diffcsp
     num_inference_steps: ${Global.num_inference_steps}
-    backbone_cfg:
-      __class_name__: DiffCSP
-      __init_params__:
-        decoder_cfg:
-          hidden_dim: 512
-          latent_dim: 256
-          num_layers: 6
-          act_fn: silu
-          dis_emb: sin
-          num_freqs: 128
-          edge_style: fc
-          ln: True
-          ip: True
-          smooth: False
-          pred_type: False
-          prop_dim: 512
-          pred_scalar: False
-          num_classes: 100
-        lattice_noise_scheduler_cfg:
-          __class_name__: DDPMScheduler
+    build_structure_cfg:
+      format: array
+      niggli: False
+    rl_cfg:
+      pretrained_model_name: matinvent_diffcsp_mp20
+      rl_epoch: 50
+      topk_ratio: 0.5
+      save_freq: 10
+      sample_cfg:
+        batch_size: 1
+        num_batches: 1
+        num_inference_steps: ${Global.rl_num_inference_steps}
+      finetune_cfg:
+        batch_size: 4
+        epochs: 2
+        timesteps: 100
+        accum_steps: 4
+        sigma: 0.025
+        optimizer_cfg:
+          __class_name__: Adam
           __init_params__:
-            beta_schedule: squaredcos_cap_v2
-            num_train_timesteps: ${Global.num_train_timesteps}
-            clip_sample: False
-        coord_noise_scheduler_cfg:
-          __class_name__: ScoreSdeVeSchedulerWrapped
-          __init_params__:
-            num_train_timesteps: ${Global.num_train_timesteps}
-            sigma_min: 0.005
-            sigma_max: 0.5
-            snr: 1e-5
-        num_train_timesteps: ${Global.num_train_timesteps}
-        time_dim: 256
-        lattice_loss_weight: 1.0
-        coord_loss_weight: 1.0
-
-RL:
-  pretrained_model_name: matinvent_diffcsp_mp20
-  rl_epoch: 50
-  topk_ratio: 0.5
-  save_freq: 10
-  sample_cfg:
-    batch_size: 1
-    num_batches: 1
-    num_inference_steps: ${Global.rl_num_inference_steps}
-  finetune_cfg:
-    batch_size: 4
-    epochs: 2
-    timesteps: 100
-    accum_steps: 4
-    sigma: 0.025
-    optimizer_cfg:
-      __class_name__: Adam
-      __init_params__:
-        lr: 0.0001
-  reward_cfg:
-    reward_threshold: 0.5
-    reduce: mean
-    prop_cfg:
-      - name: density
-        target: ascending
-        minv: 0.0
-        maxv: 10.0
-        calculator:
-          __class_name__: PyMatGen
-          task: density
-  replay_cfg:
-    buffer_size: 1000
-    sample_size: 32
-    reward_cutoff: 0.0
-  div_filter_cfg:
-    enabled: true
-    tol: 10
-    buff: 20
-    method: composition
+            lr: 0.0001
+      reward_cfg:
+        reward_threshold: 0.5
+        reduce: mean
+        prop_cfg:
+          - name: density
+            target: ascending
+            minv: 0.0
+            maxv: 10.0
+            calculator:
+              __class_name__: PyMatGen
+              task: density
+      replay_cfg:
+        buffer_size: 1000
+        sample_size: 32
+        reward_cutoff: 0.0
+      div_filter_cfg:
+        enabled: true
+        tol: 10
+        buff: 20
+        method: composition
 
 Sample:
   data:
@@ -100,8 +76,6 @@ Sample:
         shuffle: False
         drop_last: False
         batch_size: 1
-  build_structure_cfg:
-    format: array
-    niggli: False
+  build_structure_cfg: ${Model.__init_params__.build_structure_cfg}
   model_sample_params:
     num_inference_steps: ${Global.num_inference_steps}
