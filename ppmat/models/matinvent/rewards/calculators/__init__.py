@@ -12,8 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ppmat.models.matinvent.rewards.calculators.dft import DFTCalc
-from ppmat.models.matinvent.rewards.calculators.fairchem import FairChem
-from ppmat.models.matinvent.rewards.calculators.pymatgen import PyMatGen
+import os
 
-__all__ = ["PyMatGen", "DFTCalc", "FairChem"]
+
+class Calculator:
+    """Base class of the property calculators consumed by ``Reward``.
+
+    Subclasses return one float per structure and use NaN to mark failures.
+    """
+
+    def __init__(self, root_dir: str, task: str):
+        self.root_dir = root_dir
+        self.task = task
+        os.makedirs(root_dir, exist_ok=True)
+
+    def calc(self, samples, label="tmp"):
+        raise NotImplementedError

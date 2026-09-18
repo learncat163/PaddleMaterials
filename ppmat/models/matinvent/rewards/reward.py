@@ -38,11 +38,17 @@ def _linear_scale(values, minv, maxv):
 
 
 class Reward:
-    def __init__(self, root_dir: str, prop_cfg: List, reward_threshold: float,
-                 reduce: str = "mean"):
+    def __init__(
+        self,
+        root_dir: str,
+        prop_cfg: List,
+        reward_threshold: float,
+        reduce: str = "mean",
+    ):
         if reduce not in ("mean", "min", "weight"):
             raise ValueError(
-                f"reduce must be one of 'mean', 'min', 'weight', but got {reduce}")
+                f"reduce must be one of 'mean', 'min', 'weight', but got {reduce}"
+            )
         self.root_dir = root_dir
         self.prop_cfg = prop_cfg
         self.threshold = reward_threshold
@@ -60,8 +66,17 @@ class Reward:
                 cls_name = calculator_cfg.pop("__class_name__")
                 if cls_name not in CALCULATOR_REGISTRY:
                     raise ValueError(
-                        f"Unknown calculator: {cls_name}, available: {list(CALCULATOR_REGISTRY)}")
-                calc = CALCULATOR_REGISTRY[cls_name](**calculator_cfg)
+                        f"Unknown calculator: {cls_name}, available: "
+                        f"{sorted(CALCULATOR_REGISTRY)}"
+                    )
+                if "root_dir" in calculator_cfg:
+                    raise ValueError(
+                        "calculator root_dir is owned by Reward and must not be set "
+                        "in the config"
+                    )
+                calc = CALCULATOR_REGISTRY[cls_name](
+                    root_dir=self.root_dir, **calculator_cfg
+                )
                 self._cache[idx] = calc
             raw = np.asarray(calc.calc(samples, label), dtype=float)
             values[cfg["name"]] = np.nan_to_num(raw, nan=0.0).astype(float)
@@ -83,7 +98,8 @@ class Reward:
                 sv = _linear_scale(-np.abs(v - target), -cfg["maxv"], -cfg["minv"])
             else:
                 raise TypeError(
-                    "prop cfg.target must be a float, 'ascending', or 'descending'")
+                    "prop cfg.target must be a float, 'ascending', or 'descending'"
+                )
             scaled[cfg["name"]] = sv
         if self.reduce == "mean":
             rewards = np.mean(list(scaled.values()), axis=0)

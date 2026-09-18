@@ -13,139 +13,116 @@
 # limitations under the License.
 
 from typing import List
-from typing import Tuple
 
 import numpy as np
 import paddle
 from pymatgen.core.structure import Structure
 
+from ppmat.datasets.build_structure import BuildStructure
+from ppmat.datasets.num_atom_dists import NUM_ATOMS_DISTRIBUTIONS
 from ppmat.utils import logger
 
-_ATOM_TYPE_MIN = 1
-_ATOM_TYPE_MAX = 100
-# One failed sampling call is tolerated and skipped; anything outside this set is a
-# bug and must surface instead of being silently swallowed.
-_TOLERATED_SAMPLING_ERRORS = (IndexError, RuntimeError, ValueError)
+# Reference DiffCSP argmaxes random atom-type logits over 1..MAX_ATOMIC_NUM.
+_MAX_ATOMIC_NUM = 100
+# Match the atom-count distribution used by the task ``Sample.data``.
+_ATOM_COUNT_DISTRIBUTION = "ALEX_MP_20"
+# Random atom types make some model calls fail; anything else must surface.
+_TOLERATED_SAMPLE_ERRORS = (IndexError, RuntimeError)
+# Random atom types also make pymatgen reject some sampled structures.
+_TOLERATED_PARSE_ERRORS = (ValueError,)
 
 
-def _process_result(result: dict, build_structure_cfg: dict):
-    """Convert one sampled structure into RL batch data and a Structure."""
-    num_atoms = int(result["num_atoms"])
+def _build_structure(result: dict, build_structure_cfg: dict):
+    """Parse one sampled structure into a pymatgen ``Structure``."""
     frac_coords = np.asarray(result["frac_coords"], dtype=np.float32)
     atom_types = np.asarray(result["atom_types"], dtype=np.int64)
     lattice = np.asarray(result["lattice"], dtype=np.float32).reshape(3, 3)
-
-    data = {
-        "structure_array": {
-            "num_atoms": paddle.to_tensor([num_atoms], dtype="int64"),
-            "frac_coords": paddle.to_tensor(frac_coords),
-            "atom_types": paddle.to_tensor(atom_types),
-            "lattice": paddle.to_tensor(lattice).unsqueeze(0),
-        }
-    }
-
-    from ppmat.datasets.build_structure import BuildStructure
-
     cfg = dict(build_structure_cfg)
-    structure = None
     try:
-        structure = BuildStructure.build_one(
+        return BuildStructure.build_one(
             {"frac_coords": frac_coords, "atom_types": atom_types, "lattice": lattice},
             cfg.pop("format"),
             **cfg,
         )
-    except Exception as e:
-        logger.warning(f"Failed to parse a sampled structure: {e}")
-    return data, structure
+    except _TOLERATED_PARSE_ERRORS as error:
+        logger.warning(f"Failed to parse a sampled structure: {error}")
+        return None
 
 
 class BaseSampler:
-    """Generate one round of structures from a MatInvent diffusion backbone.
+    """Generate one round of structures from a MatInvent diffusion backbone."""
 
-    `min_atoms` / `max_atoms` are the atom-count ranges documented in the model
-    README; `build_structure_cfg` is the task config `Sample.build_structure_cfg`
-    so sampled structures are parsed exactly like the task sample flow.
-    """
-
-    min_atoms = 1
-    max_atoms = 50
-
-    def __init__(self, batch_size: int = 16, num_batches: int = 4,
-                 num_inference_steps: int = 1000, build_structure_cfg: dict = None):
+    def __init__(
+        self,
+        batch_size: int,
+        num_batches: int,
+        num_inference_steps: int,
+        build_structure_cfg: dict,
+    ):
         self.batch_size = batch_size
         self.num_batches = num_batches
         self.num_inference_steps = num_inference_steps
-        self.build_structure_cfg = build_structure_cfg or {"format": "array"}
+        self.build_structure_cfg = build_structure_cfg
 
-    def generate(self, model, **kwargs):
+    def generate(self, model) -> List[Structure]:
         raise NotImplementedError
 
-    def _num_atoms(self, kwargs: dict, batch_size: int, index: int = 0):
-        counts = kwargs.get("num_atoms")
-        if counts is None:
-            return paddle.randint(low=self.min_atoms, high=self.max_atoms + 1,
-                                  shape=[batch_size], dtype="int64")
-        counts = np.atleast_1d(np.asarray(counts, dtype="int64"))
-        selected = counts[(index + np.arange(batch_size)) % counts.size]
-        return paddle.to_tensor(
-            np.clip(selected, self.min_atoms, self.max_atoms), dtype="int64")
+    def _num_atoms(self, batch_size: int):
+        distribution = NUM_ATOMS_DISTRIBUTIONS[_ATOM_COUNT_DISTRIBUTION]
+        counts = np.random.choice(
+            list(distribution.keys()),
+            size=batch_size,
+            p=list(distribution.values()),
+        )
+        return paddle.to_tensor(counts, dtype="int64")
 
     def _sample(self, model, structure_array: dict):
         try:
             with paddle.no_grad():
                 return model.sample(
                     {"structure_array": structure_array},
-                    num_inference_steps=self.num_inference_steps)
-        except _TOLERATED_SAMPLING_ERRORS as e:
-            logger.warning(f"Skipped one sampling call: {e}")
+                    num_inference_steps=self.num_inference_steps,
+                )
+        except _TOLERATED_SAMPLE_ERRORS as error:
+            logger.warning(f"Skipped one sampling call: {error}")
             return None
 
-    def _collect(self, results):
-        data_list, structures = [], []
+    def _collect(self, results: List[dict]) -> List[Structure]:
+        structures = []
         for result in results:
-            data, structure = _process_result(result, self.build_structure_cfg)
-            data_list.append(data)
-            structures.append(structure)
-        return data_list, structures
+            structure = _build_structure(result, self.build_structure_cfg)
+            if structure is not None:
+                structures.append(structure)
+        return structures
 
 
 class MatterGenSampler(BaseSampler):
-    min_atoms = 2
-    max_atoms = 50
-
-    def generate(self, model, **kwargs) -> Tuple[List, List[Structure]]:
-        data_list, structures = [], []
-        for idx in range(self.num_batches * self.batch_size):
-            num_atoms = self._num_atoms(kwargs, batch_size=1, index=idx)
-            num_atoms = paddle.concat([num_atoms, num_atoms], axis=0)
-            out = self._sample(model, {"num_atoms": num_atoms})
-            if out is None:
+    def generate(self, model) -> List[Structure]:
+        structures = []
+        for _ in range(self.num_batches):
+            num_atoms = self._num_atoms(batch_size=self.batch_size)
+            sampled = self._sample(model, {"num_atoms": num_atoms})
+            if sampled is None:
                 continue
-            batch_data, batch_structures = self._collect(out["result"])
-            data_list.extend(batch_data)
-            structures.extend(batch_structures)
-        return data_list, structures
+            structures.extend(self._collect(sampled["result"]))
+        return structures
 
 
 class DiffCSPSampler(BaseSampler):
-    min_atoms = 1
-    max_atoms = 50
-
-    def generate(self, model, **kwargs) -> Tuple[List, List[Structure]]:
-        data_list, structures = [], []
+    def generate(self, model) -> List[Structure]:
+        structures = []
         for _ in range(self.num_batches):
-            num_atoms = self._num_atoms(kwargs, batch_size=self.batch_size)
+            num_atoms = self._num_atoms(batch_size=self.batch_size)
             atom_types = paddle.randint(
-                low=_ATOM_TYPE_MIN,
-                high=_ATOM_TYPE_MAX + 1,
+                low=1,
+                high=_MAX_ATOMIC_NUM + 1,
                 shape=[int(num_atoms.sum().item())],
                 dtype="int64",
             )
-            out = self._sample(
-                model, {"num_atoms": num_atoms, "atom_types": atom_types})
-            if out is None:
+            sampled = self._sample(
+                model, {"num_atoms": num_atoms, "atom_types": atom_types}
+            )
+            if sampled is None:
                 continue
-            batch_data, batch_structures = self._collect(out["result"])
-            data_list.extend(batch_data)
-            structures.extend(batch_structures)
-        return data_list, structures
+            structures.extend(self._collect(sampled["result"]))
+        return structures

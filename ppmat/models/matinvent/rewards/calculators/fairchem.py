@@ -16,23 +16,23 @@ import os
 
 import numpy as np
 
-from ppmat.models.matinvent.rewards.base import Calculator
+from ppmat.models.matinvent.rewards.calculators import Calculator
+
+_TASKS = ("bulk_modulus", "heat_capacity")
 
 
 class FairChem(Calculator):
-    """FairChem property calculator for bulk modulus and heat capacity.
+    """Read externally computed bulk modulus / heat capacity values.
 
-    This calculator expects external computation to produce a results file at:
-        {root_dir}/{label}.txt
-    with one float value per structure (NaN for failed computations).
-
-    Supported tasks: 'bulk_modulus', 'heat_capacity'
+    Results must be at ``{root_dir}/{label}.txt``, one float per structure.
     """
 
     def calc(self, samples, label="tmp"):
-        if self.task not in ("bulk_modulus", "heat_capacity"):
-            raise ValueError(f"{self.task} is unknown task for FairChem calculator, "
-                             f"expected 'bulk_modulus' or 'heat_capacity'")
+        if self.task not in _TASKS:
+            raise ValueError(
+                f"{self.task} is unknown task for FairChem calculator, "
+                f"expected one of {_TASKS}"
+            )
 
         out_path = os.path.abspath(os.path.join(self.root_dir, f"{label}.txt"))
         if not os.path.isfile(out_path):
@@ -44,7 +44,8 @@ class FairChem(Calculator):
         results = np.loadtxt(out_path, dtype=float, ndmin=1)
         if results.shape[0] != len(samples[0]):
             raise ValueError(
-                f"{out_path} holds {results.shape[0]} values, expected {len(samples[0])}"
+                f"{out_path} holds {results.shape[0]} values, "
+                f"expected {len(samples[0])}"
             )
         return results
 

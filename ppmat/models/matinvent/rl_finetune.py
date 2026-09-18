@@ -16,32 +16,64 @@ import os
 
 import paddle.nn as nn
 
-from ppmat.models.matinvent.rl_loop import MatInvent
+from ppmat.models.common.runtime import RuntimeMixin
+from ppmat.models.common.runtime import check_backend
 from ppmat.models.matinvent.rewards.reward import Reward
+from ppmat.models.matinvent.rl_loop import MatInvent
 from ppmat.models.matinvent.suites import ModelSuite
 from ppmat.models.matinvent.suites import build_backbone
 from ppmat.utils import logger
 
 
-class MatinventRL(nn.Layer):
-    """Expose the MatInvent backbone to the framework Sample flow.
+class MatinventRL(RuntimeMixin, nn.Layer):
+    """Framework-facing adapter around one MatInvent diffusion backbone.
 
-    RL fine-tuning itself is driven by the task entry through
-    `run_rl_training`; this layer only builds the backbone from
-    `backbone_cfg` and delegates sampling and weight loading to it.
+    The backbone owns the runtime; this parameter-free layer lazily builds it from
+    ``backbone_cfg`` and forwards sampling, protocol and state-dict calls to it, so
+    ``build_model_from_name`` and the framework ``Sample`` flow drive one object.
     """
 
-    def __init__(self, model_type, num_inference_steps, backbone_cfg):
+    def __init__(
+        self,
+        model_type,
+        num_inference_steps,
+        backbone_cfg,
+        execution_backend="eager",
+        runtime_options=None,
+    ):
         super().__init__()
         self.model_type = model_type
         self.num_inference_steps = num_inference_steps
         self.backbone_cfg = backbone_cfg
         self._backbone = None
+        self.requested_execution_backend = check_backend(execution_backend)
+        self.requested_runtime_options = runtime_options or {}
+
+    @property
+    def execution_backend(self):
+        return self.backbone().execution_backend
 
     def backbone(self):
         if self._backbone is None:
             self._backbone = build_backbone(self.backbone_cfg)
+            self._backbone.set_execution_backend(self.requested_execution_backend)
+            self._backbone.set_runtime_options(self.requested_runtime_options)
         return self._backbone
+
+    def set_execution_backend(self, backend):
+        self.requested_execution_backend = check_backend(backend)
+        if self._backbone is not None:
+            self._backbone.set_execution_backend(backend)
+
+    def set_runtime_options(self, runtime_options):
+        self.requested_runtime_options = runtime_options or {}
+        if self._backbone is not None:
+            self._backbone.set_runtime_options(runtime_options)
+
+    def validate_execution_backend(self, *, use_amp=False, world_size=1):
+        self.backbone().validate_execution_backend(
+            use_amp=use_amp, world_size=world_size
+        )
 
     def sample(self, data, **sample_params):
         sample_params.setdefault("num_inference_steps", self.num_inference_steps)
@@ -65,30 +97,31 @@ class MatinventRL(nn.Layer):
             self._backbone.train(mode)
         return self
 
+    def run_training(self, config):
+        """Drive the MatInvent RL loop instead of the ``BaseTrainer``."""
+        run_rl_training(config, self)
+
 
 def run_rl_training(config, model):
     """Run MatInvent RL fine-tuning, driven by the task training entry.
 
-    Args:
-        config (dict): Resolved task config containing the `RL` section. The
-            RL agent and prior start from the registered weight package named
-            by `RL.pretrained_model_name`.
-        model (MatinventRL): Model built by the entry; supplies the backbone
-            config shared with the RL agent and prior.
+    The RL agent and prior both start from the registered weight package named by
+    ``RL.pretrained_model_name``.
     """
-    rl_cfg = config["RL"]
-    output_dir = config["Trainer"]["output_dir"]
-    os.makedirs(output_dir, exist_ok=True)
-
     from ppmat.models import MODEL_REGISTRY
     from ppmat.utils import download
     from ppmat.utils.model_package import resolve_model_package_dir
+
+    rl_cfg = config["RL"]
+    output_dir = config["Trainer"]["output_dir"]
+    os.makedirs(output_dir, exist_ok=True)
 
     model_name = rl_cfg["pretrained_model_name"]
     if model_name not in MODEL_REGISTRY:
         raise ValueError(
             f"pretrained_model_name {model_name} is not registered in MODEL_REGISTRY, "
-            f"available: {sorted(MODEL_REGISTRY)}")
+            f"available: {sorted(MODEL_REGISTRY)}"
+        )
     extracted_path = download.get_weights_path_from_url(MODEL_REGISTRY[model_name])
     package_dir = resolve_model_package_dir(model_name, extracted_path)
 
@@ -97,15 +130,19 @@ def run_rl_training(config, model):
         backbone_cfg=model.backbone_cfg,
         sample_cfg=rl_cfg["sample_cfg"],
         finetune_cfg=rl_cfg["finetune_cfg"],
-        pretrained_model_path=package_dir,
         build_structure_cfg=config["Sample"]["build_structure_cfg"],
+        pretrained_model_path=package_dir,
+        execution_config=config.get("Execution"),
     )
+    reward_cfg = rl_cfg["reward_cfg"]
     reward = Reward(
         root_dir=os.path.join(output_dir, "rewards"),
-        prop_cfg=rl_cfg["reward_cfg"]["prop_cfg"],
-        reward_threshold=rl_cfg["reward_cfg"]["reward_threshold"],
-        reduce=rl_cfg["reward_cfg"]["reduce"],
+        prop_cfg=reward_cfg["prop_cfg"],
+        reward_threshold=reward_cfg["reward_threshold"],
+        reduce=reward_cfg["reduce"],
     )
+    replay_cfg = rl_cfg.get("replay_cfg")
+    div_cfg = rl_cfg["div_filter_cfg"]
     mat_invent = MatInvent(
         rl_epoch=rl_cfg["rl_epoch"],
         model_suite=model_suite,
@@ -113,10 +150,14 @@ def run_rl_training(config, model):
         topk_ratio=rl_cfg["topk_ratio"],
         save_dir=output_dir,
         save_freq=rl_cfg["save_freq"],
-        replay=rl_cfg.get("replay_cfg") is not None,
-        replay_args=rl_cfg.get("replay_cfg", {}),
-        div_filter=rl_cfg["div_filter_cfg"]["enabled"],
-        df_args=rl_cfg["div_filter_cfg"],
+        replay=replay_cfg is not None,
+        replay_args=replay_cfg,
+        div_filter=div_cfg["enabled"],
+        df_args={
+            "tol": div_cfg["tol"],
+            "buff": div_cfg["buff"],
+            "method": div_cfg["method"],
+        },
     )
     logger.info(f"Start MatInvent RL fine-tuning on {model.model_type}")
     mat_invent.run_rl()

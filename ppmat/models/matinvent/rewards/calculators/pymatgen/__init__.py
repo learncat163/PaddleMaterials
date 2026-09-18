@@ -12,10 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-
-SUBSTRATE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), "substrates"))
-
 from ppmat.models.matinvent.rewards.calculators.pymatgen.calc import PyMatGen
 
-__all__ = ["PyMatGen", "SUBSTRATE_PATH"]
+__all__ = ["PyMatGen"]

@@ -1,53 +1,11 @@
 Global:
-  do_train: True
-  do_eval: False
-  do_test: False
   num_train_timesteps: 1000
   num_inference_steps: 50
   rl_num_inference_steps: 50
 
-Dataset:
-  train:
-    dataset:
-      __class_name__: NumAtomsCrystalDataset
-      __init_params__:
-        total_num: 4
-    sampler:
-      __class_name__: BatchSampler
-      __init_params__:
-        shuffle: False
-        drop_last: False
-        batch_size: 4
-  val: null
-  test: null
-
 Trainer:
-  max_epochs: 1
   seed: 42
   output_dir: ./output/matinvent_mattergen
-  save_freq: 100
-  log_freq: 20
-  start_eval_epoch: 1
-  eval_freq: 1
-  pretrained_model_path: null
-  resume_from_checkpoint: null
-  use_amp: False
-  amp_level: 'O1'
-  eval_with_no_grad: True
-  gradient_accumulation_steps: 1
-  best_metric_indicator: 'eval_loss'
-  name_for_best_metric: "loss"
-  greater_is_better: False
-  compute_metric_during_train: False
-  metric_strategy_during_eval: 'step'
-  use_visualdl: False
-  use_wandb: False
-  use_tensorboard: False
-
-Optimizer:
-  __class_name__: Adam
-  __init_params__:
-    lr: 0.0001
 
 Model:
   __class_name__: MatinventRL
@@ -85,27 +43,25 @@ Model:
         coord_loss_weight: 0.1
         atom_loss_weight: 1.0
 
-# RL configuration
 RL:
-  enabled: true
   pretrained_model_name: matinvent_mattergen_mp20
   rl_epoch: 50
   topk_ratio: 0.5
   save_freq: 10
   sample_cfg:
     batch_size: 1
-    num_batches: 1
+    num_batches: 2
     num_inference_steps: ${Global.rl_num_inference_steps}
   finetune_cfg:
     batch_size: 4
     epochs: 2
     timesteps: 100
     accum_steps: 4
-    sigma: 1.0
+    sigma: 0.025
     optimizer_cfg:
       __class_name__: Adam
       __init_params__:
-        lr: 0.0005
+        lr: 1.0e-05
   reward_cfg:
     reward_threshold: 0.5
     reduce: mean
@@ -116,12 +72,10 @@ RL:
         maxv: 10.0
         calculator:
           __class_name__: PyMatGen
-          root_dir: ./output/matinvent/rewards
           task: density
   replay_cfg:
-    capacity: 1000
+    buffer_size: 1000
     sample_size: 32
-    buffer_size: 100
     reward_cutoff: 0.0
   div_filter_cfg:
     enabled: true
@@ -144,6 +98,5 @@ Sample:
   build_structure_cfg:
     format: array
     niggli: False
-
   model_sample_params:
     num_inference_steps: ${Global.num_inference_steps}

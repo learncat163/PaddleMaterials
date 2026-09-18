@@ -12,14 +12,4 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""
-Reward system for reinforcement learning.
-"""
-
-from ppmat.models.matinvent.rewards.base import Calculator
-from ppmat.models.matinvent.rewards.reward import Reward
-
-__all__ = [
-    "Reward",
-    "Calculator",
-]
+"""Reward system for the MatInvent reinforcement learning loop."""

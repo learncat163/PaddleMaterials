@@ -13,82 +13,115 @@
 # limitations under the License.
 
 import os
+
 import numpy as np
-from pymatgen.analysis.cost import CostAnalyzer, CostDBElements
+from pymatgen.analysis.cost import CostAnalyzer
+from pymatgen.analysis.cost import CostDBElements
 from pymatgen.analysis.hhi import HHIModel
 from pymatgen.analysis.interfaces.substrate_analyzer import SubstrateAnalyzer
 from pymatgen.core.structure import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
-from smact import Element as SmactElement
-from ppmat.models.matinvent.rewards.base import Calculator
-from ppmat.models.matinvent.rewards.calculators.pymatgen import SUBSTRATE_PATH
+
+from ppmat.models.matinvent.rewards.calculators import Calculator
+from ppmat.utils import logger
 
 SUB_MILLERS = {"Si": [(1, 0, 0)], "GaAs": [(1, 0, 0)], "InP": [(1, 0, 0)]}
 
 
-def _abundance(s):
-    try:
-        wa = sum(wf * SmactElement(el).crustal_abundance
-                 for el, wf in s.composition.to_weight_dict.items())
-        return np.nan if wa <= 0.0 else wa
-    except Exception:
-        return np.nan
-
-
-def _hhi(x):
-    m = HHIModel()
-    return np.array([m.get_hhi_reserve(s.composition) or np.nan for s in x], dtype=float)
-
-
-def _price(x):
-    ca = CostAnalyzer(CostDBElements())
-    out = []
-    for s in x:
+def _per_structure(strucs, fn):
+    """Apply ``fn`` to every structure, mapping a failure to NaN and logging it."""
+    results = []
+    for struc in strucs:
         try:
-            out.append(ca.get_cost_per_kg(s.composition))
-        except Exception:
-            out.append(np.nan)
-    return np.array(out, dtype=float)
+            results.append(fn(struc))
+        except (KeyError, NameError, TypeError, ValueError) as error:
+            logger.warning(f"Property computation failed: {error}")
+            results.append(np.nan)
+    return np.array(results, dtype=float)
 
 
-def _mcia(x, sub, millers=None):
-    sa = SubstrateAnalyzer(film_max_miller=1, substrate_max_miller=1)
-    sub = SpacegroupAnalyzer(sub, symprec=0.1).get_conventional_standard_structure()
-    rc = sub.composition.reduced_formula
-    if millers is None and rc in SUB_MILLERS:
-        millers = SUB_MILLERS[rc]
-    out = []
-    for s in x:
-        try:
-            film = SpacegroupAnalyzer(s, symprec=0.1).get_conventional_standard_structure()
-            out.append(min(m.match_area for m in sa.calculate(film=film, substrate=sub,
-                        substrate_millers=millers, lowest=True)))
-        except Exception:
-            out.append(np.nan)
-    return np.array(out, dtype=float)
+def _abundance(struc):
+    from smact import Element as SmactElement
+
+    weighted = sum(
+        weight * SmactElement(element).crustal_abundance
+        for element, weight in struc.composition.to_weight_dict.items()
+    )
+    return np.nan if weighted <= 0.0 else weighted
+
+
+def _hhi(strucs):
+    model = HHIModel()
+    return _per_structure(
+        strucs, lambda s: model.get_hhi_reserve(s.composition) or np.nan
+    )
+
+
+def _price(strucs):
+    analyzer = CostAnalyzer(CostDBElements())
+    return _per_structure(strucs, lambda s: analyzer.get_cost_per_kg(s.composition))
+
+
+def _mcia(strucs, substrate, millers=None):
+    analyzer = SubstrateAnalyzer(film_max_miller=1, substrate_max_miller=1)
+    substrate = SpacegroupAnalyzer(
+        substrate, symprec=0.1
+    ).get_conventional_standard_structure()
+    formula = substrate.composition.reduced_formula
+    if millers is None and formula in SUB_MILLERS:
+        millers = SUB_MILLERS[formula]
+
+    def min_match_area(struc):
+        film = SpacegroupAnalyzer(
+            struc, symprec=0.1
+        ).get_conventional_standard_structure()
+        matches = analyzer.calculate(
+            film=film, substrate=substrate, substrate_millers=millers, lowest=True
+        )
+        return min(match.match_area for match in matches)
+
+    return _per_structure(strucs, min_match_area)
 
 
 class PyMatGen(Calculator):
-    def __init__(self, root_dir, task="density", substrate="Si"):
+    """On-the-fly property calculator backed by pymatgen."""
+
+    def __init__(self, root_dir, task="density", substrate_path=None):
         super().__init__(root_dir, task)
-        self.substrate = Structure.from_file(os.path.join(SUBSTRATE_PATH, f"{substrate}.cif"))
+        self.substrate_path = substrate_path
         self._tasks = {
             "density": lambda x: np.array([s.density for s in x]),
             "hhi": _hhi,
             "price": _price,
-            "abundance": lambda x: np.array([_abundance(s) for s in x]),
-            "log_abundance": lambda x: np.log10(np.array([_abundance(s) for s in x])),
-            "mcia": lambda x: _mcia(x, self.substrate),
+            "abundance": lambda x: _per_structure(x, _abundance),
+            "log_abundance": lambda x: np.log10(_per_structure(x, _abundance)),
+            "mcia": lambda x: _mcia(x, self._load_substrate()),
             "num_atoms": lambda x: np.array([len(s) for s in x], dtype=float),
-            "num_elements": lambda x: np.array([len(s.composition.elements) for s in x], dtype=float),
+            "num_elements": lambda x: np.array(
+                [len(s.composition.elements) for s in x], dtype=float
+            ),
             "volume": lambda x: np.array([s.volume for s in x], dtype=float),
         }
+
+    def _load_substrate(self):
+        """Parse the substrate CIF required by the ``mcia`` task."""
+        if self.substrate_path is None:
+            raise ValueError(
+                "The 'mcia' task requires substrate_path, a path to a substrate CIF"
+            )
+        return Structure.from_file(self.substrate_path)
 
     def calc(self, samples, label="tmp"):
         struc_list = samples[0]
         fn = self._tasks.get(self.task)
         if fn is None:
-            raise ValueError(f"Unknown task: {self.task}")
+            raise ValueError(
+                f"Unknown task: {self.task}, available: {sorted(self._tasks)}"
+            )
         results = fn(struc_list)
-        np.savetxt(os.path.abspath(os.path.join(self.root_dir, f"{label}.txt")), results, fmt="%.8f")
+        out_path = os.path.abspath(os.path.join(self.root_dir, f"{label}.txt"))
+        np.savetxt(out_path, results, fmt="%.8f")
         return results
+
+
+__all__ = ["PyMatGen"]

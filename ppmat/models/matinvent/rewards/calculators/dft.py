@@ -17,17 +17,13 @@ import os
 import numpy as np
 from pymatgen.io.cif import CifWriter
 
-from ppmat.models.matinvent.rewards.base import Calculator
+from ppmat.models.matinvent.rewards.calculators import Calculator
 
 
 class DFTCalc(Calculator):
-    """DFT property calculator that writes CIF files for external VASP computation.
+    """Write structures as CIFs for an external DFT run and read values back.
 
-    This calculator exports structures as CIF files to a staging directory.
-    The actual DFT computation must be performed externally (e.g. VASP, QE).
-    After external computation completes, the results file should be placed at:
-        {root_dir}/{label}.txt
-    with one float value per structure.
+    Results must be placed at ``{root_dir}/{label}.txt``, one float per structure.
     """
 
     def calc(self, samples, label="tmp"):
@@ -35,7 +31,8 @@ class DFTCalc(Calculator):
         cif_dir = os.path.join(self.root_dir, label)
         os.makedirs(cif_dir, exist_ok=True)
         for i, struc in enumerate(struc_list):
-            CifWriter(struc).write_file(os.path.abspath(os.path.join(cif_dir, f"{i}.cif")))
+            cif_path = os.path.abspath(os.path.join(cif_dir, f"{i}.cif"))
+            CifWriter(struc).write_file(cif_path)
 
         out_path = os.path.abspath(os.path.join(self.root_dir, f"{label}.txt"))
         if not os.path.isfile(out_path):
@@ -47,7 +44,8 @@ class DFTCalc(Calculator):
         results = np.loadtxt(out_path, dtype=float, ndmin=1)
         if results.shape[0] != len(struc_list):
             raise ValueError(
-                f"{out_path} holds {results.shape[0]} values, expected {len(struc_list)}"
+                f"{out_path} holds {results.shape[0]} values, "
+                f"expected {len(struc_list)}"
             )
         return results
 
