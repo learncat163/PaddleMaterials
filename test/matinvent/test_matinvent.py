@@ -36,11 +36,11 @@ from ppmat.models import MODEL_REGISTRY
 from ppmat.models import build_model
 from ppmat.models.diffcsp.diffcsp import DiffCSP
 from ppmat.models.matinvent.dataset import create_rl_dataloader
+from ppmat.models.matinvent.mattergen import MatinventMatterGen
 from ppmat.models.matinvent.rewards.reward import CALCULATOR_REGISTRY
 from ppmat.models.matinvent.rewards.reward import Reward
 from ppmat.models.matinvent.rl_finetune import MatinventRL
 from ppmat.models.matinvent.rl_finetune import run_rl_training
-from ppmat.models.mattergen.mattergen import MatterGen
 from ppmat.utils import download
 from ppmat.utils import save_load
 from ppmat.utils.model_package import resolve_model_package_dir
@@ -51,7 +51,7 @@ _CONFIG_PATH = {
     "mattergen": str(_CONFIG_DIR / "matinvent_mattergen.yaml"),
     "diffcsp": str(_CONFIG_DIR / "matinvent_diffcsp.yaml"),
 }
-_BACKBONE_CLASS = {"mattergen": MatterGen, "diffcsp": DiffCSP}
+_BACKBONE_CLASS = {"mattergen": MatinventMatterGen, "diffcsp": DiffCSP}
 _BACKBONE_METHOD = {"mattergen": "_denoise", "diffcsp": "_decode"}
 _WEIGHTS_NAME = "best.pdparams"
 _DISPATCH_SEED = 2026
@@ -252,6 +252,35 @@ class TestModelPackage:
         )
 
         assert len(result["result"]) == 1
+
+
+class TestMatterGenBackbone:
+    """The MatInvent MatterGen variant must keep the mainline graph numerics."""
+
+    def test_paddle_graph_keeps_mainline_numerics(self):
+        mainline_cfg = copy.deepcopy(_tiny_backbone_cfg("mattergen"))
+        mainline_cfg["__class_name__"] = "MatterGen"
+        with paddle.utils.unique_name.guard():
+            paddle.seed(_DISPATCH_SEED)
+            mainline = build_model(mainline_cfg)
+        with paddle.utils.unique_name.guard():
+            paddle.seed(_DISPATCH_SEED)
+            adapter = build_model(_tiny_backbone_cfg("mattergen"))
+        assert type(adapter).__name__ == "MatinventMatterGen"
+
+        adapter.set_state_dict(_clone_state_dict(mainline))
+        mainline.eval()
+        adapter.eval()
+
+        inputs = _make_denoise_inputs("mattergen", adapter)
+        expected = mainline._denoise(*inputs)
+        actual = adapter._denoise(*inputs)
+        for expected_value, actual_value in zip(
+            _flatten_result(expected), _flatten_result(actual), strict=True
+        ):
+            np.testing.assert_allclose(
+                np.asarray(actual_value), np.asarray(expected_value), atol=0, rtol=0
+            )
 
 
 class TestDataFlow:

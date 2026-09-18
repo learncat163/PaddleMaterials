@@ -189,9 +189,9 @@ def radius_graph_pbc_ocp(
     if pbc is not None:
         pbc = paddle.atleast_2d(pbc)
         for i in range(3):
-            if not paddle.any(x=pbc[:, i].contiguous()).item():
+            if not paddle.any(x=pbc[:, i]).item():
                 pbc_[i] = False
-            elif paddle.all(x=pbc[:, i].contiguous()).item():
+            elif paddle.all(x=pbc[:, i]).item():
                 pbc_[i] = True
             else:
                 raise RuntimeError(

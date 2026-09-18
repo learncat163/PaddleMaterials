@@ -40,7 +40,12 @@ def _build_structure(result: dict, build_structure_cfg: dict):
     cfg = dict(build_structure_cfg)
     try:
         return BuildStructure.build_one(
-            {"frac_coords": frac_coords, "atom_types": atom_types, "lattice": lattice},
+            {
+                "frac_coords": frac_coords,
+                "atom_types": atom_types,
+                # The array format expects ``lattice`` as a list.
+                "lattice": lattice.tolist(),
+            },
             cfg.pop("format"),
             **cfg,
         )

@@ -13,7 +13,7 @@ Model:
     model_type: mattergen
     num_inference_steps: ${Global.num_inference_steps}
     backbone_cfg:
-      __class_name__: MatterGen
+      __class_name__: MatinventMatterGen
       __init_params__:
         decoder_cfg:
           gemnet_cfg:
