@@ -12,12 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import paddle
 import paddle.nn as nn
-from ..common import to_dense_batch
+
 from ..common import get_index_embedding
 from ..common import make_attn_mask
 from ..common import set_gelu_approx
+from ..common import to_dense_batch
 
 
 class TransformerEncoder(nn.Layer):
@@ -58,14 +58,14 @@ class TransformerEncoder(nn.Layer):
             activation=activation,
             normalize_before=norm_first,
         )
-        
+
         layer_norm = nn.LayerNorm(d_model)
         self.transformer = nn.TransformerEncoder(
             encoder_layer,
             num_layers=num_layers,
             norm=layer_norm,
         )
-        
+
         if activation == "gelu":
             set_gelu_approx(self.transformer)
 

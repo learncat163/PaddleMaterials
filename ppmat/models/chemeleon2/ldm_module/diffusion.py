@@ -18,18 +18,33 @@ from ppmat.schedulers import build_scheduler
 
 
 class GaussianDiffusion:
-    def __init__(self, model_mean_type="epsilon", model_var_type="fixed_small", loss_type="mse", **kwargs):
-        sched_kwargs = {k: v for k, v in kwargs.items() if k in (
-            "num_train_timesteps", "beta_start", "beta_end", "beta_schedule",
-            "variance_type", "prediction_type", "clip_sample",
-        )}
+    def __init__(
+        self,
+        **kwargs,
+    ):
+        sched_kwargs = {
+            k: v
+            for k, v in kwargs.items()
+            if k
+            in (
+                "num_train_timesteps",
+                "beta_start",
+                "beta_end",
+                "beta_schedule",
+                "variance_type",
+                "prediction_type",
+                "clip_sample",
+            )
+        }
         sched_kwargs.setdefault("variance_type", "fixed_small")
         sched_kwargs.setdefault("prediction_type", "epsilon")
         sched_kwargs.setdefault("beta_schedule", "linear")
-        self.scheduler = build_scheduler({
-            "__class_name__": "DDPMScheduler",
-            "__init_params__": sched_kwargs,
-        })
+        self.scheduler = build_scheduler(
+            {
+                "__class_name__": "DDPMScheduler",
+                "__init_params__": sched_kwargs,
+            }
+        )
         self.num_timesteps = self.scheduler.num_train_timesteps
 
     def q_sample(self, x_start, t, noise=None):
@@ -47,22 +62,26 @@ class GaussianDiffusion:
         model_output = model(x_t, t, **model_kwargs_no_mask)
 
         if model_output.shape[-1] == x_start.shape[-1] * 2:
-            model_output = model_output.reshape([model_output.shape[0], 2 * model_output.shape[1], model_output.shape[2] // 2])
+            # Keep epsilon; sigma is only needed for variance in the scheduler
+            model_output, _ = paddle.split(model_output, 2, axis=-1)
 
         if mask is not None:
-            model_output = model_output * paddle.tile(mask.unsqueeze(-1), [1, 2, 1]).astype(model_output.dtype)
-
-        if model_output.shape[1] == x_start.shape[1] * 2:
-            model_output, _ = paddle.split(model_output, 2, axis=1)
+            model_output = model_output * mask.unsqueeze(-1).astype(model_output.dtype)
 
         target = noise
 
         if mask is not None:
             while mask.ndim < target.ndim:
                 mask = mask.unsqueeze(-1)
-            mse = ((target - model_output) ** 2 * mask.astype(target.dtype)).sum(axis=list(range(1, target.ndim))) / mask.astype(target.dtype).sum(axis=list(range(1, target.ndim))).clip(min=1e-6)
+            mse = ((target - model_output) ** 2 * mask.astype(target.dtype)).sum(
+                axis=list(range(1, target.ndim))
+            ) / mask.astype(target.dtype).sum(axis=list(range(1, target.ndim))).clip(
+                min=1e-6
+            )
         else:
-            mse = paddle.mean((target - model_output) ** 2, axis=list(range(1, target.ndim)))
+            mse = paddle.mean(
+                (target - model_output) ** 2, axis=list(range(1, target.ndim))
+            )
 
         return {"mse": mse.mean(), "loss": mse.mean()}
 
@@ -79,26 +98,61 @@ class GaussianDiffusion:
             self.scheduler.variance_type = _saved_type
         return {"sample": out.prev_sample, "pred_xstart": out.pred_original_sample}
 
-    def _loop(self, model, shape, noise, model_kwargs, sampler_fn, progress, clip_denoised, eta=0.0):
+    def _loop(
+        self,
+        model,
+        shape,
+        noise,
+        model_kwargs,
+        sampler_fn,
+        progress,
+        clip_denoised,
+        eta=0.0,
+    ):
         img = noise if noise is not None else paddle.randn(shape)
         indices = list(range(self.num_timesteps))[::-1]
         if progress:
             try:
                 from tqdm.auto import tqdm
+
                 indices = tqdm(indices)
             except ImportError:
                 pass
         for i in indices:
-            t = paddle.to_tensor([i] * shape[0], dtype='int64')
+            t = paddle.to_tensor([i] * shape[0], dtype="int64")
             with paddle.no_grad():
-                img = sampler_fn(model, img, t, clip_denoised=clip_denoised, model_kwargs=model_kwargs, eta=eta)["sample"]
+                img = sampler_fn(
+                    model,
+                    img,
+                    t,
+                    clip_denoised=clip_denoised,
+                    model_kwargs=model_kwargs,
+                    eta=eta,
+                )["sample"]
         return img
 
-    def p_sample_loop(self, model, shape, noise=None, clip_denoised=True, model_kwargs=None, progress=False, device=None):
-        return self._loop(model, shape, noise, model_kwargs, lambda m, x, t, **kw: self.p_sample(m, x, t, **kw), progress, clip_denoised)
+    def p_sample_loop(
+        self,
+        model,
+        shape,
+        noise=None,
+        clip_denoised=True,
+        model_kwargs=None,
+        progress=False,
+        device=None,
+    ):
+        return self._loop(
+            model,
+            shape,
+            noise,
+            model_kwargs,
+            lambda m, x, t, **kw: self.p_sample(m, x, t, **kw),
+            progress,
+            clip_denoised,
+        )
 
     def _extract(self, arr, t, shape):
-        res = paddle.to_tensor(arr, dtype='float32')[t]
+        res = paddle.to_tensor(arr, dtype="float32")[t]
         while res.ndim < len(shape):
             res = res.unsqueeze(-1)
         return paddle.broadcast_to(res, shape)
@@ -109,7 +163,9 @@ class GaussianDiffusion:
             model_output, _ = paddle.split(model_output, 2, axis=-1)
         sched = self.scheduler
         alpha_bar = self._extract(sched.alphas_cumprod, t, x.shape)
-        alpha_bar_prev = self._extract(sched.alphas_cumprod.clip(min=1e-8), (t - 1).clip(min=0), x.shape)
+        alpha_bar_prev = self._extract(
+            sched.alphas_cumprod.clip(min=1e-8), (t - 1).clip(min=0), x.shape
+        )
 
         pred_x0 = (x - (1 - alpha_bar).sqrt() * model_output) / alpha_bar.sqrt()
         if clip_denoised:
@@ -117,13 +173,46 @@ class GaussianDiffusion:
 
         eps = (x - alpha_bar.sqrt() * pred_x0) / (1 - alpha_bar).sqrt()
 
-        sigma = eta * ((1 - alpha_bar_prev) / (1 - alpha_bar)).sqrt() * (1 - alpha_bar / alpha_bar_prev).sqrt()
-        noise = paddle.randn_like(x) * (t != 0).astype('float32').reshape([-1] + [1] * (x.ndim - 1))
-        mean = pred_x0 * alpha_bar_prev.sqrt() + (1 - alpha_bar_prev - sigma ** 2).clip(min=0).sqrt() * eps
-        return {"sample": mean + sigma * noise, "pred_xstart": pred_x0, "mean": mean, "std": sigma}
+        sigma = (
+            eta
+            * ((1 - alpha_bar_prev) / (1 - alpha_bar)).sqrt()
+            * (1 - alpha_bar / alpha_bar_prev).sqrt()
+        )
+        noise = paddle.randn_like(x) * (t != 0).astype("float32").reshape(
+            [-1] + [1] * (x.ndim - 1)
+        )
+        mean = (
+            pred_x0 * alpha_bar_prev.sqrt()
+            + (1 - alpha_bar_prev - sigma**2).clip(min=0).sqrt() * eps
+        )
+        return {
+            "sample": mean + sigma * noise,
+            "pred_xstart": pred_x0,
+            "mean": mean,
+            "std": sigma,
+        }
 
-    def ddim_sample_loop(self, model, shape, noise=None, clip_denoised=True, model_kwargs=None, progress=False, device=None, eta=0.0):
-        return self._loop(model, shape, noise, model_kwargs, lambda m, x, t, **kw: self.ddim_sample(m, x, t, **kw), progress, clip_denoised, eta=eta)
+    def ddim_sample_loop(
+        self,
+        model,
+        shape,
+        noise=None,
+        clip_denoised=True,
+        model_kwargs=None,
+        progress=False,
+        device=None,
+        eta=0.0,
+    ):
+        return self._loop(
+            model,
+            shape,
+            noise,
+            model_kwargs,
+            lambda m, x, t, **kw: self.ddim_sample(m, x, t, **kw),
+            progress,
+            clip_denoised,
+            eta=eta,
+        )
 
 
 class SpacedDiffusion(GaussianDiffusion):
@@ -149,8 +238,10 @@ class SpacedDiffusion(GaussianDiffusion):
         if getattr(model, "_spaced_wrapped", False):
             return model
         map_t = self._map_tensor
+
         def wrapped(x, ts, **kw):
             return model(x, map_t[ts], **kw)
+
         wrapped._spaced_wrapped = True
         return wrapped
 
@@ -172,12 +263,16 @@ class SpacedDiffusion(GaussianDiffusion):
 
 def space_timesteps(num_timesteps, section_counts):
     if isinstance(section_counts, str) and section_counts.startswith("ddim"):
-        desired = int(section_counts[len("ddim"):])
+        desired = int(section_counts[len("ddim") :])
         for i in range(1, num_timesteps):
             if len(range(0, num_timesteps, i)) == desired:
                 return set(range(0, num_timesteps, i))
         raise ValueError(f"cannot create {num_timesteps} steps with integer stride")
-    counts = [int(x) for x in section_counts.split(",")] if isinstance(section_counts, str) else section_counts
+    counts = (
+        [int(x) for x in section_counts.split(",")]
+        if isinstance(section_counts, str)
+        else section_counts
+    )
     size_per = num_timesteps // len(counts)
     extra = num_timesteps % len(counts)
     all_steps = []
@@ -192,17 +287,34 @@ def space_timesteps(num_timesteps, section_counts):
     return set(all_steps)
 
 
-def create_diffusion(timestep_respacing, noise_schedule="linear", sigma_small=False,
-                      learn_sigma=True, diffusion_steps=1000, **kwargs):
+def create_diffusion(
+    timestep_respacing,
+    noise_schedule="linear",
+    sigma_small=False,
+    learn_sigma=True,
+    diffusion_steps=1000,
+    **kwargs,
+):
     beta_schedule_map = {"linear": "linear", "squaredcos_cap_v2": "squaredcos_cap_v2"}
     bs = beta_schedule_map.get(noise_schedule, "linear")
-    var_type = "learned_range" if learn_sigma else ("fixed_small" if sigma_small else "fixed_large")
+    var_type = (
+        "learned_range"
+        if learn_sigma
+        else ("fixed_small" if sigma_small else "fixed_large")
+    )
 
     if timestep_respacing is None or timestep_respacing == "":
         timestep_respacing = [diffusion_steps]
 
-    kw = dict(num_train_timesteps=diffusion_steps, beta_schedule=bs, variance_type=var_type, prediction_type="epsilon")
-    if isinstance(timestep_respacing, (list, tuple)) or isinstance(timestep_respacing, str):
+    kw = dict(
+        num_train_timesteps=diffusion_steps,
+        beta_schedule=bs,
+        variance_type=var_type,
+        prediction_type="epsilon",
+    )
+    if isinstance(timestep_respacing, (list, tuple)) or isinstance(
+        timestep_respacing, str
+    ):
         use_ts = space_timesteps(diffusion_steps, timestep_respacing)
         return SpacedDiffusion(use_timesteps=use_ts, **kw)
 

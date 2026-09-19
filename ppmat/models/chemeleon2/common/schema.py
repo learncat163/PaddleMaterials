@@ -14,11 +14,13 @@
 
 import paddle
 
+from ppmat.datasets.build_structure import BuildStructure
 from ppmat.datasets.geometric_data_type.data import Data
 from ppmat.utils.crystal import lattice_params_to_matrix_paddle
 
 __all__ = [
     "CrystalBatch",
+    "build_structure_array",
     "create_empty_batch",
 ]
 
@@ -48,12 +50,14 @@ class CrystalBatch(Data):
         for i in range(num_graphs):
             mask = batch_np == i
             sd = {}
-            for k in ('atom_types', 'frac_coords', 'cart_coords'):
+            for k in ("atom_types", "frac_coords", "cart_coords"):
                 v = getattr(self, k, None)
                 if v is not None:
                     sd[k] = v[mask]
             if self.lattices is not None:
-                sd['lattices'] = self.lattices[i] if self.lattices.ndim == 3 else self.lattices
+                sd["lattices"] = (
+                    self.lattices[i] if self.lattices.ndim == 3 else self.lattices
+                )
             structures.append(sd)
         return structures
 
@@ -66,39 +70,36 @@ class CrystalBatch(Data):
             raise ValueError("atom_types and lattices must be set")
         atoms_list = []
         for sd in self._split_by_batch_index():
-            types = sd['atom_types'].cpu().numpy()
-            lat = sd['lattices'].cpu().numpy().squeeze()
+            types = sd["atom_types"].cpu().numpy()
+            lat = sd["lattices"].cpu().numpy().squeeze()
             atoms = Atoms(numbers=types, cell=lat, pbc=True)
-            if frac_coords and 'frac_coords' in sd:
-                atoms.set_scaled_positions(sd['frac_coords'].cpu().numpy())
-            elif 'cart_coords' in sd:
-                atoms.set_positions(sd['cart_coords'].cpu().numpy())
+            if frac_coords and "frac_coords" in sd:
+                atoms.set_scaled_positions(sd["frac_coords"].cpu().numpy())
+            elif "cart_coords" in sd:
+                atoms.set_positions(sd["cart_coords"].cpu().numpy())
             atoms_list.append(atoms)
         return atoms_list
 
     def to_structures(self, frac_coords=True):
-        try:
-            from pymatgen.core import Lattice, Structure, Element
-        except ImportError:
-            raise ImportError("Pymatgen is required. pip install pymatgen")
         if self.atom_types is None or self.lattices is None:
             raise ValueError("atom_types and lattices must be set")
         structure_list = []
         for sd in self._split_by_batch_index():
-            types_int = sd['atom_types'].cpu().numpy().tolist()
-            if isinstance(types_int[0], list):
-                types_int = [item for sublist in types_int for item in sublist]
-            symbols = [Element.from_Z(int(z)).symbol for z in types_int]
-            lat_np = sd['lattices'].cpu().numpy().squeeze()
-            if frac_coords and 'frac_coords' in sd:
-                coords = sd['frac_coords']
-                coords_are_cartesian = False
-            elif 'cart_coords' in sd:
-                coords = sd['cart_coords']
-                coords_are_cartesian = True
+            if frac_coords and "frac_coords" in sd:
+                coords = sd["frac_coords"]
+            elif "cart_coords" in sd and not frac_coords:
+                coords = sd["cart_coords"]
             else:
-                raise ValueError("frac_coords or cart_coords required")
-            s = Structure(Lattice(lat_np), symbols, coords.cpu().numpy(), coords_are_cartesian=coords_are_cartesian)
+                raise ValueError("frac_coords required")
+            # Unified parsing interface via BuildStructure.build_one
+            crystal_data = {
+                "atom_types": sd["atom_types"].cpu().numpy().tolist(),
+                "frac_coords": coords.cpu().numpy().tolist(),
+                "lattice": sd["lattices"].cpu().numpy().squeeze().tolist(),
+            }
+            s = BuildStructure.build_one(
+                crystal_data, "array", niggli=False, canocial=False
+            )
             structure_list.append(s)
         return structure_list
 
@@ -111,11 +112,9 @@ def build_structure_array(batch, structure_array):
     if "atom_types" in structure_array:
         batch.atom_types = structure_array["atom_types"]
     else:
-        batch.atom_types = paddle.zeros([total_atoms], dtype='int64')
+        batch.atom_types = paddle.zeros([total_atoms], dtype="int64")
     batch.num_atoms = num_atoms
-    batch.batch = paddle.repeat_interleave(
-        paddle.arange(batch_size), repeats=num_atoms
-    )
+    batch.batch = paddle.repeat_interleave(paddle.arange(batch_size), repeats=num_atoms)
 
     if "frac_coords" in structure_array:
         batch.frac_coords = structure_array["frac_coords"]
@@ -131,32 +130,33 @@ def build_structure_array(batch, structure_array):
 
     batch.num_nodes = total_atoms
     batch.num_graphs = batch_size
-    batch.token_idx = paddle.concat([
-        paddle.arange(n) for n in num_atoms
-    ])
+    batch.token_idx = paddle.concat([paddle.arange(n) for n in num_atoms])
 
     return batch
 
 
-def create_empty_batch(num_atoms, device='cpu', atom_types=None):
+def create_empty_batch(num_atoms, device="cpu", atom_types=None):
     data_list = []
     for i, n in enumerate(num_atoms):
         d = CrystalBatch(
-            atom_types=paddle.empty([n], dtype='int64') if atom_types is None else paddle.to_tensor(atom_types[i], dtype='int64'),
+            atom_types=paddle.empty([n], dtype="int64")
+            if atom_types is None
+            else paddle.to_tensor(atom_types[i], dtype="int64"),
             frac_coords=paddle.empty([n, 3]),
             cart_coords=paddle.empty([n, 3]),
             lattices=paddle.empty([1, 3, 3]),
-            num_atoms=paddle.to_tensor(n, dtype='int64'),
+            num_atoms=paddle.to_tensor(n, dtype="int64"),
             lengths=paddle.empty([1, 3]),
             lengths_scaled=paddle.empty([1, 3]),
             angles=paddle.empty([1, 3]),
             angles_radians=paddle.empty([1, 3]),
-            token_idx=paddle.arange(n, dtype='int64'),
+            token_idx=paddle.arange(n, dtype="int64"),
             num_nodes=n,
         )
         data_list.append(d)
     from ppmat.datasets.geometric_data_type.batch import Batch
+
     batch = Batch.from_data_list(data_list)
-    if device == 'gpu':
-        batch = batch.to('gpu')
+    if device == "gpu":
+        batch = batch.to("gpu")
     return batch

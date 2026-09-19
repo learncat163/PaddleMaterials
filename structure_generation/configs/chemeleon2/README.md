@@ -17,7 +17,7 @@ Chemeleon2 represents a crystal structure by its unit cell:
 - fractional coordinates: $X = (x_1, \ldots, x_N)$, $x_i \in [0,1)^3$
 - lattice parameters: lengths $(a, b, c)$ and angles $(\alpha, \beta, \gamma)$
 
-The three-stage pipeline is strictly sequential: the VAE is trained first to learn a continuous latent space, the LDM is then trained to generate in that latent space, and finally the RL module fine-tunes the LDM denoiser using reward signals.
+The three-stage pipeline is strictly sequential: the VAE is trained first to learn a continuous latent space, the LDM is then trained to generate in that latent space, and finally RL fine-tuning shapes generation toward target properties. This repo ports the VAE and LDM stages; the RL stage is not yet ported (see Stage 3 below).
 
 ### Method
 
@@ -79,35 +79,13 @@ $$
 
 where $w$ is the guidance scale (default 2.0). LoRA (Low-Rank Adaptation) is supported for parameter-efficient fine-tuning of the DiT on labeled datasets.
 
-#### 3) Stage 3: Reinforcement Learning (RL) with GRPO
+#### 3) Stage 3: Reinforcement Learning (RL) with GRPO (not yet ported)
 
-> **Note**: The RL module is currently experimental. The rollout pipeline and several reward components (`StructureDiversityReward`, `CompositionDiversityReward`, `PredictorReward`) raise `NotImplementedError`. Only `CreativityReward` and `EnergyReward` are functional. End-to-end RL training has not been fully validated.
-
-
-The RL module fine-tunes the LDM denoiser using Group Relative Policy Optimization (GRPO) to maximize expected rewards from a modular reward system. The VAE and condition module remain frozen throughout.
-
-**Policy**: The LDM denoiser $\pi_\theta$ defines a Gaussian policy over latent transitions. Log-probabilities of trajectories $\{z_T, z_{T-1}, \ldots, z_0\}$ are computed as:
-
-$$
-\log \pi_\theta(\tau) = \sum_{t=0}^{T-1} \log \mathcal{N}(z_t;\, \mu_\theta(z_{t+1}, t),\, \sigma_t^2 I)
-$$
-
-**GRPO objective**: For each batch, $G$ trajectories are sampled per composition (group). Advantages $A_t$ are computed by normalizing rewards within each group. The clipped surrogate loss is:
-
-$$
-\mathcal{L}_\text{GRPO} = -\mathbb{E}\!\left[\min\!\left(r_t(\theta)\, A_t,\; \text{clip}(r_t(\theta), 1-\epsilon, 1+\epsilon)\, A_t\right)\right] + \beta\, D_\text{KL} - \gamma\, H
-$$
-
-where $r_t(\theta) = \pi_\theta / \pi_{\theta_\text{old}}$ is the probability ratio, $\epsilon$ is the clipping parameter, $\beta$ controls KL penalty, and $\gamma$ controls entropy bonus.
-
-**Reward system**: Multiple `RewardComponent` objects can be configured with weights:
-
-| Component | Purpose |
-|-----------|---------|
-| `CreativityReward` | Reward unique (AMD-based) and novel structures |
-| `EnergyReward` | Penalize high energy above convex hull (MACE-Torch) |
-
-Custom reward components can be defined by subclassing `RewardComponent` and configuring them via YAML.
+The original paper fine-tunes the LDM denoiser with Group Relative Policy
+Optimization (GRPO) and a modular, multi-objective reward system to steer
+generation toward desired material properties. This RL stage is described in
+the paper for reference only and is **not yet ported** in PaddleMaterials; the
+current release covers the VAE and LDM stages only.
 
 ---
 
@@ -142,6 +120,8 @@ Optional fields include `num_atoms`, `band_gap`, `e_above_hull`, and other prope
 | chemeleon2_vae | MP-20 | VAE | 1 | - | [chemeleon2_mp20_vae.yaml](chemeleon2_mp20_vae.yaml) | [checkpoint](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/Chemeleon2/chemeleon2_vae.zip) |
 | chemeleon2_ldm | MP-20 | LDM | 1 | - | [chemeleon2_mp20_ldm.yaml](chemeleon2_mp20_ldm.yaml) | [checkpoint](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/Chemeleon2/chemeleon2_ldm.zip) |
 
+> **Note**: Both released checkpoints are unconditional (built without `condition_module`), so de novo generation by atom count is supported while conditional (CSP) sampling is not enabled. The RL training stage is experimental and has no training entry in this repo.
+
 ### Original PyTorch Checkpoints
 
 Pre-trained model checkpoints are available via [HuggingFace Hub](https://huggingface.co/hspark1212/chemeleon2-checkpoints).
@@ -152,13 +132,13 @@ Pre-trained model checkpoints are available via [HuggingFace Hub](https://huggin
 | `mp_20_ldm_base` | MP-20 | LDM | `experiment=mp_20/ldm_base` |
 | `mp_20_ldm_rl` | MP-20 | RL (DNG) | `custom_reward=rl_dng` |
 
-Pre-computed benchmark structures (10,000 generated structures per model) for de novo generation are available in `benchmarks/dng/`:
+Pre-computed benchmark structures (10,000 generated structures per model) for de novo generation are available in the original Chemeleon2 repository at `benchmarks/dng/`:
 
 | Benchmark File | Model | Dataset |
 |---|---|---|
 | `chemeleon2_rl_dng_mp_20.json.gz` | RL-DNG | MP-20 |
 
-Evaluation metrics (computed against MP-20 reference via `src/evaluate.py`):
+Evaluation metrics (computed against MP-20 reference via the original repository's `src/evaluate.py`):
 
 | Metric | Base LDM (expected) | RL-DNG (expected) |
 |---|---|---|
@@ -215,13 +195,23 @@ python structure_generation/train.py -c structure_generation/configs/chemeleon2/
 # This command is used to predict the crystal structure using a trained model.
 # Mode 1: Use a pre-trained model (downloads automatically via MODEL_REGISTRY).
 # Mode 2: Use a custom configuration file and checkpoint.
-# Results are saved to the folder specified by --save_path (default: result).
+# Results are saved to the folder specified by --output_path (default: results).
+#
+# Note: the released chemeleon2_ldm checkpoint is unconditional. The
+# --condition mode of sample.py is not supported by this checkpoint.
+# Note: the ``Sample.data`` section of the yaml is only consumed by the
+# ``compute_metric`` / ``by_dataloader`` modes. The ``by_num_atoms`` mode
+# builds its input batch from ``--num_atoms`` alone and needs no data files.
+#
+# The ``StructGenMetric`` in the yaml reports validity / uniqueness / novelty;
+# novelty compares every unique structure against the 27k reference pickle,
+# so the runtime grows linearly with the number of unique structures.
 
 # Mode 1: Auto-download (requires local MODEL_REGISTRY entry or internet access)
-python structure_generation/sample.py --model_name='chemeleon2_ldm' --weights_name='latest.pdparams' --save_path='result_chemeleon2_ldm/' --mode='by_num_atoms' --num_atoms=20
+python structure_generation/sample.py --model_name='chemeleon2_ldm' --weights_name='best.pdparams' --output_path='result_chemeleon2_ldm/' --mode='by_num_atoms' --num_atoms=20
 
 # Mode 2: Custom checkpoint
-python structure_generation/sample.py --config_path='structure_generation/configs/chemeleon2/chemeleon2_mp20_sample.yaml' --checkpoint_path='./output/chemeleon2_ldm/checkpoints/latest.pdparams' --save_path='result_chemeleon2_ldm/' --mode='by_num_atoms' --num_atoms=20
+python structure_generation/sample.py --config_path='structure_generation/configs/chemeleon2/chemeleon2_mp20_sample.yaml' --checkpoint_path='./output/chemeleon2_ldm/checkpoints/best.pdparams' --output_path='result_chemeleon2_ldm/' --mode='by_num_atoms' --num_atoms=20
 
 # Quick forward pass test (no training data required)
 python -c "

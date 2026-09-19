@@ -16,9 +16,11 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from ppmat.models.chemeleon2.common import apply_augmentation, apply_noise
 from ppmat.models.chemeleon2.common import DiagonalGaussianDistribution
-from ppmat.models.chemeleon2.common.schema import CrystalBatch, build_structure_array
+from ppmat.models.chemeleon2.common import apply_augmentation
+from ppmat.models.chemeleon2.common import apply_noise
+from ppmat.models.chemeleon2.common.schema import CrystalBatch
+from ppmat.models.chemeleon2.common.schema import build_structure_array
 from ppmat.utils.crystal import lattice_params_to_matrix_paddle
 
 
@@ -32,13 +34,11 @@ class VAEModule(nn.Layer):
         augmentation=None,
         noise=None,
         atom_type_predict=True,
-        optimizer=None,
-        scheduler=None,
     ):
         super().__init__()
 
-        # Build nested models if encoder/decoder are config dicts
         from ppmat.models import build_model
+
         if isinstance(encoder, dict):
             self.encoder = build_model(encoder)
         else:
@@ -53,8 +53,6 @@ class VAEModule(nn.Layer):
         self.augmentation = augmentation
         self.noise = noise
         self.atom_type_predict = atom_type_predict
-        self.optimizer_config = optimizer
-        self.scheduler_config = scheduler
 
         self.quant_conv = nn.Linear(
             self.encoder.hidden_dim, 2 * latent_dim, bias_attr=False
@@ -76,7 +74,7 @@ class VAEModule(nn.Layer):
         encoded["x"] = self.post_quant_conv(encoded["x"])
         decoder_out = self.decoder(encoded)
         return decoder_out
-    
+
     def reconstruct(self, decoder_out, batch):
         batch_rec = CrystalBatch()
 
@@ -87,12 +85,10 @@ class VAEModule(nn.Layer):
 
         batch_rec.frac_coords = decoder_out["frac_coords"]
 
-        # Decoder outputs lengths_scaled, need to scale back by num_atoms^(1/3)
+        # Scale back the decoder lengths by num_atoms^(1/3)
         lengths_scaled = decoder_out["lengths"]
         num_atoms = batch.num_atoms
-        if num_atoms.ndim == 0:
-            num_atoms = num_atoms.unsqueeze(-1)
-        elif num_atoms.ndim == 1:
+        if num_atoms.ndim <= 1:
             num_atoms = num_atoms.unsqueeze(-1)
 
         lengths = lengths_scaled * num_atoms ** (1 / 3)
@@ -125,7 +121,9 @@ class VAEModule(nn.Layer):
         crystal_batch.lengths_scaled = structure_array["lengths"] / (
             num_atoms_tensor ** (1 / 3)
         )
-        cart_coords = paddle.matmul(crystal_batch.frac_coords, crystal_batch.lattices[crystal_batch.batch])
+        cart_coords = paddle.matmul(
+            crystal_batch.frac_coords, crystal_batch.lattices[crystal_batch.batch]
+        )
         crystal_batch.cart_coords = cart_coords
         return crystal_batch
 
@@ -137,17 +135,19 @@ class VAEModule(nn.Layer):
 
     def calculate_loss(self, batch, training=True):
         if training and self.augmentation is not None:
-            translate = self.augmentation.get('translate', False)
-            rotate = self.augmentation.get('rotate', False)
+            translate = self.augmentation.get("translate", False)
+            rotate = self.augmentation.get("rotate", False)
             batch = apply_augmentation(batch, translate=translate, rotate=rotate)
 
         if training and self.noise is not None:
-            ratio = self.noise.get('ratio', 0.0)
-            corruption_scale = self.noise.get('corruption_scale', 0.1)
+            ratio = self.noise.get("ratio", 0.0)
+            corruption_scale = self.noise.get("corruption_scale", 0.1)
             if ratio > 0:
-                batch = apply_noise(batch, ratio=ratio, corruption_scale=corruption_scale)
+                batch = apply_noise(
+                    batch, ratio=ratio, corruption_scale=corruption_scale
+                )
 
-        # Directly call encode and decode to avoid recursion with new forward method
+        # Direct encode/decode calls avoid recursion through forward
         encoded = self.encode(batch)
         z = encoded["posterior"].sample()
         encoded["x"] = z
@@ -161,16 +161,20 @@ class VAEModule(nn.Layer):
             )
         loss_lengths = F.mse_loss(decoder_out["lengths"], batch.lengths_scaled)
         loss_angles = F.mse_loss(decoder_out["angles"], batch.angles_radians)
-        loss_frac_coords = F.mse_loss(
-            decoder_out["frac_coords"], batch.frac_coords
-        )
+        loss_frac_coords = F.mse_loss(decoder_out["frac_coords"], batch.frac_coords)
 
         loss_kl = encoded["posterior"].kl().mean()
 
         fa_loss = 0
         if self.loss_weights.get("fa", 0) > 0:
+            if not hasattr(batch, "mace_features") or batch.mace_features is None:
+                raise ValueError(
+                    "loss_weights['fa'] > 0 requires 'mace_features' in the "
+                    "structure_array. Enable the 'mace_features' property in "
+                    "MP20Dataset.property_names or set loss_weights['fa'] to 0."
+                )
+            mace_features = getattr(batch, "mace_features")
             z = self.proj(encoded["z"])
-            mace_features = batch.mace_features
             z_norm = F.normalize(z, axis=-1)
             mace_features_norm = F.normalize(mace_features, axis=-1)
             z_cos_sim = paddle.einsum("ij,kj->ik", z_norm, z_norm)
@@ -203,9 +207,9 @@ class VAEModule(nn.Layer):
 
     def get_config(self):
         return {
-            'latent_dim': self.latent_dim,
-            'loss_weights': self.loss_weights,
-            'augmentation': self.augmentation,
-            'noise': self.noise,
-            'atom_type_predict': self.atom_type_predict,
+            "latent_dim": self.latent_dim,
+            "loss_weights": self.loss_weights,
+            "augmentation": self.augmentation,
+            "noise": self.noise,
+            "atom_type_predict": self.atom_type_predict,
         }

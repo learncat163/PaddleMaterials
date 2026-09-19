@@ -32,10 +32,17 @@ class DiagonalGaussianDistribution:
 
     def kl(self, other=None):
         if other is None:
-            return 0.5 * paddle.sum(paddle.pow(self.mean, 2) + self.var - 1.0 - self.logvar, axis=[1])
+            return 0.5 * paddle.sum(
+                paddle.pow(self.mean, 2) + self.var - 1.0 - self.logvar, axis=[1]
+            )
         return 0.5 * paddle.sum(
-            paddle.pow(self.mean - other.mean, 2) / other.var + self.var / other.var - 1.0 - self.logvar + other.logvar,
-            axis=[1])
+            paddle.pow(self.mean - other.mean, 2) / other.var
+            + self.var / other.var
+            - 1.0
+            - self.logvar
+            + other.logvar,
+            axis=[1],
+        )
 
     def mode(self):
         return self.mean

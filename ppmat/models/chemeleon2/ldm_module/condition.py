@@ -13,6 +13,7 @@
 # limitations under the License.
 
 from enum import Enum
+
 import paddle
 import paddle.nn as nn
 
@@ -31,7 +32,7 @@ class ConditionModule(nn.Layer):
         hidden_dim,
         drop_prob,
         stats=None,
-        **kwargs,
+        num_classes=None,
     ):
         super().__init__()
         self.condition_type = condition_type
@@ -52,7 +53,7 @@ class ConditionModule(nn.Layer):
                     in_dim=100,
                     hidden_dim=hidden_dim,
                 )
-            elif cond_type == ConditionType.VALUE.value:
+            elif cond_type in (ConditionType.VALUE.value, "value"):
                 _stats = self.stats.get(cond_name, {})
                 self.encoders[cond_name] = ValueEncoder(
                     hidden_dim=hidden_dim,
@@ -60,11 +61,13 @@ class ConditionModule(nn.Layer):
                     std=_stats.get("std", None),
                 )
             elif cond_type == ConditionType.CATEGORICAL.value:
-                assert "num_classes" in kwargs, (
-                    "num_classes must be provided when using CLASS condition type"
-                )
+                if num_classes is None:
+                    raise ValueError(
+                        "num_classes must be provided when using CLASS "
+                        "condition type"
+                    )
                 self.encoders[cond_name] = CategoricalEncoder(
-                    in_dim=kwargs["num_classes"],
+                    in_dim=num_classes,
                     hidden_dim=hidden_dim,
                 )
             else:
@@ -78,20 +81,26 @@ class ConditionModule(nn.Layer):
 
     def forward(self, batch_y, training=True):
         target_conditions = list(batch_y.keys())
-        assert set(target_conditions) == set(self.target_condition), (
-            f"Expected conditions {self.target_condition}, but got {target_conditions}"
-        )
+        assert set(target_conditions) == set(
+            self.target_condition
+        ), f"Expected conditions {self.target_condition}, but got {target_conditions}"
 
+        first = list(batch_y.values())[0]
+        if isinstance(first, (int, float)):
+            # Normalize scalar payloads like the sampler does
+            batch_y = {
+                k: ([v] if isinstance(v, (int, float)) else v)
+                for k, v in batch_y.items()
+            }
         batch_size = len(list(batch_y.values())[0])
         if training:
             assert self.drop_prob >= 0
             drop_mask = paddle.rand([batch_size]) < self.drop_prob
         else:
-            drop_mask = paddle.concat([
-                paddle.zeros([batch_size]),
-                paddle.ones([batch_size])
-            ])
-            drop_mask = drop_mask.astype('bool')
+            drop_mask = paddle.concat(
+                [paddle.zeros([batch_size]), paddle.ones([batch_size])]
+            )
+            drop_mask = drop_mask.astype("bool")
             batch_y = {k: _duplicate(v) for k, v in batch_y.items()}
 
         cond_embeds = []
@@ -134,17 +143,15 @@ class BaseEncoder(nn.Layer):
         )
         self.null_embed = paddle.create_parameter(
             shape=[1, in_dim],
-            dtype='float32',
-            default_initializer=nn.initializer.Normal()
+            dtype="float32",
+            default_initializer=nn.initializer.Normal(),
         )
 
     def forward(self, y, drop_mask=None):
         y = self.preprocess(y)
         if drop_mask is not None:
             y = paddle.where(
-                drop_mask.unsqueeze(-1).expand_as(y),
-                self.null_embed.expand_as(y),
-                y
+                drop_mask.unsqueeze(-1).expand_as(y), self.null_embed.expand_as(y), y
             )
         return self.embedding(y)
 
@@ -153,14 +160,12 @@ class ValueEncoder(BaseEncoder):
     def __init__(self, hidden_dim, mean=None, std=None):
         self.mean = mean
         self.std = std
-        
+
         def preprocess(batch):
-            if isinstance(batch, list):
-                batch = paddle.to_tensor(batch, dtype='float32')
-            elif not isinstance(batch, paddle.Tensor):
-                batch = paddle.to_tensor(batch, dtype='float32')
-            
-            batch = batch.astype('float32').unsqueeze(-1)
+            if not isinstance(batch, paddle.Tensor):
+                batch = paddle.to_tensor(batch, dtype="float32")
+            # Accept scalar/1-D/2-D payloads uniformly as [B, 1]
+            batch = batch.reshape([-1]).astype("float32").unsqueeze(-1)
             if self.mean is not None and self.std is not None:
                 batch = (batch - self.mean) / self.std
             return batch
@@ -175,16 +180,18 @@ class ValueEncoder(BaseEncoder):
 class CategoricalEncoder(BaseEncoder):
     def __init__(self, in_dim, hidden_dim):
         self.num_classes = in_dim
-        
+
         def preprocess(batch):
             if isinstance(batch, list):
-                idx = paddle.to_tensor(batch, dtype='int64')
+                idx = paddle.to_tensor(batch, dtype="int64")
             elif not isinstance(batch, paddle.Tensor):
-                idx = paddle.to_tensor(batch, dtype='int64')
+                idx = paddle.to_tensor(batch, dtype="int64")
             else:
-                idx = batch.astype('int64')
-            
-            return paddle.nn.functional.one_hot(idx, num_classes=self.num_classes).astype('float32')
+                idx = batch.astype("int64")
+
+            return paddle.nn.functional.one_hot(
+                idx, num_classes=self.num_classes
+            ).astype("float32")
 
         super().__init__(
             in_dim=in_dim,
@@ -197,13 +204,16 @@ class _ElementEncoder(BaseEncoder):
     def __init__(self, in_dim, hidden_dim, fill_fn):
         self._in_dim = in_dim
         self._fill = fill_fn
+
         def preprocess(batch):
             vals = [self._to_embeds(s) for s in batch]
             return paddle.concat(vals, axis=0)
+
         super().__init__(in_dim=in_dim, hidden_dim=hidden_dim, preprocess=preprocess)
 
     def _to_embeds(self, s):
         from pymatgen.core import Element
+
         v = paddle.zeros([self._in_dim])
         self._fill(v, s, Element)
         return v.unsqueeze(0)
@@ -213,10 +223,12 @@ class CompositionEncoder(_ElementEncoder):
     def __init__(self, in_dim, hidden_dim):
         def fill(v, comp_str, Element):
             from pymatgen.core import Composition
+
             comp = Composition(comp_str).reduced_composition
             for el, amt in comp.get_el_amt_dict().items():
                 v[Element(el).Z] = float(amt)
             v = v / v.sum() if v.sum() > 0 else v
+
         super().__init__(in_dim, hidden_dim, fill)
 
 
@@ -225,7 +237,5 @@ class ChemicalSystemEncoder(_ElementEncoder):
         def fill(v, cs, Element):
             for el in cs.split("-"):
                 v[Element(el).Z] = 1.0
+
         super().__init__(in_dim, hidden_dim, fill)
-
-
-

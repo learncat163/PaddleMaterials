@@ -15,10 +15,11 @@
 import paddle.nn as nn
 
 from ppmat.utils.scatter import scatter_mean
-from ..common import to_dense_batch
+
 from ..common import get_index_embedding
 from ..common import make_attn_mask
 from ..common import set_gelu_approx
+from ..common import to_dense_batch
 
 
 class TransformerDecoder(nn.Layer):
@@ -50,14 +51,14 @@ class TransformerDecoder(nn.Layer):
             activation=activation,
             normalize_before=norm_first,
         )
-        
+
         layer_norm = nn.LayerNorm(d_model)
         self.transformer = nn.TransformerEncoder(
             encoder_layer,
             num_layers=num_layers,
             norm=layer_norm,
         )
-        
+
         if activation == "gelu":
             set_gelu_approx(self.transformer)
 

@@ -11,11 +11,3 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-from ppmat.models.chemeleon2.ldm_module.ldm import LDMModule
-from ppmat.models.chemeleon2.vae_module.vae import VAEModule
-
-__all__ = [
-    "VAEModule",
-    "LDMModule",
-]
