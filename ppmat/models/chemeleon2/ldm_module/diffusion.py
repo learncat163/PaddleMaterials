@@ -61,9 +61,8 @@ class GaussianDiffusion:
         model_kwargs_no_mask["apply_mask"] = False
         model_output = model(x_t, t, **model_kwargs_no_mask)
 
-        if model_output.shape[-1] == x_start.shape[-1] * 2:
-            # Keep epsilon; sigma is only needed for variance in the scheduler
-            model_output, _ = paddle.split(model_output, 2, axis=-1)
+        if model_output.shape[1] == x_start.shape[1] * 2:
+            model_output = model_output[:, : x_start.shape[1], :]
 
         if mask is not None:
             model_output = model_output * mask.unsqueeze(-1).astype(model_output.dtype)
@@ -71,12 +70,13 @@ class GaussianDiffusion:
         target = noise
 
         if mask is not None:
-            while mask.ndim < target.ndim:
-                mask = mask.unsqueeze(-1)
-            mse = ((target - model_output) ** 2 * mask.astype(target.dtype)).sum(
-                axis=list(range(1, target.ndim))
-            ) / mask.astype(target.dtype).sum(axis=list(range(1, target.ndim))).clip(
-                min=1e-6
+            mask_b = mask.astype(target.dtype)
+            while mask_b.ndim < target.ndim:
+                mask_b = mask_b.unsqueeze(-1)
+            mask_b = paddle.broadcast_to(mask_b, list(target.shape))
+            squared = (target - model_output) ** 2 * mask_b
+            mse = squared.sum(axis=list(range(1, target.ndim))) / (
+                mask_b.sum(axis=list(range(1, target.ndim))).clip(min=1e-6)
             )
         else:
             mse = paddle.mean(
@@ -87,8 +87,8 @@ class GaussianDiffusion:
 
     def p_sample(self, model, x, t, clip_denoised=True, model_kwargs=None, eta=0.0):
         model_output = model(x, t, **(model_kwargs or {}))
-        if model_output.shape[-1] == x.shape[-1] * 2:
-            model_output, _ = paddle.split(model_output, 2, axis=-1)
+        if model_output.shape[1] == x.shape[1] * 2:
+            model_output = model_output[:, : x.shape[1], :]
             _saved_type = self.scheduler.variance_type
             self.scheduler.variance_type = "fixed_small"
         else:
@@ -159,8 +159,8 @@ class GaussianDiffusion:
 
     def ddim_sample(self, model, x, t, clip_denoised=True, model_kwargs=None, eta=0.0):
         model_output = model(x, t, **(model_kwargs or {}))
-        if model_output.shape[-1] == x.shape[-1] * 2:
-            model_output, _ = paddle.split(model_output, 2, axis=-1)
+        if model_output.shape[1] == x.shape[1] * 2:
+            model_output = model_output[:, : x.shape[1], :]
         sched = self.scheduler
         alpha_bar = self._extract(sched.alphas_cumprod, t, x.shape)
         alpha_bar_prev = self._extract(

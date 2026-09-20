@@ -91,17 +91,9 @@ current release covers the VAE and LDM stages only.
 
 ## Dataset Description
 
-### Dataset Contents
-
 - **MP-20**: A benchmark subset of Materials Project structures containing **up to 20 atoms per unit cell**. It is widely used for fair comparison across crystal generative models. The dataset includes property labels and is split into train/val/test sets.
 
-| Dataset | Train | Val | Test |
-| :---: | :---: | :---: | :---: |
-| MP-20 | 23,974 | 3,078 | 3,089 |
-
-### Data Format
-
-Each structure sample minimally provides:
+Recommended data fields for each sample:
 - `atom_types`: length-$N$ list of atomic numbers
 - `frac_coords`: $N \times 3$ fractional coordinates in $[0,1)$
 - `lengths`: lattice vector lengths $(a, b, c)$
@@ -109,49 +101,25 @@ Each structure sample minimally provides:
 
 Optional fields include `num_atoms`, `band_gap`, `e_above_hull`, and other property labels.
 
+#### MP-20 split (download link)
+| Dataset | Train | Val | Test |
+| --- | --- | --- | --- |
+| [MP-20](https://paddle-org.bj.bcebos.com/paddlematerial/datasets/mp_20/mp_20.zip) | 27136 | 9047 | 9046 |
+
 ---
 
 ## Results
 
-### PaddleMaterials Pretrained Models
+| Model | Dataset | GPUs | Training Time | Config | Checkpoint / Log |
+| --- | --- | --- | --- | --- | --- |
+| chemeleon2_vae | mp20 | 1 | - | [chemeleon2_mp20_vae.yaml](chemeleon2_mp20_vae.yaml) | [checkpoint](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/Chemeleon2/chemeleon2_vae.zip) |
+| chemeleon2_ldm | mp20 | 1 | - | [chemeleon2_mp20_ldm.yaml](chemeleon2_mp20_ldm.yaml) | [checkpoint](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/Chemeleon2/chemeleon2_ldm.zip) |
 
-| Model | Dataset | Stage | GPUs | Training Time | Config | Checkpoint / Log |
-| --- | --- | --- | --- | --- | --- | --- |
-| chemeleon2_vae | MP-20 | VAE | 1 | - | [chemeleon2_mp20_vae.yaml](chemeleon2_mp20_vae.yaml) | [checkpoint](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/Chemeleon2/chemeleon2_vae.zip) |
-| chemeleon2_ldm | MP-20 | LDM | 1 | - | [chemeleon2_mp20_ldm.yaml](chemeleon2_mp20_ldm.yaml) | [checkpoint](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/Chemeleon2/chemeleon2_ldm.zip) |
-
-> **Note**: Both released checkpoints are unconditional (built without `condition_module`), so de novo generation by atom count is supported while conditional (CSP) sampling is not enabled. The RL training stage is experimental and has no training entry in this repo.
-
-### Original PyTorch Checkpoints
-
-Pre-trained model checkpoints are available via [HuggingFace Hub](https://huggingface.co/hspark1212/chemeleon2-checkpoints).
-
-| Model Name | Dataset | Stage | Config |
-|---|---|---|---|
-| `mp_20_vae` | MP-20 | VAE | `experiment=mp_20/vae_dng` |
-| `mp_20_ldm_base` | MP-20 | LDM | `experiment=mp_20/ldm_base` |
-| `mp_20_ldm_rl` | MP-20 | RL (DNG) | `custom_reward=rl_dng` |
-
-Pre-computed benchmark structures (10,000 generated structures per model) for de novo generation are available in the original Chemeleon2 repository at `benchmarks/dng/`:
-
-| Benchmark File | Model | Dataset |
-|---|---|---|
-| `chemeleon2_rl_dng_mp_20.json.gz` | RL-DNG | MP-20 |
-
-Evaluation metrics (computed against MP-20 reference via the original repository's `src/evaluate.py`):
-
-| Metric | Base LDM (expected) | RL-DNG (expected) |
-|---|---|---|
-| Unique | 0.90 – 0.95 | 0.95 – 0.98 |
-| Novel | 0.70 – 0.80 | 0.85 – 0.95 |
-| Stable (`e_above_hull < 0.1 eV`) | 0.02 – 0.05 | 0.05 – 0.10 |
-| Composition Validity | 0.90 – 0.95 | 0.95 – 0.98 |
+> **Note**: Both released checkpoints are unconditional (built without `condition_module`), so de novo generation by atom count is supported while conditional (CSP) sampling is not enabled. The RL stage is experimental and has no training entry in this repo. Original PyTorch checkpoints are available via [HuggingFace Hub](https://huggingface.co/hspark1212/chemeleon2-checkpoints).
 
 ---
 
 ## Command
-
-> **Prerequisite**: Training and evaluation require the MP-20 dataset placed at `./data/mp_20/` containing `train.csv`, `val.csv`, `test.csv` with CIF structure strings and property labels.
 
 ### Training
 
@@ -198,19 +166,14 @@ python structure_generation/train.py -c structure_generation/configs/chemeleon2/
 # Results are saved to the folder specified by --output_path (default: results).
 #
 # Note: the released chemeleon2_ldm checkpoint is unconditional. The
-# --condition mode of sample.py is not supported by this checkpoint.
-# Note: the ``Sample.data`` section of the yaml is only consumed by the
-# ``compute_metric`` / ``by_dataloader`` modes. The ``by_num_atoms`` mode
-# builds its input batch from ``--num_atoms`` alone and needs no data files.
-#
-# The ``StructGenMetric`` in the yaml reports validity / uniqueness / novelty;
-# novelty compares every unique structure against the 27k reference pickle,
-# so the runtime grows linearly with the number of unique structures.
+# --condition mode of sample.py is not supported by this checkpoint. The
+# ``by_num_atoms`` mode builds its input batch from ``--num_atoms`` alone and
+# needs no data files.
 
-# Mode 1: Auto-download (requires local MODEL_REGISTRY entry or internet access)
+# Mode 1: pre-trained model
 python structure_generation/sample.py --model_name='chemeleon2_ldm' --weights_name='best.pdparams' --output_path='result_chemeleon2_ldm/' --mode='by_num_atoms' --num_atoms=20
 
-# Mode 2: Custom checkpoint
+# Mode 2: custom config + checkpoint
 python structure_generation/sample.py --config_path='structure_generation/configs/chemeleon2/chemeleon2_mp20_sample.yaml' --checkpoint_path='./output/chemeleon2_ldm/checkpoints/best.pdparams' --output_path='result_chemeleon2_ldm/' --mode='by_num_atoms' --num_atoms=20
 
 # Quick forward pass test (no training data required)

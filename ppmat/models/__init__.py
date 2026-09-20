@@ -21,6 +21,12 @@ from typing import Optional
 
 from omegaconf import OmegaConf
 
+from ppmat.models.chemeleon2 import Chemeleon2LDMModule
+from ppmat.models.chemeleon2 import Chemeleon2VAEModule
+from ppmat.models.chemeleon2.ldm_module import Chemeleon2ConditionModule
+from ppmat.models.chemeleon2.ldm_module.dit import Chemeleon2DiT
+from ppmat.models.chemeleon2.vae_module.decoder import Chemeleon2TransformerDecoder
+from ppmat.models.chemeleon2.vae_module.encoder import Chemeleon2TransformerEncoder
 from ppmat.models.chgnet.chgnet import CHGNet
 from ppmat.models.chgnet.chgnet_graph_converter import CHGNetGraphConverter
 from ppmat.models.comformer.comformer import iComformer
@@ -41,11 +47,6 @@ from ppmat.models.mattergen.mattergen import MatterGenWithCondition
 from ppmat.models.mattersim.m3gnet import M3GNet
 from ppmat.models.mattersim.m3gnet_graph_converter import M3GNetGraphConvertor
 from ppmat.models.megnet.megnet import MEGNetPlus
-from ppmat.models.chemeleon2 import LDMModule, VAEModule
-from ppmat.models.chemeleon2.ldm_module.dit import DiT
-from ppmat.models.chemeleon2.rl_module.rl import RLModule
-from ppmat.models.chemeleon2.vae_module.decoder import TransformerDecoder
-from ppmat.models.chemeleon2.vae_module.encoder import TransformerEncoder
 from ppmat.models.sfin.sfin import SFIN
 from ppmat.models.spherenet.spherenet import SphereNet
 from ppmat.utils import download
@@ -76,12 +77,12 @@ __all__ = [
     "DiffPrior",
     "DiffNMR",
     "InfGCN",
-    "VAEModule",
-    "LDMModule",
-    "DiT",
-    "TransformerDecoder",
-    "TransformerEncoder",
-    "RLModule",
+    "Chemeleon2VAEModule",
+    "Chemeleon2LDMModule",
+    "Chemeleon2DiT",
+    "Chemeleon2ConditionModule",
+    "Chemeleon2TransformerDecoder",
+    "Chemeleon2TransformerEncoder",
     "SFIN",
     "SphereNet",
 ]
@@ -134,7 +135,7 @@ MODEL_REGISTRY = {
     "dimenetpp_mp2018_train_60k_G": "https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/property_prediction/dimenet++/dimenetpp_mp2018_train_60k_G.zip",
     "dimenetpp_mp2018_train_60k_K": "https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/property_prediction/dimenet++/dimenetpp_mp2018_train_60k_K.zip",
     "mattersim_1M": "https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/interatomic_potentials/mattersim/mattersim_1M.zip",
-    "mattersim_5M": "https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/interatomic_potentials/mattersim/mattersim_5M.zip",
+    "mattersim_5M": "https://paddle-org.bj.bcvebos.com/paddlematerial/checkpoints/interatomic_potentials/mattersim/mattersim_5M.zip",
     "mattergen_ml2ddb": "https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/MatterGen/mattergen_ml2ddb.zip",
     "mattergen_ml2ddb_chemical_system": "https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/MatterGen/mattergen_ml2ddb_chemical_system.zip",
     "mattergen_ml2ddb_space_group": "https://paddle-org.bj.bcebos.com/paddlematerial/workflow/ml2ddb/mattergen_ml2ddb_space_group.zip",

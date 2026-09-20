@@ -189,8 +189,10 @@ class Chemeleon2DiT(nn.Layer):
 
         x = self.final_layer(x, c)
 
+        x = x.reshape([x.shape[0], 2 * x.shape[1], self.latent_dim])
+
         if mask is not None and apply_mask:
-            x = x * mask.unsqueeze(-1).astype(x.dtype)
+            x = x * mask.repeat(1, 2).unsqueeze(-1).astype(x.dtype)
 
         return x
 

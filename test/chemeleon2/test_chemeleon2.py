@@ -111,6 +111,44 @@ def test_ldm_pipeline():
         )
     assert "result" in r
 
+    # Generation-to-evaluation contract: the sample() output schema must be
+    # directly consumable by the generation metrics layer. Deterministic
+    # structures are used because the tiny random model can emit degenerate
+    # lattices that stall the structure matcher.
+    from ppmat.metrics import StructGenMetric
+    from ppmat.metrics.utils import Crystal
+
+    def make_pred(atom_types, frac_coords, lattice):
+        return {
+            "atom_types": np.array(atom_types),
+            "frac_coords": np.array(frac_coords),
+            "lattice": np.array(lattice),
+        }
+
+    schema_pred = {
+        k: np.asarray(v)
+        for k, v in r["result"][0].items()
+        if k in ("atom_types", "frac_coords", "lattice")
+    }
+    assert sorted(schema_pred) == ["atom_types", "frac_coords", "lattice"]
+
+    a = [11.0, 11.0, 8.0]
+    coords = [[0.1, 0.1, 0.1], [0.6, 0.1, 0.1], [0.6, 0.6, 0.1]]
+    latt = [[5.0, 0.0, 0.0], [0.0, 5.0, 0.0], [0.0, 0.0, 5.0]]
+    valid_pred = make_pred(a, coords, latt)
+    # A deterministically invalid variant: a non-positive lattice is always
+    # rejected by the metric layer.
+    bad_pred = make_pred(a, coords, [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
+    metric = StructGenMetric()
+    res = metric([valid_pred, valid_pred, bad_pred])
+    assert 0.0 <= res["validity"] <= 1.0 and res["validity"] > 0.0
+    assert 0.0 <= res["uniqueness"] <= 1.0 and res["uniqueness"] < 1.0
+
+    ref_metric = StructGenMetric()
+    ref_metric.reference_structures = [Crystal(valid_pred).structure]
+    res2 = ref_metric([valid_pred])
+    assert res2["novelty"] == 0.0
+
     cfg = ldm.get_config()
     assert cfg is not None and "use_cfg" in cfg
 
@@ -170,46 +208,9 @@ def test_ldm_conditional_pipeline():
         assert "result" in r and len(r["result"]) == 1
 
 
-def test_struct_gen_metric():
-    # Generation metrics on hand-crafted structures: Na2O valid twice plus
-    # one invalid variant (a non-positive lattice is always rejected).
-    import numpy as np
-
-    from ppmat.metrics import StructGenMetric
-    from ppmat.metrics.utils import Crystal
-
-    def make_pred(atom_types, frac_coords, lattice):
-        return {
-            "atom_types": np.array(atom_types),
-            "frac_coords": np.array(frac_coords),
-            "lattice": np.array(lattice),
-        }
-
-    a = [11.0, 11.0, 8.0]
-    coords = [[0.1, 0.1, 0.1], [0.6, 0.1, 0.1], [0.6, 0.6, 0.1]]
-    latt = [[5.0, 0.0, 0.0], [0.0, 5.0, 0.0], [0.0, 0.0, 5.0]]
-    pred_common = make_pred(a, coords, latt)
-
-    # Deterministically invalid: a non-positive lattice is always rejected.
-    bad = make_pred(a, coords, [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]])
-
-    metric = StructGenMetric()
-    res = metric([pred_common, make_pred(a, coords, latt), bad])
-    assert 0.0 <= res["validity"] <= 1.0 and res["validity"] > 0.0
-    assert 0.0 <= res["uniqueness"] <= 1.0 and res["uniqueness"] < 1.0
-
-    # Novelty only runs with a reference set; reuse the generated structure
-    # as its own reference so the unique structure is correctly non-novel.
-    ref_metric = StructGenMetric()
-    novelty_pred = [make_pred(a, coords, latt), pred_common]
-    ref = [Crystal(pred_common).structure]
-    ref_metric.reference_structures = ref
-    res2 = ref_metric(novelty_pred)
-    assert res2["novelty"] == 0.0
-
-
-def test_ldm_cinn_protocol_and_state_dict():
-    # The LDM owns the compiled runtime; enabling CINN must not alter weights.
+def test_ldm_cinn_dispatch_and_parity(monkeypatch):
+    # Single runtime-contract check: hook protocol, weight invariance under
+    # backend switches, boundary funneling and eager/cinn numeric parity.
     from ppmat.models.common.runtime import RuntimeMixin
 
     ldm = _build_ldm()
@@ -228,11 +229,6 @@ def test_ldm_cinn_protocol_and_state_dict():
     ldm.set_execution_backend("eager")
     assert ldm.execution_backend == "eager"
 
-
-def test_ldm_cinn_dispatch_and_parity(monkeypatch):
-    # Every denoise call must go through the single ``denoise_step`` boundary,
-    # and the eager/cinn-dispatch paths must be numerically identical.
-    ldm = _build_ldm()
     ldm.eval()
     batch = _batch([8, 12])
 
@@ -301,17 +297,37 @@ def test_ldm_cinn_gpu_compile_parity():
 
 
 if __name__ == "__main__":
+    # Mirror the pytest conftest device pin so both entry points agree.
+    paddle.set_device("cpu")
     tests = [
         test_vae_pipeline,
         test_ldm_pipeline,
         test_ldm_conditional_pipeline,
-        test_struct_gen_metric,
-        test_ldm_cinn_protocol_and_state_dict,
+        test_ldm_cinn_dispatch_and_parity,
     ]
+
+    import inspect
+
+    class PatchStub:
+        def setattr(self, target, name, value):
+            setattr(target, name, value)
+
+    def test_needs_patch(function):
+        return any(
+            param.default is inspect.Parameter.empty and param.name == "monkeypatch"
+            for param in inspect.signature(function).parameters.values()
+        )
+
+    def run_with_patch_stub(function):
+        function(PatchStub())
+
     failed = 0
     for t in tests:
         try:
-            t()
+            if test_needs_patch(t):
+                run_with_patch_stub(t)
+            else:
+                t()
             print(f"[PASS] {t.__name__}")
         except Exception as e:
             print(f"[FAIL] {t.__name__}: {e}")
