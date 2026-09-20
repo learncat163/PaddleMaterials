@@ -14,7 +14,6 @@
 
 import pickle
 
-from p_tqdm import p_map
 from pymatgen.analysis.structure_matcher import StructureMatcher
 
 from ppmat.utils import logger
@@ -35,8 +34,8 @@ class StructGenMetric:
     - ``uniqueness``: fraction of unique structures among valid ones, judged
       by ``StructureMatcher.group_structures``.
     - ``novelty``: fraction of unique structures that do not match any
-      structure in an optional reference set (e.g. the MP-20 training data
-      pickle shipped with the dataset).
+      structure in an optional reference set (e.g. a pickle of the training
+      split built locally from the dataset).
 
     The metric is consumed offline and in one shot by
     ``StructureSampler.compute_metric`` (``metric(total_results)``). It
@@ -60,16 +59,27 @@ class StructGenMetric:
                     "reference pickle must contain a list of pymatgen structures"
                 )
 
-    def _novelty_one(self, structure):
+    @staticmethod
+    def _composition_key(structure):
+        return structure.composition.element_composition.fractional_composition
+
+    def _build_reference_index(self):
+        reference_index = {}
+        for ref_structure in self.reference_structures:
+            reference_index.setdefault(self._composition_key(ref_structure), []).append(
+                ref_structure
+            )
+        return reference_index
+
+    def _novelty_one(self, structure, reference_index):
+        candidates = reference_index.get(self._composition_key(structure), [])
         try:
             # Novel: matches none of the reference structures
             is_new = all(
                 not self.matcher.fit(structure, ref_structure)
-                for ref_structure in self.reference_structures
+                for ref_structure in candidates
             )
         except Exception as e:
-            # StructureMatcher can fail on degenerate lattices; the structure
-            # is treated as not novel but the failure is logged, not silenced.
             logger.warning(f"novelty check failed for one structure: {e}")
             return False
         return bool(is_new)
@@ -96,13 +106,10 @@ class StructGenMetric:
 
         if self.reference_structures is not None:
             unique_structures = [group[0] for group in groups]
-            # O(n_unique x n_reference) StructureMatcher.fit calls; p_map
-            # parallelizes the per-structure scan to keep MP-20-scale
-            # reference sets tractable.
-            flags = p_map(
-                self._novelty_one,
-                unique_structures,
-                desc="Computing novelty",
-            )
+            reference_index = self._build_reference_index()
+            flags = [
+                self._novelty_one(structure, reference_index)
+                for structure in unique_structures
+            ]
             results["novelty"] = sum(flags) / max(n_unique, 1)
         return results

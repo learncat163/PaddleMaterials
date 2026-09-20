@@ -58,4 +58,4 @@ Sample:
   metrics:
     __class_name__: StructGenMetric
     __init_params__:
-      reference_file_path: "./data/mp_20/novelty_reference.pkl"
+      reference_file_path: null
