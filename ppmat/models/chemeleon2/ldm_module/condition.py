@@ -33,6 +33,9 @@ class Chemeleon2ConditionModule(nn.Layer):
         drop_prob,
         stats=None,
         num_classes=None,
+        # 100 element slots cover the bundled MP-20 data (max atomic
+        # number 94, verified over data/mp_20/train.csv).
+        max_num_elements=100,
     ):
         super().__init__()
         self.condition_type = condition_type
@@ -41,17 +44,18 @@ class Chemeleon2ConditionModule(nn.Layer):
         self.drop_prob = drop_prob
         self.stats = stats if stats is not None else {}
         self.num_classes = num_classes if num_classes is not None else {}
+        self.max_num_elements = max_num_elements
 
         self.encoders = nn.LayerDict()
         for cond_name, cond_type in condition_type.items():
             if cond_type == ConditionType.COMPOSITION.value:
                 self.encoders[cond_name] = CompositionEncoder(
-                    in_dim=100,
+                    in_dim=max_num_elements,
                     hidden_dim=hidden_dim,
                 )
             elif cond_type == ConditionType.CHEMICAL_SYSTEM.value:
                 self.encoders[cond_name] = ChemicalSystemEncoder(
-                    in_dim=100,
+                    in_dim=max_num_elements,
                     hidden_dim=hidden_dim,
                 )
             elif cond_type in (ConditionType.VALUE.value, "value"):
@@ -83,9 +87,11 @@ class Chemeleon2ConditionModule(nn.Layer):
 
     def forward(self, batch_y, training=True):
         target_conditions = list(batch_y.keys())
-        assert set(target_conditions) == set(
-            self.target_condition
-        ), f"Expected conditions {self.target_condition}, but got {target_conditions}"
+        if set(target_conditions) != set(self.target_condition):
+            raise ValueError(
+                f"Expected conditions {self.target_condition}, "
+                f"but got {target_conditions}"
+            )
 
         first = list(batch_y.values())[0]
         if isinstance(first, (int, float)):
@@ -96,7 +102,8 @@ class Chemeleon2ConditionModule(nn.Layer):
             }
         batch_size = len(list(batch_y.values())[0])
         if training:
-            assert self.drop_prob >= 0
+            if self.drop_prob < 0:
+                raise ValueError(f"drop_prob must be >= 0, got {self.drop_prob}")
             drop_mask = paddle.rand([batch_size]) < self.drop_prob
         else:
             drop_mask = paddle.concat(

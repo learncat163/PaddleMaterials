@@ -18,9 +18,6 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 
-from ppmat.models.chemeleon2.common import apply_lora_to_linear
-from ppmat.models.chemeleon2.common import merge_lora_weights
-from ppmat.models.chemeleon2.common import print_trainable_parameters
 from ppmat.models.chemeleon2.common import to_dense_batch
 from ppmat.models.chemeleon2.common.schema import CrystalBatch
 from ppmat.models.chemeleon2.common.schema import build_structure_array
@@ -29,7 +26,6 @@ from ppmat.models.chemeleon2.ldm_module.diffusion import create_diffusion
 from ppmat.models.common.runtime import RuntimeMixin
 from ppmat.models.common.runtime import runtime_boundary
 from ppmat.utils import logger
-from ppmat.utils.crystal import lattice_params_to_matrix_paddle
 
 # MP-20 caps the structures at 20 atoms per unit cell.
 DEFAULT_NUM_ATOMS = 20
@@ -45,13 +41,11 @@ class Chemeleon2LDMModule(RuntimeMixin, nn.Layer):
     def __init__(
         self,
         denoiser=None,
-        augmentation=None,
         diffusion_configs=None,
         condition_module=None,
         vae=None,
         vae_ckpt_path=None,
         ldm_ckpt_path=None,
-        lora_configs=None,
         execution_backend="eager",
         runtime_options=None,
     ):
@@ -80,8 +74,6 @@ class Chemeleon2LDMModule(RuntimeMixin, nn.Layer):
         self.register_buffer("latent_std", paddle.to_tensor(1.0))
 
         self.diffusion_configs = diffusion_configs
-        self.augmentation = augmentation
-        self.lora_configs = lora_configs
 
         if diffusion_configs is not None:
             self.diffusion = create_diffusion(**diffusion_configs)
@@ -110,27 +102,14 @@ class Chemeleon2LDMModule(RuntimeMixin, nn.Layer):
         if ldm_ckpt_path is not None:
             checkpoint = paddle.load(ldm_ckpt_path)
             if "model_state_dict" in checkpoint:
-                self.set_state_dict(checkpoint["model_state_dict"])
-                if "latent_std" in checkpoint:
-                    self.latent_std = checkpoint["latent_std"]
-            else:
-                # Bare state_dict payload without latent_std metadata.
-                self.set_state_dict(checkpoint)
-
-        if lora_configs is not None:
-            rank = lora_configs.get("r", 8)
-            alpha = lora_configs.get("lora_alpha", 16)
-            dropout = lora_configs.get("lora_dropout", 0.0)
-            target_modules = lora_configs.get("target_modules", None)
-
-            self.denoiser = apply_lora_to_linear(
-                self.denoiser,
-                rank=rank,
-                alpha=alpha,
-                dropout=dropout,
-                target_modules=target_modules,
-            )
-            print_trainable_parameters(self.denoiser)
+                checkpoint = checkpoint["model_state_dict"]
+            self.set_state_dict(checkpoint)
+            if "latent_std" in checkpoint:
+                # Re-register after set_state_dict: the buffer entry inside
+                # the checkpoint dict would otherwise be consumed as a stale
+                # overwrite; an explicit re-register pins the checkpointed
+                # normalization constant.
+                self.register_buffer("latent_std", checkpoint["latent_std"])
 
     @property
     def condition_names(self):
@@ -161,25 +140,20 @@ class Chemeleon2LDMModule(RuntimeMixin, nn.Layer):
 
     def _convert_sample_batch(self, batch):
         structure_array = batch["structure_array"]
-        num_atoms = structure_array["num_atoms"]
-        batch_size = num_atoms.shape[0]
 
         crystal_batch = build_structure_array(CrystalBatch(), structure_array)
-
-        # Neutral placeholder lattice; the real one is predicted by the VAE decoder
-        if not hasattr(crystal_batch, "lattices") or crystal_batch.lattices is None:
-            crystal_batch.lengths = paddle.rand([batch_size, 3]) * 10 + 5
-            crystal_batch.angles = paddle.rand([batch_size, 3]) * 60 + 60
-            crystal_batch.lattices = lattice_params_to_matrix_paddle(
-                crystal_batch.lengths, crystal_batch.angles
-            )
-
         return crystal_batch
 
     def calculate_loss(self, batch, training=True):
         if not hasattr(self, "vae") or self.vae is None:
             raise ValueError(
                 "VAE must be loaded before training. Set vae_ckpt_path in __init__."
+            )
+
+        if not hasattr(batch, "lattices") or batch.lattices is None:
+            raise ValueError(
+                "Batch must contain real lattices ('lattice' or "
+                "'lengths'+'angles' in structure_array) for the VAE encoder."
             )
 
         with paddle.no_grad():
@@ -194,7 +168,8 @@ class Chemeleon2LDMModule(RuntimeMixin, nn.Layer):
         y = None
         if self.use_cfg:
             y = batch.y
-            assert y is not None, "Batch must contain 'y' field when use_cfg=True"
+            if y is None:
+                raise ValueError("Batch must contain 'y' field when use_cfg=True")
             y = self.condition_module(y, training=training)
             if y.shape[0] != x.shape[0]:
                 # CFG doubling from the condition module; align the latent
@@ -289,7 +264,8 @@ class Chemeleon2LDMModule(RuntimeMixin, nn.Layer):
         y = None
         if self.use_cfg:
             y = batch.y
-            assert y is not None, "Batch must contain 'y' field when use_cfg=True"
+            if y is None:
+                raise ValueError("Batch must contain 'y' field when use_cfg=True")
             z = paddle.concat([z, z], axis=0)
             mask = paddle.concat([mask, mask], axis=0)
             y = self.condition_module(y, training=False)
@@ -352,30 +328,12 @@ class Chemeleon2LDMModule(RuntimeMixin, nn.Layer):
 
         return {"result": result_list}
 
-    def merge_lora(self):
-        if self.lora_configs is not None:
-            self.denoiser = merge_lora_weights(self.denoiser)
-            self.lora_configs = None
-            logger.info("LoRA weights merged into base model")
-        else:
-            logger.info("No LoRA weights to merge")
-
-    def get_config(self):
-        config = {
-            "diffusion_configs": self.diffusion_configs,
-            "augmentation": self.augmentation,
-            "lora_configs": self.lora_configs,
-            "use_cfg": self.use_cfg,
-        }
-        if hasattr(self, "vae") and self.vae is not None:
-            config["vae"] = self.vae.get_config()
-        return config
-
     def predict(
         self,
         data,
         num_inference_steps=DEFAULT_INFERENCE_STEPS,
         sampler=DEFAULT_SAMPLER,
+        progress=True,
     ):
         payload = data if isinstance(data, dict) else {}
         num_samples = payload.get("num_samples", 1)
@@ -384,7 +342,16 @@ class Chemeleon2LDMModule(RuntimeMixin, nn.Layer):
         eta = payload.get("eta", DEFAULT_ETA)
 
         if "num_atoms" in payload:
-            num_atoms_list = [payload["num_atoms"]] * num_samples
+            num_atoms = payload["num_atoms"]
+            if isinstance(num_atoms, (list, tuple)):
+                if len(num_atoms) != num_samples:
+                    raise ValueError(
+                        "num_atoms list length must match num_samples "
+                        f"({len(num_atoms)} != {num_samples})."
+                    )
+                num_atoms_list = [int(n) for n in num_atoms]
+            else:
+                num_atoms_list = [int(num_atoms)] * num_samples
         else:
             num_atoms_list = [DEFAULT_NUM_ATOMS] * num_samples
 
@@ -409,7 +376,7 @@ class Chemeleon2LDMModule(RuntimeMixin, nn.Layer):
                     num_inference_steps=num_inference_steps,
                     eta=eta,
                     cfg_scale=cfg_scale,
-                    progress=False,
+                    progress=progress,
                 )
             all_results.extend(result["result"])
         # Downstream contract of StructureSampler: {"result": [...]}

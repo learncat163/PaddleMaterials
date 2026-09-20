@@ -15,6 +15,7 @@
 import paddle
 
 from ppmat.datasets.build_structure import BuildStructure
+from ppmat.datasets.geometric_data_type.batch import Batch
 from ppmat.datasets.geometric_data_type.data import Data
 from ppmat.utils.crystal import lattice_params_to_matrix_paddle
 
@@ -139,7 +140,7 @@ def build_structure_array(batch, structure_array):
     return batch
 
 
-def create_empty_batch(num_atoms, device="cpu", atom_types=None):
+def create_empty_batch(num_atoms, atom_types=None):
     data_list = []
     for i, n in enumerate(num_atoms):
         d = CrystalBatch(
@@ -158,9 +159,5 @@ def create_empty_batch(num_atoms, device="cpu", atom_types=None):
             num_nodes=n,
         )
         data_list.append(d)
-    from ppmat.datasets.geometric_data_type.batch import Batch
-
     batch = Batch.from_data_list(data_list)
-    if device == "gpu":
-        batch = batch.to("gpu")
     return batch

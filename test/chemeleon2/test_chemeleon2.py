@@ -86,9 +86,6 @@ def test_vae_pipeline():
     rec = vae.reconstruct(decoded, b)
     assert rec.lattices is not None and rec.lengths is not None
 
-    cfg = vae.get_config()
-    assert cfg is not None and "latent_dim" in cfg
-
 
 def test_ldm_pipeline():
     ldm = _build_ldm()
@@ -149,18 +146,42 @@ def test_ldm_pipeline():
     res2 = ref_metric([valid_pred])
     assert res2["novelty"] == 0.0
 
-    cfg = ldm.get_config()
-    assert cfg is not None and "use_cfg" in cfg
 
-    ldm.merge_lora()
-    assert ldm.lora_configs is None
+def test_ldm_spaced_scheduler_alphas():
+    # Regression for the spaced-sampling math: the SpacedDiffusion scheduler
+    # must be rebuilt from the spaced betas so that alphas_cumprod decays
+    # monotonically over the spaced chain (a scheduler still carrying the
+    # original 1000-step alphas_cumprod would stay near 1.0 and make the
+    # DDIM/DDPM update equations meaningless).
+    from ppmat.models.chemeleon2.ldm_module.diffusion import create_diffusion
+
+    full = create_diffusion(
+        timestep_respacing="", noise_schedule="linear", diffusion_steps=1000
+    )
+    spaced = create_diffusion(
+        timestep_respacing="ddim50", noise_schedule="linear", diffusion_steps=1000
+    )
+    assert spaced.num_timesteps == 50
+    assert spaced.timestep_map == list(range(0, 1000, 20))
+
+    orig = full.scheduler.alphas_cumprod.numpy()
+    new = spaced.scheduler.alphas_cumprod.numpy()
+    assert new.shape[0] == 50
+    assert new[-1] < 1e-3 and new[0] > 0.5
+    assert np.allclose(new, orig[spaced.timestep_map], atol=1e-6)
+
+    # DDPM respacing shares the same invariant (no "ddim" prefix)
+    ddpm_spaced = create_diffusion(
+        timestep_respacing="5", noise_schedule="linear", diffusion_steps=1000
+    )
+    ddpm_new = ddpm_spaced.scheduler.alphas_cumprod.numpy()
+    assert ddpm_new.shape[0] == 5 and ddpm_new[-1] < 1e-3
+    assert np.allclose(ddpm_new, orig[ddpm_spaced.timestep_map], atol=1e-6)
 
 
 def test_ldm_conditional_pipeline():
     # Small end-to-end CFG pipeline build: forward, loss and sampling with a
     # condition module wired into the DiT through the condition_dim channel.
-    import copy
-
     cfg = copy.deepcopy(_load_cfg("ldm"))
     params = cfg["__init_params__"]
     params["denoiser"]["__init_params__"].update(
@@ -294,46 +315,3 @@ def test_ldm_cinn_gpu_compile_parity():
         paddle.set_device("cpu")
 
     assert bool(paddle.allclose(eager, cinn, atol=2e-5).item())
-
-
-if __name__ == "__main__":
-    # Mirror the pytest conftest device pin so both entry points agree.
-    paddle.set_device("cpu")
-    tests = [
-        test_vae_pipeline,
-        test_ldm_pipeline,
-        test_ldm_conditional_pipeline,
-        test_ldm_cinn_dispatch_and_parity,
-    ]
-
-    import inspect
-
-    class PatchStub:
-        def setattr(self, target, name, value):
-            setattr(target, name, value)
-
-    def test_needs_patch(function):
-        return any(
-            param.default is inspect.Parameter.empty and param.name == "monkeypatch"
-            for param in inspect.signature(function).parameters.values()
-        )
-
-    def run_with_patch_stub(function):
-        function(PatchStub())
-
-    failed = 0
-    for t in tests:
-        try:
-            if test_needs_patch(t):
-                run_with_patch_stub(t)
-            else:
-                t()
-            print(f"[PASS] {t.__name__}")
-        except Exception as e:
-            print(f"[FAIL] {t.__name__}: {e}")
-            import traceback
-
-            traceback.print_exc()
-            failed += 1
-    print(f"\nTotal: {len(tests)}, Passed: {len(tests) - failed}, Failed: {failed}")
-    exit(1 if failed > 0 else 0)

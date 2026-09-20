@@ -19,7 +19,6 @@ import paddle
 __all__ = [
     "get_index_embedding",
     "to_dense_batch",
-    "lattice_vector_to_volume",
     "apply_augmentation",
     "apply_noise",
     "set_gelu_approx",
@@ -37,13 +36,6 @@ def get_index_embedding(indices, emb_dim, max_len=2048):
     )
     pos_embedding = paddle.concat([pos_embedding_sin, pos_embedding_cos], axis=-1)
     return pos_embedding
-
-
-def lattice_vector_to_volume(lattice):
-    if lattice.ndim == 2:
-        lattice = lattice.unsqueeze(0)
-    a, b, c = lattice[:, 0, :], lattice[:, 1, :], lattice[:, 2, :]
-    return paddle.abs(paddle.sum(a * paddle.cross(b, c), axis=-1))
 
 
 def to_dense_batch(x, batch_idx, max_num_nodes=None):

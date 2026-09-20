@@ -18,10 +18,7 @@ from ppmat.schedulers import build_scheduler
 
 
 class GaussianDiffusion:
-    def __init__(
-        self,
-        **kwargs,
-    ):
+    def __init__(self, learn_sigma=False, **kwargs):
         sched_kwargs = {
             k: v
             for k, v in kwargs.items()
@@ -46,6 +43,15 @@ class GaussianDiffusion:
             }
         )
         self.num_timesteps = self.scheduler.num_train_timesteps
+        # Whether the denoiser emits extra variance channels that must be
+        # stripped before the epsilon output reaches the scheduler.
+        self.learn_sigma = learn_sigma
+
+    def split_epsilon(self, model_output):
+        if self.learn_sigma:
+            epsilon, _ = paddle.split(model_output, 2, axis=1)
+            return epsilon
+        return model_output
 
     def q_sample(self, x_start, t, noise=None):
         if noise is None:
@@ -60,9 +66,7 @@ class GaussianDiffusion:
         model_kwargs_no_mask = dict(model_kwargs or {})
         model_kwargs_no_mask["apply_mask"] = False
         model_output = model(x_t, t, **model_kwargs_no_mask)
-
-        if model_output.shape[1] == x_start.shape[1] * 2:
-            model_output = model_output[:, : x_start.shape[1], :]
+        model_output = self.split_epsilon(model_output)
 
         if mask is not None:
             model_output = model_output * mask.unsqueeze(-1).astype(model_output.dtype)
@@ -87,15 +91,8 @@ class GaussianDiffusion:
 
     def p_sample(self, model, x, t, clip_denoised=True, model_kwargs=None, eta=0.0):
         model_output = model(x, t, **(model_kwargs or {}))
-        if model_output.shape[1] == x.shape[1] * 2:
-            model_output = model_output[:, : x.shape[1], :]
-            _saved_type = self.scheduler.variance_type
-            self.scheduler.variance_type = "fixed_small"
-        else:
-            _saved_type = None
+        model_output = self.split_epsilon(model_output)
         out = self.scheduler.step(model_output, int(t[0].item()), x)
-        if _saved_type is not None:
-            self.scheduler.variance_type = _saved_type
         return {"sample": out.prev_sample, "pred_xstart": out.pred_original_sample}
 
     def _loop(
@@ -139,7 +136,6 @@ class GaussianDiffusion:
         clip_denoised=True,
         model_kwargs=None,
         progress=False,
-        device=None,
     ):
         return self._loop(
             model,
@@ -159,8 +155,7 @@ class GaussianDiffusion:
 
     def ddim_sample(self, model, x, t, clip_denoised=True, model_kwargs=None, eta=0.0):
         model_output = model(x, t, **(model_kwargs or {}))
-        if model_output.shape[1] == x.shape[1] * 2:
-            model_output = model_output[:, : x.shape[1], :]
+        model_output = self.split_epsilon(model_output)
         sched = self.scheduler
         alpha_bar = self._extract(sched.alphas_cumprod, t, x.shape)
         alpha_bar_prev = self._extract(
@@ -200,7 +195,6 @@ class GaussianDiffusion:
         clip_denoised=True,
         model_kwargs=None,
         progress=False,
-        device=None,
         eta=0.0,
     ):
         return self._loop(
@@ -233,6 +227,23 @@ class SpacedDiffusion(GaussianDiffusion):
                 self.timestep_map.append(i)
         self.num_timesteps = len(new_betas)
         self._map_tensor = paddle.to_tensor(self.timestep_map)
+
+        # Rebuild the scheduler from the spaced betas so that every index this
+        # class hands to the scheduler (t in step/add_noise and the
+        # alphas_cumprod lookups in ddim_sample) refers to the spaced chain.
+        # Keeping the original 1000-step alphas_cumprod would make sampling
+        # read alphas near 1.0 at the end of the loop instead of near 0.
+        self.scheduler = build_scheduler(
+            {
+                "__class_name__": "DDPMScheduler",
+                "__init_params__": {
+                    "trained_betas": new_betas,
+                    "variance_type": sched.variance_type,
+                    "prediction_type": sched.prediction_type,
+                    "clip_sample": sched.clip_sample,
+                },
+            }
+        )
 
     def _wrap_model(self, model):
         if getattr(model, "_spaced_wrapped", False):
@@ -295,22 +306,23 @@ def create_diffusion(
     diffusion_steps=1000,
     **kwargs,
 ):
-    beta_schedule_map = {"linear": "linear", "squaredcos_cap_v2": "squaredcos_cap_v2"}
-    bs = beta_schedule_map.get(noise_schedule, "linear")
-    var_type = (
-        "learned_range"
-        if learn_sigma
-        else ("fixed_small" if sigma_small else "fixed_large")
+    beta_schedule = (
+        noise_schedule
+        if noise_schedule in ("linear", "squaredcos_cap_v2")
+        else "linear"
     )
+
+    var_type = "fixed_small" if (learn_sigma or sigma_small) else "fixed_large"
 
     if timestep_respacing is None or timestep_respacing == "":
         timestep_respacing = [diffusion_steps]
 
     kw = dict(
         num_train_timesteps=diffusion_steps,
-        beta_schedule=bs,
+        beta_schedule=beta_schedule,
         variance_type=var_type,
         prediction_type="epsilon",
+        learn_sigma=learn_sigma,
     )
     if isinstance(timestep_respacing, (list, tuple)) or isinstance(
         timestep_respacing, str

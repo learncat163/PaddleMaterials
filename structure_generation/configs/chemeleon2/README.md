@@ -77,7 +77,7 @@ $$
 \epsilon_\text{cfg} = \epsilon_\theta(\cdot \mid \varnothing) + w \cdot \bigl(\epsilon_\theta(\cdot \mid y) - \epsilon_\theta(\cdot \mid \varnothing)\bigr)
 $$
 
-where $w$ is the guidance scale (default 2.0). LoRA (Low-Rank Adaptation) is supported for parameter-efficient fine-tuning of the DiT on labeled datasets.
+where $w$ is the guidance scale (default 2.0).
 
 #### 3) Stage 3: Reinforcement Learning (RL) with GRPO (not yet ported)
 
@@ -105,6 +105,14 @@ Optional fields include `num_atoms`, `band_gap`, `e_above_hull`, and other prope
 | Dataset | Train | Val | Test |
 | --- | --- | --- | --- |
 | [MP-20](https://paddle-org.bj.bcebos.com/paddlematerial/datasets/mp_20/mp_20.zip) | 27136 | 9047 | 9046 |
+
+#### Novelty reference
+The `metrics.reference_file_path` field of `chemeleon2_mp20_sample.yaml` expects
+`novelty_reference.pkl`: a pickle file holding the list of training-set
+pymatgen `Structure` objects used for the novelty computation. It is not part
+of the MP-20 zip; build it locally from the downloaded `train.csv` (parse the
+cif strings with `BuildStructure.build_one`) or set `reference_file_path` to
+null to skip the novelty metric.
 
 ---
 

@@ -204,12 +204,3 @@ class Chemeleon2VAEModule(nn.Layer):
             "loss_kl": loss_kl,
             "fa_loss": fa_loss,
         }
-
-    def get_config(self):
-        return {
-            "latent_dim": self.latent_dim,
-            "loss_weights": self.loss_weights,
-            "augmentation": self.augmentation,
-            "noise": self.noise,
-            "atom_type_predict": self.atom_type_predict,
-        }
