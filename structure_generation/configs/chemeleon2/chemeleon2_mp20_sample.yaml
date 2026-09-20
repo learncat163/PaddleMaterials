@@ -1,27 +1,43 @@
 Model:
-  __class_name__: LDMModule
+  __class_name__: Chemeleon2LDMModule
   __init_params__:
     denoiser:
-      __class_name__: DiT
+      __class_name__: Chemeleon2DiT
       __init_params__:
         hidden_dim: 768
+        num_layers: 12
         num_heads: 12
+        mlp_ratio: 4.0
         input_dim: 8
         learn_sigma: true
     diffusion_configs:
       timestep_respacing: ""
+      noise_schedule: linear
+      sigma_small: false
+      learn_sigma: true
+      diffusion_steps: 1000
     vae:
-      __class_name__: VAEModule
+      __class_name__: Chemeleon2VAEModule
       __init_params__:
         encoder:
-          __class_name__: TransformerEncoder
+          __class_name__: Chemeleon2TransformerEncoder
           __init_params__:
+            max_num_elements: 100
             d_model: 512
+            nhead: 8
+            dim_feedforward: 2048
+            activation: gelu
+            dropout: 0.0
             num_layers: 8
         decoder:
-          __class_name__: TransformerDecoder
+          __class_name__: Chemeleon2TransformerDecoder
           __init_params__:
+            max_num_elements: 100
             d_model: 512
+            nhead: 8
+            dim_feedforward: 2048
+            activation: gelu
+            dropout: 0.0
             num_layers: 8
         latent_dim: 8
         loss_weights: {}

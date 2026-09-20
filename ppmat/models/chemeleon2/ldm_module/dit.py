@@ -133,16 +133,16 @@ class DiTBlock(nn.Layer):
         return x
 
 
-class DiT(nn.Layer):
+class Chemeleon2DiT(nn.Layer):
     def __init__(
         self,
-        input_dim=256,
-        hidden_dim=1024,
-        num_heads=8,
+        input_dim=8,
+        hidden_dim=768,
+        num_heads=12,
         num_layers=12,
         mlp_ratio=4.0,
         condition_dim=None,
-        learn_sigma=False,
+        learn_sigma=True,
     ):
         super().__init__()
 

@@ -25,7 +25,7 @@ class ConditionType(Enum):
     CATEGORICAL = "categorical"
 
 
-class ConditionModule(nn.Layer):
+class Chemeleon2ConditionModule(nn.Layer):
     def __init__(
         self,
         condition_type,
@@ -40,6 +40,7 @@ class ConditionModule(nn.Layer):
         self.hidden_dim = hidden_dim
         self.drop_prob = drop_prob
         self.stats = stats if stats is not None else {}
+        self.num_classes = num_classes if num_classes is not None else {}
 
         self.encoders = nn.LayerDict()
         for cond_name, cond_type in condition_type.items():
@@ -61,13 +62,14 @@ class ConditionModule(nn.Layer):
                     std=_stats.get("std", None),
                 )
             elif cond_type == ConditionType.CATEGORICAL.value:
-                if num_classes is None:
+                if cond_name not in self.num_classes:
                     raise ValueError(
-                        "num_classes must be provided when using CLASS "
-                        "condition type"
+                        "num_classes for categorical condition "
+                        f"'{cond_name}' must be provided as a dict entry, "
+                        "e.g. num_classes={'<condition name>': <num classes>}"
                     )
                 self.encoders[cond_name] = CategoricalEncoder(
-                    in_dim=num_classes,
+                    in_dim=self.num_classes[cond_name],
                     hidden_dim=hidden_dim,
                 )
             else:
@@ -136,6 +138,7 @@ class BaseEncoder(nn.Layer):
         self.hidden_dim = hidden_dim
 
         self.preprocess = preprocess
+
         self.embedding = nn.Sequential(
             nn.Linear(in_dim, hidden_dim, bias_attr=True),
             nn.Silu(),
@@ -158,16 +161,13 @@ class BaseEncoder(nn.Layer):
 
 class ValueEncoder(BaseEncoder):
     def __init__(self, hidden_dim, mean=None, std=None):
-        self.mean = mean
-        self.std = std
-
         def preprocess(batch):
             if not isinstance(batch, paddle.Tensor):
                 batch = paddle.to_tensor(batch, dtype="float32")
             # Accept scalar/1-D/2-D payloads uniformly as [B, 1]
             batch = batch.reshape([-1]).astype("float32").unsqueeze(-1)
-            if self.mean is not None and self.std is not None:
-                batch = (batch - self.mean) / self.std
+            if mean is not None and std is not None:
+                batch = (batch - mean) / std
             return batch
 
         super().__init__(
@@ -175,12 +175,12 @@ class ValueEncoder(BaseEncoder):
             hidden_dim=hidden_dim,
             preprocess=preprocess,
         )
+        self.mean = mean
+        self.std = std
 
 
 class CategoricalEncoder(BaseEncoder):
     def __init__(self, in_dim, hidden_dim):
-        self.num_classes = in_dim
-
         def preprocess(batch):
             if isinstance(batch, list):
                 idx = paddle.to_tensor(batch, dtype="int64")
@@ -189,27 +189,27 @@ class CategoricalEncoder(BaseEncoder):
             else:
                 idx = batch.astype("int64")
 
-            return paddle.nn.functional.one_hot(
-                idx, num_classes=self.num_classes
-            ).astype("float32")
+            return paddle.nn.functional.one_hot(idx, num_classes=in_dim).astype(
+                "float32"
+            )
 
         super().__init__(
             in_dim=in_dim,
             hidden_dim=hidden_dim,
             preprocess=preprocess,
         )
+        self.num_classes = in_dim
 
 
 class _ElementEncoder(BaseEncoder):
     def __init__(self, in_dim, hidden_dim, fill_fn):
-        self._in_dim = in_dim
-        self._fill = fill_fn
-
         def preprocess(batch):
             vals = [self._to_embeds(s) for s in batch]
             return paddle.concat(vals, axis=0)
 
         super().__init__(in_dim=in_dim, hidden_dim=hidden_dim, preprocess=preprocess)
+        self._in_dim = in_dim
+        self._fill = fill_fn
 
     def _to_embeds(self, s):
         from pymatgen.core import Element

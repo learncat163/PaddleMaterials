@@ -12,14 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ppmat.models.chemeleon2.ldm_module.condition import ConditionModule
+from ppmat.models.chemeleon2.ldm_module.condition import Chemeleon2ConditionModule
 from ppmat.models.chemeleon2.ldm_module.condition import ConditionType
-from ppmat.models.chemeleon2.ldm_module.dit import DiT
-from ppmat.models.chemeleon2.ldm_module.ldm import LDMModule
+from ppmat.models.chemeleon2.ldm_module.dit import Chemeleon2DiT
+from ppmat.models.chemeleon2.ldm_module.ldm import Chemeleon2LDMModule
 
 __all__ = [
-    "LDMModule",
-    "DiT",
-    "ConditionModule",
+    "Chemeleon2LDMModule",
+    "Chemeleon2DiT",
+    "Chemeleon2ConditionModule",
     "ConditionType",
 ]

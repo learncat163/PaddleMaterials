@@ -152,7 +152,7 @@ class GaussianDiffusion:
         )
 
     def _extract(self, arr, t, shape):
-        res = paddle.to_tensor(arr, dtype="float32")[t]
+        res = arr[t]
         while res.ndim < len(shape):
             res = res.unsqueeze(-1)
         return paddle.broadcast_to(res, shape)

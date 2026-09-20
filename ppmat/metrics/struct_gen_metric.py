@@ -16,7 +16,6 @@ import pickle
 
 from p_tqdm import p_map
 from pymatgen.analysis.structure_matcher import StructureMatcher
-from tqdm import tqdm
 
 __all__ = [
     "StructGenMetric",
@@ -36,6 +35,11 @@ class StructGenMetric:
     - ``novelty``: fraction of unique structures that do not match any
       structure in an optional reference set (e.g. the MP-20 training data
       pickle shipped with the dataset).
+
+    The metric is consumed offline and in one shot by
+    ``StructureSampler.compute_metric`` (``metric(total_results)``). It
+    intentionally does not implement ``StreamingMetricBase``: there is no
+    incremental train/eval consumer for structure-generation metrics.
     """
 
     def __init__(self, reference_file_path=None, stol=0.5, angle_tol=10, ltol=0.3):

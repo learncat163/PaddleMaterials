@@ -26,6 +26,8 @@ from ppmat.models.chemeleon2.common.schema import CrystalBatch
 from ppmat.models.chemeleon2.common.schema import build_structure_array
 from ppmat.models.chemeleon2.common.schema import create_empty_batch
 from ppmat.models.chemeleon2.ldm_module.diffusion import create_diffusion
+from ppmat.models.common.runtime import RuntimeMixin
+from ppmat.models.common.runtime import runtime_boundary
 from ppmat.utils import logger
 from ppmat.utils.crystal import lattice_params_to_matrix_paddle
 
@@ -33,7 +35,7 @@ from ppmat.utils.crystal import lattice_params_to_matrix_paddle
 DEFAULT_NUM_ATOMS = 20
 
 
-class LDMModule(nn.Layer):
+class Chemeleon2LDMModule(RuntimeMixin, nn.Layer):
     def __init__(
         self,
         denoiser=None,
@@ -44,8 +46,11 @@ class LDMModule(nn.Layer):
         vae_ckpt_path=None,
         ldm_ckpt_path=None,
         lora_configs=None,
+        execution_backend="eager",
+        runtime_options=None,
     ):
         super().__init__()
+        self._init_runtime(execution_backend, runtime_options)
         from ppmat.models import build_model
 
         if isinstance(denoiser, dict):
@@ -137,6 +142,17 @@ class LDMModule(nn.Layer):
         loss_dict = self.calculate_loss(crystal_batch, training=True)
         return {"loss_dict": loss_dict}
 
+    def _denoise_step(self, x, t, mask=None, y=None, apply_mask=True, cfg_scale=None):
+        return self._runtime_denoise(x, t, mask, y, apply_mask, cfg_scale)
+
+    @runtime_boundary("denoise_step")
+    def _runtime_denoise(
+        self, x, t, mask=None, y=None, apply_mask=True, cfg_scale=None
+    ):
+        if cfg_scale is not None:
+            return self.denoiser.forward_with_cfg(x, t, mask, y, cfg_scale)
+        return self.denoiser(x, t, mask=mask, y=y, apply_mask=apply_mask)
+
     def _convert_sample_batch(self, batch):
         structure_array = batch["structure_array"]
         num_atoms = structure_array["num_atoms"]
@@ -183,7 +199,7 @@ class LDMModule(nn.Layer):
 
         model_kwargs = {"mask": mask, "y": y}
         loss_dict = self.diffusion.training_losses(
-            model=self.denoiser,
+            model=self._denoise_step,
             x_start=x,
             t=t,
             model_kwargs=model_kwargs,
@@ -279,9 +295,7 @@ class LDMModule(nn.Layer):
         if self.use_cfg:
             model_kwargs["cfg_scale"] = cfg_scale
 
-        model_fn = (
-            self.denoiser.forward_with_cfg if self.use_cfg else self.denoiser.forward
-        )
+        model_fn = self._denoise_step
 
         diffusion_out = sampler_fn(
             model=model_fn,

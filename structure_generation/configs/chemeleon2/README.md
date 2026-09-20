@@ -25,7 +25,7 @@ The three-stage pipeline is strictly sequential: the VAE is trained first to lea
 
 The VAE compresses crystal structures into a continuous latent space of dimension $L=8$ per atom, enabling the LDM to operate in a low-dimensional, well-structured space.
 
-**Encoder** (`TransformerEncoder`, 8 layers, $d_\text{model}=512$, 8 heads): Atom type embeddings and fractional coordinate projections are summed and passed through transformer self-attention layers to produce per-atom representations of shape $(B_n, d_\text{model})$. A linear projection `quant_conv` maps these to mean $\mu$ and log-variance $\log\sigma^2$:
+**Encoder** (`Chemeleon2TransformerEncoder`, 8 layers, $d_\text{model}=512$, 8 heads): Atom type embeddings and fractional coordinate projections are summed and passed through transformer self-attention layers to produce per-atom representations of shape $(B_n, d_\text{model})$. A linear projection `quant_conv` maps these to mean $\mu$ and log-variance $\log\sigma^2$:
 
 $$
 (\mu, \log\sigma^2) = \text{quant\_conv}(\text{Encoder}(A, X)) \in \mathbb{R}^{B_n \times 2L}
@@ -37,7 +37,7 @@ $$
 z = \mu + \sigma \odot \epsilon, \quad \epsilon \sim \mathcal{N}(0, I), \quad z \in \mathbb{R}^{B_n \times L}
 $$
 
-**Decoder** (`TransformerDecoder`, 8 layers, $d_\text{model}=512$, 8 heads): The latent $z$ is projected back to $d_\text{model}$ via `post_quant_conv` and decoded into four prediction heads: atom type logits, lattice lengths $(a,b,c)$, lattice angles $(\alpha,\beta,\gamma)$, and fractional coordinates $(x,y,z)$.
+**Decoder** (`Chemeleon2TransformerDecoder`, 8 layers, $d_\text{model}=512$, 8 heads): The latent $z$ is projected back to $d_\text{model}$ via `post_quant_conv` and decoded into four prediction heads: atom type logits, lattice lengths $(a,b,c)$, lattice angles $(\alpha,\beta,\gamma)$, and fractional coordinates $(x,y,z)$.
 
 **Training objective**:
 
@@ -57,7 +57,7 @@ $$
 q(z_t | z_0) = \mathcal{N}\!\left(z_t;\, \sqrt{\bar{\alpha}_t}\, z_0,\, (1 - \bar{\alpha}_t) I\right)
 $$
 
-**Denoiser** (`DiT`, Diffusion Transformer): A Vision Transformer-based architecture with `hidden_size=768`, `depth=12`, `num_heads=12` processes the noisy dense latent $(B, N, L)$ with timestep $t$ and optional condition $y$, using Adaptive LayerNorm (AdaLN) conditioning and masked self-attention to handle variable-length structures:
+**Denoiser** (`Chemeleon2DiT`, Diffusion Transformer): A Vision Transformer-based architecture with `hidden_size=768`, `depth=12`, `num_heads=12` processes the noisy dense latent $(B, N, L)$ with timestep $t$ and optional condition $y$, using Adaptive LayerNorm (AdaLN) conditioning and masked self-attention to handle variable-length structures:
 
 $$
 \epsilon_\theta = \text{DiT}(z_t,\, t,\, \text{mask},\, y)
@@ -71,7 +71,7 @@ $$
 
 **Sampling**: Both DDPM and DDIM samplers are supported. DDIM with 50 steps is the default for efficient generation. The final latent $z_0$ is decoded by the frozen VAE decoder to recover the crystal structure.
 
-**Conditional generation**: A `ConditionModule` embeds composition (CSP) or scalar property conditions into a vector $y \in \mathbb{R}^{L_y}$. Classifier-Free Guidance (CFG) is applied at sampling time:
+**Conditional generation**: A `Chemeleon2ConditionModule` embeds composition (CSP) or scalar property conditions into a vector $y \in \mathbb{R}^{L_y}$. Classifier-Free Guidance (CFG) is applied at sampling time:
 
 $$
 \epsilon_\text{cfg} = \epsilon_\theta(\cdot \mid \varnothing) + w \cdot \bigl(\epsilon_\theta(\cdot \mid y) - \epsilon_\theta(\cdot \mid \varnothing)\bigr)

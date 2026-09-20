@@ -22,19 +22,18 @@ from ..common import set_gelu_approx
 from ..common import to_dense_batch
 
 
-class TransformerDecoder(nn.Layer):
+class Chemeleon2TransformerDecoder(nn.Layer):
     def __init__(
         self,
         atom_type_predict=True,
         max_num_elements=100,
-        d_model=1024,
+        d_model=512,
         nhead=8,
         dim_feedforward=2048,
         activation="gelu",
         dropout=0.0,
         norm_first=True,
-        bias=True,
-        num_layers=6,
+        num_layers=8,
     ):
         super().__init__()
 

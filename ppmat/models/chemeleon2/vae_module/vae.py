@@ -24,7 +24,7 @@ from ppmat.models.chemeleon2.common.schema import build_structure_array
 from ppmat.utils.crystal import lattice_params_to_matrix_paddle
 
 
-class VAEModule(nn.Layer):
+class Chemeleon2VAEModule(nn.Layer):
     def __init__(
         self,
         encoder,

@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from ppmat.models.chemeleon2.vae_module.vae import VAEModule
+from ppmat.models.chemeleon2.vae_module.vae import Chemeleon2VAEModule
 
 __all__ = [
-    "VAEModule",
+    "Chemeleon2VAEModule",
 ]

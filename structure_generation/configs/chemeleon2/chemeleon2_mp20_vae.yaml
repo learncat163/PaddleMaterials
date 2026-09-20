@@ -2,23 +2,39 @@ Global:
   do_eval: True
 
 Model:
-  __class_name__: VAEModule
+  __class_name__: Chemeleon2VAEModule
   __init_params__:
     encoder:
-      __class_name__: TransformerEncoder
+      __class_name__: Chemeleon2TransformerEncoder
       __init_params__:
+        max_num_elements: 100
         d_model: 512
+        nhead: 8
+        dim_feedforward: 2048
+        activation: gelu
+        dropout: 0.0
         num_layers: 8
     decoder:
-      __class_name__: TransformerDecoder
+      __class_name__: Chemeleon2TransformerDecoder
       __init_params__:
+        max_num_elements: 100
         d_model: 512
+        nhead: 8
+        dim_feedforward: 2048
+        activation: gelu
+        dropout: 0.0
         num_layers: 8
     latent_dim: 8
     loss_weights:
+      atom_types: 1.0
+      lengths: 1.0
       angles: 10.0
       frac_coords: 10.0
-      kl: 1e-5
+      kl: 1.0e-05
+      fa: 0.0
+    augmentation:
+      translate: false
+      rotate: false
 
 Dataset:
   train:

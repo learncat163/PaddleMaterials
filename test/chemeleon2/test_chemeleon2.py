@@ -12,9 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import os
 
+import numpy as np
 import paddle
+import pytest
 from omegaconf import OmegaConf
 
 from ppmat.models import build_model
@@ -132,7 +135,7 @@ def test_ldm_conditional_pipeline():
         d_model=64, dim_feedforward=128, num_layers=2
     )
     params["condition_module"] = {
-        "__class_name__": "ConditionModule",
+        "__class_name__": "Chemeleon2ConditionModule",
         "__init_params__": {
             "condition_type": {"condition": "composition"},
             "hidden_dim": 64,
@@ -205,47 +208,96 @@ def test_struct_gen_metric():
     assert res2["novelty"] == 0.0
 
 
-def test_lora_merge_math():
-    # LoRA adapter math in the Paddle weight layout: after wrap (B=0) the
-    # output equals the base layer; with random B, the LoRA forward, the
-    # manually composed update and the merged plain model agree exactly.
-    import paddle
-    import paddle.nn as nn
+def test_ldm_cinn_protocol_and_state_dict():
+    # The LDM owns the compiled runtime; enabling CINN must not alter weights.
+    from ppmat.models.common.runtime import RuntimeMixin
 
-    from ppmat.models.chemeleon2.common.lora import apply_lora_to_linear
-    from ppmat.models.chemeleon2.common.lora import merge_lora_weights
+    ldm = _build_ldm()
+    assert isinstance(ldm, RuntimeMixin)
+    for hook in (
+        "set_execution_backend",
+        "set_runtime_options",
+        "validate_execution_backend",
+    ):
+        assert callable(getattr(ldm, hook, None))
 
-    class M(nn.Layer):
-        def __init__(self):
-            super().__init__()
-            self.fc1 = nn.Linear(64, 128)
-            self.fc2 = nn.Linear(128, 64)
+    keys_eager = sorted(ldm.state_dict().keys())
+    ldm.set_execution_backend("cinn")
+    assert ldm.execution_backend == "cinn"
+    assert sorted(ldm.state_dict().keys()) == keys_eager
+    ldm.set_execution_backend("eager")
+    assert ldm.execution_backend == "eager"
 
-    m = M()
-    x = paddle.randn([4, 64])
-    baseline = m.fc2(m.fc1(x))
 
-    # Capture the original plain weights before the adapter replacement.
-    w1, b1 = m.fc1.weight, m.fc1.bias
-    w2, b2 = m.fc2.weight, m.fc2.bias
+def test_ldm_cinn_dispatch_and_parity(monkeypatch):
+    # Every denoise call must go through the single ``denoise_step`` boundary,
+    # and the eager/cinn-dispatch paths must be numerically identical.
+    ldm = _build_ldm()
+    ldm.eval()
+    batch = _batch([8, 12])
 
-    wrapped = apply_lora_to_linear(m, rank=4)
-    cw = wrapped.fc1.lora
-    cw.lora_B.set_value(
-        paddle.randn([cw.lora_B.shape[0], cw.lora_B.shape[1]]).astype("float32")
+    paddle.seed(7)
+    with paddle.no_grad():
+        eager_result = ldm.sample(
+            batch, sampler="ddim", num_inference_steps=4, progress=False
+        )
+
+    seen_boundaries = []
+
+    def eager_dispatch(name, function, *args, **kwargs):
+        seen_boundaries.append(name)
+        return function(*args, **kwargs)
+
+    monkeypatch.setattr(ldm, "_run_runtime", eager_dispatch)
+    ldm.set_execution_backend("cinn")
+    paddle.seed(7)
+    with paddle.no_grad():
+        cinn_result = ldm.sample(
+            batch, sampler="ddim", num_inference_steps=4, progress=False
+        )
+
+    assert seen_boundaries and set(seen_boundaries) == {"denoise_step"}
+    for eager_struct, cinn_struct in zip(eager_result["result"], cinn_result["result"]):
+        for key in ("atom_types", "frac_coords", "lattice"):
+            assert np.array_equal(
+                np.asarray(eager_struct[key]), np.asarray(cinn_struct[key])
+            )
+
+
+@pytest.mark.skipif(
+    os.environ.get("PPMAT_RUN_CINN_WORKFLOW_TESTS") != "1",
+    reason="set PPMAT_RUN_CINN_WORKFLOW_TESTS=1 to run the CINN GPU compile test",
+)
+def test_ldm_cinn_gpu_compile_parity():
+    # Real CINN compilation on GPU: one compiled denoise step must match eager.
+    if not (paddle.is_compiled_with_cuda() and paddle.base.is_compiled_with_cinn()):
+        pytest.skip("CUDA Paddle built with CINN is required")
+
+    cfg = copy.deepcopy(_load_cfg("ldm"))
+    params = cfg["__init_params__"]
+    params["denoiser"]["__init_params__"].update(
+        hidden_dim=64, num_layers=2, num_heads=4
     )
-    out_lora = wrapped.fc2(wrapped.fc1(x))
-    d1 = wrapped.fc1.lora.lora_A @ wrapped.fc1.lora.lora_B * wrapped.fc1.lora.scaling
-    d2 = wrapped.fc2.lora.lora_A @ wrapped.fc2.lora.lora_B * wrapped.fc2.lora.scaling
-    manual = (x @ (w1 + d1) + b1) @ (w2 + d2) + b2
-    assert float((out_lora - manual).abs().max()) < 1e-4
+    for part in ("encoder", "decoder"):
+        params["vae"]["__init_params__"][part]["__init_params__"].update(
+            d_model=64, dim_feedforward=128, num_layers=2
+        )
 
-    merged = merge_lora_weights(wrapped)
-    out_merged = merged.fc2(merged.fc1(x))
-    # fp32 CPU tolerance: merge reorders the matmul graph slightly.
-    assert float((out_merged - out_lora).abs().max()) < 1e-3
-    # Merge must be a pure weight relocation: sanity anchor on the baseline.
-    assert baseline is not None
+    paddle.set_device("gpu")
+    try:
+        ldm = build_model(cfg)
+        ldm.eval()
+        x = paddle.randn([2, 8, 8])
+        t = paddle.to_tensor([3, 3], dtype="int64")
+        mask = paddle.ones([2, 8], dtype="bool")
+        with paddle.no_grad():
+            eager = ldm._denoise_step(x, t, mask=mask)
+            ldm.set_execution_backend("cinn")
+            cinn = ldm._denoise_step(x, t, mask=mask)
+    finally:
+        paddle.set_device("cpu")
+
+    assert bool(paddle.allclose(eager, cinn, atol=2e-5).item())
 
 
 if __name__ == "__main__":
@@ -254,7 +306,7 @@ if __name__ == "__main__":
         test_ldm_pipeline,
         test_ldm_conditional_pipeline,
         test_struct_gen_metric,
-        test_lora_merge_math,
+        test_ldm_cinn_protocol_and_state_dict,
     ]
     failed = 0
     for t in tests:

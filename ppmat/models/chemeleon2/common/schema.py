@@ -130,7 +130,11 @@ def build_structure_array(batch, structure_array):
 
     batch.num_nodes = total_atoms
     batch.num_graphs = batch_size
-    batch.token_idx = paddle.concat([paddle.arange(n) for n in num_atoms])
+    starts = paddle.cumsum(num_atoms) - num_atoms
+    local_offsets = paddle.repeat_interleave(starts, num_atoms)
+    batch.token_idx = (
+        paddle.arange(total_atoms, dtype=num_atoms.dtype) - local_offsets
+    ).astype("int64")
 
     return batch
 
