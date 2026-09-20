@@ -34,6 +34,12 @@ from ppmat.utils.crystal import lattice_params_to_matrix_paddle
 # MP-20 caps the structures at 20 atoms per unit cell.
 DEFAULT_NUM_ATOMS = 20
 
+# Sampling defaults shared by sample() and predict().
+DEFAULT_SAMPLER = "ddim"
+DEFAULT_INFERENCE_STEPS = 50
+DEFAULT_ETA = 1.0
+DEFAULT_CFG_SCALE = 2.0
+
 
 class Chemeleon2LDMModule(RuntimeMixin, nn.Layer):
     def __init__(
@@ -214,10 +220,10 @@ class Chemeleon2LDMModule(RuntimeMixin, nn.Layer):
     def sample(
         self,
         batch,
-        sampler="ddim",
-        num_inference_steps=50,
-        eta=1.0,
-        cfg_scale=2.0,
+        sampler=DEFAULT_SAMPLER,
+        num_inference_steps=DEFAULT_INFERENCE_STEPS,
+        eta=DEFAULT_ETA,
+        cfg_scale=DEFAULT_CFG_SCALE,
         return_atoms=False,
         return_structure=False,
         progress=True,
@@ -365,19 +371,24 @@ class Chemeleon2LDMModule(RuntimeMixin, nn.Layer):
             config["vae"] = self.vae.get_config()
         return config
 
-    def predict(self, data, num_inference_steps=50, sampler="ddim"):
-        num_samples = data.get("num_samples", 1) if isinstance(data, dict) else 1
-        batch_size = (
-            data.get("batch_size", num_samples)
-            if isinstance(data, dict)
-            else num_samples
-        )
-        if "num_atoms" in data:
-            num_atoms_list = [data["num_atoms"]] * num_samples
+    def predict(
+        self,
+        data,
+        num_inference_steps=DEFAULT_INFERENCE_STEPS,
+        sampler=DEFAULT_SAMPLER,
+    ):
+        payload = data if isinstance(data, dict) else {}
+        num_samples = payload.get("num_samples", 1)
+        batch_size = payload.get("batch_size", num_samples)
+        cfg_scale = payload.get("cfg_scale", DEFAULT_CFG_SCALE)
+        eta = payload.get("eta", DEFAULT_ETA)
+
+        if "num_atoms" in payload:
+            num_atoms_list = [payload["num_atoms"]] * num_samples
         else:
             num_atoms_list = [DEFAULT_NUM_ATOMS] * num_samples
 
-        condition = data.get("condition", None) if isinstance(data, dict) else None
+        condition = payload.get("condition", None)
         if condition is not None and not self.use_cfg:
             raise ValueError(
                 "This LDM was built without a condition_module (unconditional). "
@@ -396,6 +407,8 @@ class Chemeleon2LDMModule(RuntimeMixin, nn.Layer):
                     batch,
                     sampler=sampler,
                     num_inference_steps=num_inference_steps,
+                    eta=eta,
+                    cfg_scale=cfg_scale,
                     progress=False,
                 )
             all_results.extend(result["result"])
