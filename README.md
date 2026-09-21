@@ -5,11 +5,14 @@
 </p>
 
 <p align="center">
+  <a href="https://paddlepaddle.github.io/PaddleMaterials/">
+    <img alt="Homepage" src="https://img.shields.io/badge/Homepage-PaddleMaterials-3B82F6?style=flat">
+  </a>
   <a href="Install.md">
     <img alt="Python 3.10+" src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&amp;logoColor=white">
   </a>
   <a href="https://pypi.org/project/ppmat/">
-    <img alt="PyPI version" src="https://img.shields.io/pypi/v/ppmat?logo=pypi&amp;logoColor=white">
+    <img alt="PyPI version" src="https://img.shields.io/pypi/v/ppmat?logo=pypi&amp;logoColor=white&amp;cacheSeconds=300">
   </a>
   <a href="LICENSE">
     <img alt="Apache 2.0 License" src="https://img.shields.io/github/license/PaddlePaddle/PaddleMaterials">
@@ -17,6 +20,12 @@
   <a href="https://github.com/PaddlePaddle/PaddleMaterials/stargazers">
     <img alt="GitHub Stars" src="https://img.shields.io/github/stars/PaddlePaddle/PaddleMaterials?style=flat&amp;logo=github">
   </a>
+</p>
+
+<p align="center">
+  <a href="README.md"><img src="https://img.shields.io/badge/English-blue" alt="English"></a>
+  <a href="README_zh.md"><img src="https://img.shields.io/badge/简体中文-lightgrey" alt="简体中文"></a>
+  <a href="README_ja.md"><img src="https://img.shields.io/badge/日本語-lightgrey" alt="日本語"></a>
 </p>
 
 ## 🚀 Introduction
@@ -94,8 +103,9 @@ Predict material formation energy using a pretrained MEGNet model:
 python property_prediction/predict.py \
     --model_name='megnet_mp2018_train_60k_e_form' \
     --weights_name='best.pdparams' \
-    --cif_file_path='./property_prediction/example_data/cifs/' \
-    --save_path='result.csv'
+    --input_format='cif' \
+    --input_path='./property_prediction/example_data/cifs/' \
+    --output_path='result_property_prediction/'
 ```
 
 #### Structure Generation
@@ -106,7 +116,7 @@ Generate novel crystal structures using a pretrained MatterGen model:
 python structure_generation/sample.py \
     --model_name='mattergen_mp20' \
     --weights_name='latest.pdparams' \
-    --save_path='result_mattergen_mp20/' \
+    --output_path='result_mattergen_mp20/' \
     --mode='by_num_atoms' \
     --num_atoms=4
 ```
@@ -119,35 +129,42 @@ Predict energy and forces using a pretrained MatterSim model:
 python interatomic_potentials/predict.py \
     --model_name='mattersim_1M' \
     --weights_name='mattersim-v1.0.0-1M_model.pdparams' \
-    --cif_file_path='./interatomic_potentials/example_data/cifs/' \
-    --save_path='result.csv'
+    --input_format='cif' \
+    --input_path='./interatomic_potentials/example_data/cifs/' \
+    --output_path='result_interatomic_potentials/'
 ```
 
 #### Electronic Structure
 
-Predict electron density using a pretrained InfGCN checkpoint:
+Predict electron density from the bundled methane example using a pretrained InfGCN
+model:
 
 ```bash
 python electronic_structure/predict.py \
-    --config='electronic_structure/configs/infgcn/infgcn_qm9.yaml' \
-    --checkpoint='path/to/infgcn_qm9.pdparams' \
-    --split='validation' \
-    --index=0 \
-    --output_dir='output/infgcn_qm9/validation_0' \
-    --save_pred_cube
+    --model_name='infgcn_qm9' \
+    --weights_name='best.pdparams' \
+    --input_format='mol' \
+    --input_path='electronic_structure/example_data/methane.mol' \
+    --grid_shape=8 \
+    --grid_batch_size=4096 \
+    --output_path='output/infgcn_qm9/methane'
 ```
 
-See the [InfGCN prediction guide](electronic_structure/configs/infgcn/README.md#prediction) for dataset and checkpoint preparation.
+See the [InfGCN prediction guide](electronic_structure/configs/infgcn/README.md#prediction)
+for registered-model and local-checkpoint inference from MOL, CUBE, CHGCAR, and
+density JSON inputs. Real test-split field examples are bundled under
+`electronic_structure/example_data/`.
 
 #### Spectrum Elucidation
 
-Run NMR spectrum elucidation using a pretrained DiffNMR checkpoint:
+Run NMR spectrum elucidation using the bundled example and a pretrained DiffNMR
+model:
 
 ```bash
 python spectrum_elucidation/sample.py \
-    --config_path='spectrum_elucidation/configs/diffnmr/DiffNMR.yaml' \
-    --checkpoint_path='path/to/DiffNMR_nless15_best.pdparams' \
-    --save_path='result_diffnmr_nless15/'
+    --model_name='diffnmr_msdnmr_nless15' \
+    --weights_name='best.pdparams' \
+    --output_path='result_diffnmr_nless15/'
 ```
 
 #### Spectrum Enhancement
@@ -157,7 +174,9 @@ Enhance STEM images using a pretrained SFIN model:
 ```bash
 python spectrum_enhancement/predict.py \
     --model_name='sfin_haadf_enhance' \
-    --split='val'
+    --weights_name='best.pdparams' \
+    --input_path='spectrum_enhancement/example_data/sfin_haadf.png' \
+    --output_path='result_sfin/'
 ```
 
 ---
