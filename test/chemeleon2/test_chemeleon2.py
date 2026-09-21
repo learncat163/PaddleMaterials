@@ -41,18 +41,31 @@ def _build_ldm():
     return build_model(_load_cfg("ldm"))
 
 
+def _structure_array(num_atoms_list, seed=42):
+    # Plain-dict dataset batch as produced by MP20Dataset + the collator.
+    paddle.seed(seed)
+    total = sum(num_atoms_list)
+    return {
+        "atom_types": paddle.randint(1, 90, [total]),
+        "num_atoms": paddle.to_tensor(num_atoms_list),
+        "frac_coords": paddle.rand([total, 3]),
+        "lengths": paddle.to_tensor([[5.0, 5.0, 5.0] for _ in num_atoms_list]),
+        "angles": paddle.to_tensor([[90.0, 90.0, 90.0] for _ in num_atoms_list]),
+    }
+
+
 def _batch(num_atoms_list, seed=42):
     from ppmat.models.chemeleon2.common.schema import CrystalBatch
 
-    paddle.seed(seed)
+    structure_array = _structure_array(num_atoms_list, seed=seed)
     total = sum(num_atoms_list)
     b = CrystalBatch()
-    b.atom_types = paddle.randint(1, 90, [total])
-    b.frac_coords = paddle.rand([total, 3])
+    b.atom_types = structure_array["atom_types"]
+    b.frac_coords = structure_array["frac_coords"]
     b.cart_coords = paddle.rand([total, 3])
     b.lattices = paddle.stack([paddle.eye(3) * 5 for _ in num_atoms_list])
-    b.lengths = paddle.to_tensor([[5.0, 5.0, 5.0] for _ in num_atoms_list])
-    b.angles = paddle.to_tensor([[90.0, 90.0, 90.0] for _ in num_atoms_list])
+    b.lengths = structure_array["lengths"]
+    b.angles = structure_array["angles"]
     b.lengths_scaled = b.lengths / paddle.to_tensor(
         num_atoms_list, dtype="float32"
     ).unsqueeze(-1) ** (1 / 3)
@@ -85,6 +98,24 @@ def test_vae_pipeline():
 
     rec = vae.reconstruct(decoded, b)
     assert rec.lattices is not None and rec.lengths is not None
+
+
+def test_forward_loss_contract():
+    # BaseTrainer contract: forward() consumes the plain-dict dataset batch
+    # ({"structure_array": ...}) and returns {"loss_dict": {"loss": ...}}
+    # with a finite scalar suitable for gradient backprop.
+    structure_array = _structure_array([8, 12])
+    paddle.seed(42)
+    with paddle.no_grad():
+        outputs = {
+            "vae": _build_vae()({"structure_array": structure_array}),
+            "ldm": _build_ldm()({"structure_array": structure_array}),
+        }
+    for out in outputs.values():
+        assert "loss_dict" in out
+        assert "loss" in out["loss_dict"]
+        assert paddle.is_tensor(out["loss_dict"]["loss"])
+        assert not paddle.isnan(out["loss_dict"]["loss"]).item()
 
 
 def test_ldm_pipeline():

@@ -144,8 +144,10 @@ null to skip the novelty metric.
 # Stage 1: VAE training (mp20 dataset)
 python structure_generation/train.py -c structure_generation/configs/chemeleon2/chemeleon2_mp20_vae.yaml
 
-# Stage 2: LDM training (mp20 dataset, requires pre-trained VAE)
-# Before training, set vae_ckpt_path in the yaml to the VAE checkpoint path.
+# Stage 2: LDM training (mp20 dataset, requires a pre-trained VAE)
+# Set vae_ckpt_path in chemeleon2_mp20_ldm.yaml to the VAE checkpoint
+# (e.g. the best.pdparams extracted from chemeleon2_vae.zip); training
+# on a randomly initialized frozen VAE is meaningless.
 python structure_generation/train.py -c structure_generation/configs/chemeleon2/chemeleon2_mp20_ldm.yaml
 ```
 

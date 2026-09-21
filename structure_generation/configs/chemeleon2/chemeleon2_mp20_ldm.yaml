@@ -44,6 +44,7 @@ Model:
             num_layers: 8
         latent_dim: 8
         loss_weights: {}
+    vae_ckpt_path: null
 
 Dataset:
   train:

@@ -83,6 +83,15 @@ class Chemeleon2LDMModule(RuntimeMixin, nn.Layer):
         if vae is not None:
             self.vae = vae
 
+        if vae is not None and vae_ckpt_path is None and ldm_ckpt_path is None:
+            logger.warning(
+                "VAE weights are not loaded via vae_ckpt_path and "
+                "ldm_ckpt_path is not set. If a full checkpoint (MODEL_REGISTRY "
+                "package or Trainer.pretrained_model_path) is loaded after "
+                "construction, ignore this warning. Otherwise Stage-2 LDM "
+                "training would run on a randomly initialized frozen VAE."
+            )
+
         if vae_ckpt_path is not None:
             if not hasattr(self, "vae") or self.vae is None:
                 raise ValueError(
