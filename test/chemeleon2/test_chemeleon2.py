@@ -108,6 +108,16 @@ def test_ldm_pipeline():
         )
     assert "result" in r
 
+    # An unconditional build must reject condition payloads loudly instead
+    # of silently ignoring them.
+    with pytest.raises(ValueError):
+        ldm.predict(
+            {"num_samples": 1, "num_atoms": 8, "condition": "MgO"},
+            num_inference_steps=1,
+            sampler="ddim",
+            progress=False,
+        )
+
     # Generation-to-evaluation contract: the sample() output schema must be
     # directly consumable by the generation metrics layer. Deterministic
     # structures are used because the tiny random model can emit degenerate
@@ -178,6 +188,24 @@ def test_ldm_spaced_scheduler_alphas():
     assert ddpm_new.shape[0] == 5 and ddpm_new[-1] < 1e-3
     assert np.allclose(ddpm_new, orig[ddpm_spaced.timestep_map], atol=1e-6)
 
+    # t=0 must fall back to the identity update (alpha_bar_prev=1.0),
+    # matching the upstream alphas_cumprod_prev convention.
+    diffusion = create_diffusion(
+        timestep_respacing="ddim50", noise_schedule="linear", diffusion_steps=1000
+    )
+    x = paddle.randn([2, 4, 8])
+    t0 = paddle.to_tensor([0, 0], dtype="int64")
+
+    def zero_model(x, t, **kwargs):
+        # learn_sigma=True: the denoiser emits (B, 2N, L) before split_epsilon
+        return paddle.zeros([x.shape[0], 2 * x.shape[1], x.shape[2]])
+
+    with paddle.no_grad():
+        out = diffusion.ddim_sample(
+            zero_model, x, t0, clip_denoised=False, model_kwargs=None, eta=0.0
+        )
+    assert paddle.allclose(out["sample"], out["pred_xstart"])
+
 
 def test_ldm_conditional_pipeline():
     # Small end-to-end CFG pipeline build: forward, loss and sampling with a
@@ -227,6 +255,17 @@ def test_ldm_conditional_pipeline():
             data_by_condition, sampler="ddim", num_inference_steps=3, progress=False
         )
         assert "result" in r and len(r["result"]) == 1
+
+    # predict() follows the same top-level-key convention; a scalar condition
+    # must be routed through condition_module instead of crashing on it.
+    with paddle.no_grad():
+        r = ldm.predict(
+            {"num_samples": 1, "num_atoms": 8, "condition": "MgO"},
+            num_inference_steps=3,
+            sampler="ddim",
+            progress=False,
+        )
+    assert "result" in r and len(r["result"]) == 1
 
 
 def test_ldm_cinn_dispatch_and_parity(monkeypatch):

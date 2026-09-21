@@ -34,6 +34,7 @@ class Chemeleon2VAEModule(nn.Layer):
         augmentation=None,
         noise=None,
         atom_type_predict=True,
+        fa_proj_dim=256,
     ):
         super().__init__()
 
@@ -62,7 +63,7 @@ class Chemeleon2VAEModule(nn.Layer):
         )
 
         if self.loss_weights.get("fa", 0) > 0:
-            self.proj = nn.Linear(self.latent_dim, 256)
+            self.proj = nn.Linear(self.latent_dim, fa_proj_dim)
 
     def encode(self, batch):
         encoded = self.encoder(batch)

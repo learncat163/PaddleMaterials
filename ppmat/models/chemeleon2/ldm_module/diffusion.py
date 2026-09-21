@@ -53,6 +53,15 @@ class GaussianDiffusion:
             return epsilon
         return model_output
 
+    @property
+    def alphas_cumprod_prev(self):
+        # Upstream convention: prev[0] = 1.0 so the DDIM update is the
+        # identity at t=0.
+        alphas_cumprod = self.scheduler.alphas_cumprod
+        return paddle.concat(
+            [paddle.ones_like(alphas_cumprod[:1]), alphas_cumprod[:-1]]
+        )
+
     def q_sample(self, x_start, t, noise=None):
         if noise is None:
             noise = paddle.randn_like(x_start)
@@ -158,9 +167,7 @@ class GaussianDiffusion:
         model_output = self.split_epsilon(model_output)
         sched = self.scheduler
         alpha_bar = self._extract(sched.alphas_cumprod, t, x.shape)
-        alpha_bar_prev = self._extract(
-            sched.alphas_cumprod.clip(min=1e-8), (t - 1).clip(min=0), x.shape
-        )
+        alpha_bar_prev = self._extract(self.alphas_cumprod_prev, t, x.shape)
 
         pred_x0 = (x - (1 - alpha_bar).sqrt() * model_output) / alpha_bar.sqrt()
         if clip_denoised:
@@ -304,7 +311,6 @@ def create_diffusion(
     sigma_small=False,
     learn_sigma=True,
     diffusion_steps=1000,
-    **kwargs,
 ):
     beta_schedule = (
         noise_schedule
@@ -317,17 +323,14 @@ def create_diffusion(
     if timestep_respacing is None or timestep_respacing == "":
         timestep_respacing = [diffusion_steps]
 
-    kw = dict(
+    # The factory always respaces (matching the upstream create_diffusion),
+    # so every returned diffusion reads scheduler values from the spaced chain.
+    use_timesteps = space_timesteps(diffusion_steps, timestep_respacing)
+    return SpacedDiffusion(
+        use_timesteps=use_timesteps,
         num_train_timesteps=diffusion_steps,
         beta_schedule=beta_schedule,
         variance_type=var_type,
         prediction_type="epsilon",
         learn_sigma=learn_sigma,
     )
-    if isinstance(timestep_respacing, (list, tuple)) or isinstance(
-        timestep_respacing, str
-    ):
-        use_ts = space_timesteps(diffusion_steps, timestep_respacing)
-        return SpacedDiffusion(use_timesteps=use_ts, **kw)
-
-    return GaussianDiffusion(**kw)

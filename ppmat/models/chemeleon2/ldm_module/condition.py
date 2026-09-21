@@ -33,8 +33,6 @@ class Chemeleon2ConditionModule(nn.Layer):
         drop_prob,
         stats=None,
         num_classes=None,
-        # 100 element slots cover the bundled MP-20 data (max atomic
-        # number 94, verified over data/mp_20/train.csv).
         max_num_elements=100,
     ):
         super().__init__()

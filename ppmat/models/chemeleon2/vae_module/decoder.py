@@ -71,9 +71,11 @@ class Chemeleon2TransformerDecoder(nn.Layer):
         return self.d_model
 
     def forward(self, encoded_batch):
-        x = encoded_batch["x"]
-
-        x += get_index_embedding(encoded_batch["token_idx"], self.d_model)
+        # Out-of-place add: the caller may reuse the passed dict, so the
+        # positional embedding must not be baked into encoded_batch["x"].
+        x = encoded_batch["x"] + get_index_embedding(
+            encoded_batch["token_idx"], self.d_model
+        )
 
         x_dense, token_mask = to_dense_batch(x, encoded_batch["batch"])
 

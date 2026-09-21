@@ -51,6 +51,7 @@ class StructGenMetric:
             )
         self.matcher = StructureMatcher(stol=stol, angle_tol=angle_tol, ltol=ltol)
         self.reference_structures = None
+        self._reference_index = None
         if reference_file_path is not None:
             with open(reference_file_path, "rb") as f:
                 self.reference_structures = pickle.load(f)
@@ -58,6 +59,7 @@ class StructGenMetric:
                 raise ValueError(
                     "reference pickle must contain a list of pymatgen structures"
                 )
+            self._reference_index = self._build_reference_index()
 
     @staticmethod
     def _composition_key(structure):
@@ -105,10 +107,14 @@ class StructGenMetric:
         results["uniqueness"] = n_unique / n_valid
 
         if self.reference_structures is not None:
+            # Built once and reused across calls; ``reference_structures`` is
+            # expected to be fixed after construction (tests may also inject
+            # it directly, which triggers a build on the first call).
+            if self._reference_index is None:
+                self._reference_index = self._build_reference_index()
             unique_structures = [group[0] for group in groups]
-            reference_index = self._build_reference_index()
             flags = [
-                self._novelty_one(structure, reference_index)
+                self._novelty_one(structure, self._reference_index)
                 for structure in unique_structures
             ]
             results["novelty"] = sum(flags) / max(n_unique, 1)

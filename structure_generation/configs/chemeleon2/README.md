@@ -71,6 +71,15 @@ $$
 
 **Sampling**: Both DDPM and DDIM samplers are supported. DDIM with 50 steps is the default for efficient generation. The final latent $z_0$ is decoded by the frozen VAE decoder to recover the crystal structure.
 
+**Port deviation note**: The upstream model trains its variance head with a
+variational-bound term (`ModelVarType.LEARNED_RANGE`) in addition to the
+epsilon MSE. This port trains only the epsilon head with the objective
+above: the variance output channels created by `learn_sigma` receive no
+training signal, and `sampler=ddpm` uses the scheduler's fixed variance
+instead of the upstream learned-range variance. DDIM (the default sampler)
+does not consume variance and is unaffected; keep `sampler=ddim` when
+comparing against upstream results.
+
 **Conditional generation**: A `Chemeleon2ConditionModule` embeds composition (CSP) or scalar property conditions into a vector $y \in \mathbb{R}^{L_y}$. Classifier-Free Guidance (CFG) is applied at sampling time:
 
 $$

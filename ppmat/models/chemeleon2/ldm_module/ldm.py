@@ -355,12 +355,27 @@ class Chemeleon2LDMModule(RuntimeMixin, nn.Layer):
         else:
             num_atoms_list = [DEFAULT_NUM_ATOMS] * num_samples
 
-        condition = payload.get("condition", None)
-        if condition is not None and not self.use_cfg:
+        names = self.condition_names or []
+        known_keys = {"num_samples", "batch_size", "num_atoms", "cfg_scale", "eta"}
+        unknown = [k for k in payload if k not in known_keys and k not in set(names)]
+        if unknown:
+            raise ValueError(
+                f"predict() payload has unsupported keys {unknown}; supported "
+                f"keys are {sorted(known_keys | set(names))}."
+            )
+        raw_conditions = {name: payload[name] for name in names if name in payload}
+        if raw_conditions and not self.use_cfg:
             raise ValueError(
                 "This LDM was built without a condition_module (unconditional). "
-                "Passing 'condition' has no effect; rebuild the model with "
-                "condition_module to use conditional sampling."
+                f"Passing condition fields {sorted(raw_conditions)} has no "
+                "effect; rebuild the model with condition_module to use "
+                "conditional sampling."
+            )
+        missing = [name for name in names if name not in raw_conditions]
+        if missing:
+            raise ValueError(
+                f"predict() payload is missing required condition fields "
+                f"{missing}; expected {sorted(names)}."
             )
 
         all_results = []
@@ -368,7 +383,11 @@ class Chemeleon2LDMModule(RuntimeMixin, nn.Layer):
             cb = min(batch_size, num_samples - i)
             cur = num_atoms_list[i : i + cb]
             batch = create_empty_batch(cur)
-            batch.y = condition
+            if raw_conditions:
+                batch.y = {
+                    name: _condition_batch(raw_conditions[name], i, cb, num_samples)
+                    for name in raw_conditions
+                }
             with paddle.no_grad():
                 result = self.sample(
                     batch,
@@ -381,3 +400,27 @@ class Chemeleon2LDMModule(RuntimeMixin, nn.Layer):
             all_results.extend(result["result"])
         # Downstream contract of StructureSampler: {"result": [...]}
         return {"result": all_results}
+
+
+def _condition_batch(value, offset, count, total):
+    """Align one condition value with the current batch of ``count`` samples.
+
+    Accepts a scalar or a sequence of length ``total`` (per-sample) or ``1``
+    (shared). Scalars and length-1 payloads are replicated; ``total``-length
+    payloads are sliced. This mirrors the top-level-key convention of
+    ``StructureSampler.sample_by_condition``.
+    """
+    if isinstance(value, paddle.Tensor):
+        values = value if value.ndim > 0 else [value]
+    elif isinstance(value, (list, tuple)):
+        values = list(value)
+    else:
+        values = [value]
+    n = len(values)
+    if n == total:
+        return values[offset : offset + count]
+    if n == 1:
+        if isinstance(values, paddle.Tensor):
+            return paddle.concat([values] * count, axis=0)
+        return values * count
+    raise ValueError(f"condition length {n} must match num_samples ({total}) or be 1.")
