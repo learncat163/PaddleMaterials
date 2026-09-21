@@ -12,13 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Q-Former (BERT variant with cross-attention) for MatterChat.
-
-Cannot reuse paddle.nn / PaddleNLP BertModel: Q-Former injects cross-attention layers,
-accepts query_embeds as input (bypassing word embeddings), and splits each layer's FFN
-into two parallel paths (query vs. text). These modifications are incompatible with the
-standard BERT implementation.
-"""
+"""Q-Former (BERT variant with cross-attention) for MatterChat."""
 
 import contextlib
 import math

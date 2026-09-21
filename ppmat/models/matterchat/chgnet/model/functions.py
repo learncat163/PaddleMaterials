@@ -16,18 +16,15 @@ from __future__ import annotations
 
 from typing import Sequence
 
-from paddle import Tensor, nn
+from paddle import Tensor
+from paddle import nn
 
-from ppmat.models.chgnet.chgnet import aggregate
 from ppmat.models.matterchat.utils.activations import ScaledSiLU
 from ppmat.models.matterchat.utils.activations import get_activation as find_activation
 
 
 class MLP(nn.Layer):
-    """Multi-Layer Perceptron with configurable activation.
-
-    Kept local because the framework CHGNet MLP hardcodes paddle.nn.Silu().
-    """
+    """Multi-Layer Perceptron with configurable activation."""
 
     def __init__(
         self,
@@ -120,7 +117,6 @@ def find_normalization(name: str, dim: int = None) -> nn.Layer | None:
 __all__ = [
     "MLP",
     "GatedMLP",
-    "aggregate",
     "find_normalization",
     "find_activation",
     "ScaledSiLU",

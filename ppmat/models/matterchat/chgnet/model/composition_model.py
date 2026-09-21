@@ -29,9 +29,7 @@ if TYPE_CHECKING:
 
 
 class CompositionModel(nn.Layer):
-    """A simple FC model that takes in a chemical composition (no structure info)
-    and outputs energy.
-    """
+    """A simple FC model that takes in a chemical composition (no structure info)."""
 
     def __init__(
         self,

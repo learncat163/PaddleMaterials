@@ -63,12 +63,7 @@ class MistralTokenizerWrapper:
         max_length: Optional[int] = None,
         **kwargs,
     ) -> EncodingResult:
-        """Encode text to token IDs and attention mask.
-
-        Note: ``return_tensors`` is accepted for API compatibility with
-        HuggingFace tokenizers but ignored; this wrapper always returns
-        ``paddle.Tensor`` objects.
-        """
+        """Encode text to token IDs and attention mask."""
         is_batched = isinstance(text, list)
         if not is_batched:
             text = [text]

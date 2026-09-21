@@ -63,27 +63,27 @@ $$
 P(y_t \mid y_{<t},\; Z,\; T) = \text{softmax}(\text{LLM}([Z;\,T;\,y_{<t}]))
 $$
 
-#### 4) Three-stage training
-Following BLIP-2, MatterChat is trained in stages with progressive unfreezing:
+#### 4) Released checkpoint
 
-| Stage | Trainable | Frozen |
-|-------|-----------|--------|
-| 1 | Q-Former | CHGNet, LLM (not yet implemented) |
-| 2 | Q-Former + llm_proj | CHGNet, LLM |
-| 3 | Q-Former + llm_proj + LoRA | CHGNet, LLM (LoRA adapters only) |
+The released checkpoint corresponds to the BLIP-2 stage-2 product: the
+Q-Former and llm_proj are trained, while the CHGNet encoder and the Mistral
+LLM stay frozen. This repository migrates the inference (dialogue) pipeline
+only; the three-stage training procedure is out of scope and can be found in
+the original paper and repository.
 
 
 ---
 
-## Dataset Description
+## Data Format
 
-MatterChat is trained on instruction-tuning data for crystal Q&A. Each sample pairs a crystal structure (pymatgen `Structure`) with a question and its answer:
+MatterChat is a dialogue model: each request pairs a crystal structure with a
+text question, and the model produces a text answer.
 
-- `structure`: pymatgen `Structure` object (serialized as dict for the dataloader)
-- `text_input`: the question, e.g. "what is the chemical formula of this material?"
-- `text_output`: the answer, e.g. "Si"
+- input: a pymatgen `Structure` (parsed from a CIF file) plus a prompt, e.g.
+  "what is the chemical formula of this material?"
+- output: a generated answer, e.g. "Si"
 
-The dataset class `MTDataset` supports loading from pickle material files + JSON question/answer files, or falls back to a small built-in demo set (Si, GaN).
+No dataset download is required for inference.
 
 ---
 
@@ -99,16 +99,27 @@ Dialogue test results (greedy decoding, float32):
 | --- | --- | --- | --- | --- |
 | Si | Si | Cmcm | No | 0.68795 |
 | GaN | GaN | P6_3mc | No | 1.68300 |
-| LiCoO2 (YZnSe2) | YZnSe2 | Fd-3m | No | 0.23871 |
 
 ---
 
 ## Command
 
 ### Inference
+
 MatterChat is a dialogue model, not a structure generator. It does **not** use
 `structure_generation/sample.py` (StructureSampler), which expects `model.sample()`
 and outputs CIF files. Instead, load the model and call `chat()`.
+
+#### Tokenizer
+
+The tokenizer is packaged inside the checkpoint zip as `tokenizer.json`
+(a HuggingFace-fast tokenizer in WordLevel format). `build_model_from_name`
+downloads and extracts the zip automatically; `Blip2MistralInstruct.from_pretrained`
+resolves `tokenizer.json` next to the yaml config and builds the wrapped
+`MistralTokenizerWrapper` from it. When you build the model from a custom
+config instead, pass the tokenizer file through `__init_params__.tokenizer_path`
+(leave `llm_tokenizer` null) - the Q-Former token embedding resize and the
+prompt tokenization depend on it.
 
 ```bash
 # Mode 1: Use a pre-trained model (downloads automatically via MODEL_REGISTRY)

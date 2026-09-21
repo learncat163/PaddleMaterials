@@ -14,15 +14,6 @@
 
 from __future__ import annotations
 
-from ppmat.models.matterchat.chgnet.utils.common_utils import AverageMeter, mae, mkdir, read_json, write_json
-from ppmat.models.matterchat.chgnet.utils.vasp_utils import parse_vasp_dir, solve_charge_by_mag
+from ppmat.utils.io import write_json
 
-__all__ = [
-    "AverageMeter",
-    "mae",
-    "read_json",
-    "write_json",
-    "mkdir",
-    "parse_vasp_dir",
-    "solve_charge_by_mag",
-]
+__all__ = ["write_json"]

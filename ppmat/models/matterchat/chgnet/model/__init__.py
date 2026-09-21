@@ -14,11 +14,6 @@
 
 from __future__ import annotations
 
-from ppmat.models.matterchat.chgnet.model.dynamics import (
-    CHGNetCalculator,
-    MolecularDynamics,
-    StructOptimizer,
-)
 from ppmat.models.matterchat.chgnet.model.model import CHGNet
 
-__all__ = ["CHGNet", "StructOptimizer", "MolecularDynamics", "CHGNetCalculator"]
+__all__ = ["CHGNet"]

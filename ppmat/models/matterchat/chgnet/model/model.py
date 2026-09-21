@@ -50,9 +50,7 @@ if TYPE_CHECKING:
 
 
 class CHGNet(nn.Layer):
-    """Crystal Hamiltonian Graph neural Network
-    A model that takes in a crystal graph and output energy, force, magmom, stress.
-    """
+    """Crystal Hamiltonian Graph neural Network."""
 
     def __init__(
         self,

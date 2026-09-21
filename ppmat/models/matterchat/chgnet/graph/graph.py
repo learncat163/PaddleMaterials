@@ -80,28 +80,18 @@ class DirectedEdge:
         if isinstance(self_image, np.ndarray):
             eq_check = np.array_equal(self_image, other_image)
         else:
-            eq_check = (self_image == other_image)
+            eq_check = self_image == other_image
 
-        if (
-            self.nodes == other.nodes
-            and eq_check
-        ):
-            print(
-                "!!!!!! the two directed edges are equal but this operation is "
-                "not supposed to happen"
-            )
+        if self.nodes == other.nodes and eq_check:
             return True
 
         neg_other_image = -1 * other_image
         if isinstance(neg_other_image, np.ndarray):
             neg_eq_check = np.array_equal(self_image, neg_other_image)
         else:
-            neg_eq_check = (self_image == neg_other_image)
+            neg_eq_check = self_image == neg_other_image
 
-        if (
-            self.nodes == other.nodes[::-1]
-            and neg_eq_check
-        ):
+        if self.nodes == other.nodes[::-1] and neg_eq_check:
             return True
         return False
 
@@ -204,16 +194,15 @@ class Graph:
             center1, center2 = list(u_edge.nodes)
             try:
                 directed_edge1, directed_edge2 = u_edge.info["directed_edge_index"]
-            except ValueError:
-                print("Did not find 2 Directed_edges !!!")
-                print(u_edge)
-                print(
-                    "edge.info['directed_edge_index'] = ",
-                    u_edge.info["directed_edge_index"],
-                )
-                print()
-                print("len directed_edges_list = ", len(self.directed_edges_list))
-                print("len undirected_edges_list = ", len(self.undirected_edges_list))
+            except ValueError as exc:
+                raise ValueError(
+                    f"Undirected edge {u_edge} does not carry exactly 2 directed "
+                    f"edge indices (got {u_edge.info['directed_edge_index']!r}); "
+                    f"directed_edges_list has {len(self.directed_edges_list)} "
+                    f"entries while undirected_edges_list has "
+                    f"{len(self.undirected_edges_list)} entries, which indicates "
+                    f"directed edges are not complete"
+                ) from exc
             for directed_edges in self.nodes[center1].neighbors.values():
                 for directed_edge in directed_edges:
                     if directed_edge.index == directed_edge1:

@@ -12,11 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""PaddlePaddle Mistral-7B model implementation.
-
-Cannot reuse Paddle built-in layers: GQA, RoPE, RMSNorm, Sliding Window Attention,
-and Dynamic KV Cache have no PaddlePaddle equivalent.
-"""
+"""PaddlePaddle Mistral-7B model implementation."""
 
 import math
 from dataclasses import dataclass

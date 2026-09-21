@@ -13,7 +13,6 @@
 # limitations under the License.
 
 # Shared activation function registry for MatterChat.
-# Consolidated from q_former_base, modeling_mistral, and chgnet/functions.
 
 from __future__ import annotations
 

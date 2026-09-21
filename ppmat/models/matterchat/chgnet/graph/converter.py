@@ -14,15 +14,17 @@
 
 from __future__ import annotations
 
-import sys
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING
+from typing import Literal
 
 import paddle
-from paddle import Tensor
 import paddle.nn as nn
+from paddle import Tensor
 
 from ppmat.models.matterchat.chgnet.graph.crystalgraph import CrystalGraph
-from ppmat.models.matterchat.chgnet.graph.graph import Graph, Node
+from ppmat.models.matterchat.chgnet.graph.graph import Graph
+from ppmat.models.matterchat.chgnet.graph.graph import Node
+from ppmat.utils import logger
 
 if TYPE_CHECKING:
     from pymatgen.core import Structure
@@ -53,17 +55,11 @@ class CrystalGraphConverter(nn.Layer):
     ) -> CrystalGraph:
         """Convert a structure, return a CrystalGraph."""
         n_atoms = len(structure)
-        atomic_number = paddle.to_tensor(
-            [i.specie.Z for i in structure], dtype="int64"
-        )
+        atomic_number = paddle.to_tensor([i.specie.Z for i in structure], dtype="int64")
         atomic_number.stop_gradient = True
-        atom_frac_coord = paddle.to_tensor(
-            structure.frac_coords, dtype=datatype
-        )
+        atom_frac_coord = paddle.to_tensor(structure.frac_coords, dtype=datatype)
         atom_frac_coord.stop_gradient = False
-        lattice = paddle.to_tensor(
-            structure.lattice.matrix, dtype=datatype
-        )
+        lattice = paddle.to_tensor(structure.lattice.matrix, dtype=datatype)
         lattice.stop_gradient = False
         center_index, neighbor_index, image, distance = self.get_neighbors(structure)
 
@@ -94,7 +90,7 @@ class CrystalGraphConverter(nn.Layer):
             if on_isolated_atoms == "ignore":
                 return None
             if on_isolated_atoms == "warn":
-                print(msg, file=sys.stderr)
+                logger.warning(msg)
                 return None
             raise ValueError(msg)
 

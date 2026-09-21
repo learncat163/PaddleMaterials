@@ -55,7 +55,6 @@ from ppmat.datasets.qm9_dataset import QM9Dataset  # noqa
 from ppmat.datasets.sfin_dataset import SFINDataset
 from ppmat.datasets.split_mptrj_data import none_to_zero
 from ppmat.datasets.transform import build_transforms
-from ppmat.models.matterchat.trainer import MTDataset  # noqa
 from ppmat.utils import logger
 
 __all__ = [

@@ -16,10 +16,5 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def cpu_device():
-    """Keep matterchat tests on the default device.
-
-    Overrides the test-wide CPU pinning fixture: matterchat model fixtures are
-    module-scoped and build before the parent fixture switches devices, which
-    leaves parameters on GPU while the runtime context is CPU.
-    """
+    """Keep matterchat tests on the default device."""
     yield

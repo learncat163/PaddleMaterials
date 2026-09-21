@@ -33,12 +33,14 @@ class Blip2MistralInstruct(Blip2Base):
         llm_tokenizer=None,
         llm_model=None,
         tokenizer_path=None,
+        llm_config=None,
     ):
         super().__init__()
 
         if llm_tokenizer is None and tokenizer_path is not None and tokenizer_path:
-            from ppmat.models.matterchat.utils.tokenizer import MistralTokenizerWrapper
             import os as _os
+
+            from ppmat.models.matterchat.utils.tokenizer import MistralTokenizerWrapper
 
             _resolved = _os.path.expanduser(tokenizer_path)
             llm_tokenizer = MistralTokenizerWrapper(_resolved)
@@ -66,7 +68,7 @@ class Blip2MistralInstruct(Blip2Base):
         self.llm_model = (
             llm_model
             if llm_model is not None
-            else MistralForCausalLM(self._get_default_mistral_config())
+            else MistralForCausalLM(self._build_llm_config(llm_config))
         )
 
         for param in self.llm_model.parameters():
@@ -87,31 +89,22 @@ class Blip2MistralInstruct(Blip2Base):
             self.prompt_length = 0
 
     @staticmethod
-    def _get_default_mistral_config():
-        return MistralConfig()
+    def _build_llm_config(llm_config):
+        """Build the Mistral config; a dict selects a smaller custom LLM."""
+        if llm_config is None:
+            return MistralConfig()
+        return MistralConfig(**llm_config)
 
     @classmethod
     def from_pretrained(cls, path):
-        """Load MatterChat from a MODEL_REGISTRY-style directory.
-
-        Directory structure:
-            path/
-            ├── *.yaml
-            ├── tokenizer.json
-            └── checkpoints/
-                ├── best.pdparams  (or model.pdparams.index.json + shards)
-
-        Args:
-            path (str): Path to the extracted MODEL_REGISTRY directory.
-
-        Returns:
-            Blip2MistralInstruct: Loaded model with tokenizer and weights.
-        """
-        import os as _os, json as _json
+        """Load MatterChat from a MODEL_REGISTRY-style directory."""
+        import os as _os
 
         from omegaconf import OmegaConf
 
-        yaml_files = [f for f in _os.listdir(path) if f.endswith(".yaml") or f.endswith(".yml")]
+        yaml_files = [
+            f for f in _os.listdir(path) if f.endswith(".yaml") or f.endswith(".yml")
+        ]
         if not yaml_files:
             raise FileNotFoundError(f"No yaml config found in {path}")
         config_path = _os.path.join(path, yaml_files[0])
@@ -130,7 +123,7 @@ class Blip2MistralInstruct(Blip2Base):
         return model
 
     def _load_weights_from_registry(self, weight_dir):
-        import os as _os, json as _json
+        import os as _os
 
         ckpt_dir = _os.path.join(weight_dir, "checkpoints")
         if not _os.path.isdir(ckpt_dir):
@@ -152,7 +145,8 @@ class Blip2MistralInstruct(Blip2Base):
         )
 
     def _load_sharded_weights(self, ckpt_dir, index_path):
-        import json as _json, os as _os
+        import json as _json
+        import os as _os
 
         with open(index_path) as f:
             idx = _json.load(f)
@@ -177,18 +171,10 @@ class Blip2MistralInstruct(Blip2Base):
             state_dict = state_dict["state_dict"]
         self.set_state_dict(state_dict)
 
-    def _run_qformer(self, query_tokens, material_embeds, material_atts, prompt_text=None):
-        """Run Q-Former with optional text input, shared by forward/generate/generate_followup.
-
-        Args:
-            query_tokens: [B, num_query_tokens, hidden_size]
-            material_embeds: [B, N_atoms, encoder_width]
-            material_atts: [B, N_atoms]
-            prompt_text: list of strings or None
-
-        Returns:
-            Q-Former output (BaseModelOutputWithPoolingAndCrossAttentions)
-        """
+    def _run_qformer(
+        self, query_tokens, material_embeds, material_atts, prompt_text=None
+    ):
+        """Run Q-Former with optional text input, shared by forward and generate."""
         if self.qformer_text_input and prompt_text is not None:
             text_input = self.tokenizer(
                 prompt_text,
@@ -198,7 +184,9 @@ class Blip2MistralInstruct(Blip2Base):
                 return_tensors="pd",
             )
             query_atts = paddle.ones(query_tokens.shape[:-1], dtype=paddle.int64)
-            qformer_atts = paddle.concat([query_atts, text_input.attention_mask], axis=1)
+            qformer_atts = paddle.concat(
+                [query_atts, text_input.attention_mask], axis=1
+            )
             return self.Qformer.bert(
                 text_input.input_ids,
                 attention_mask=qformer_atts,
@@ -216,35 +204,30 @@ class Blip2MistralInstruct(Blip2Base):
             )
 
     def _encode_for_generate(self, samples):
-        """Shared encoding pipeline for generate / generate_followup.
-
-        Steps: CHGNet encode -> Q-Former encode -> llm_proj -> tokenizer -> concat.
-        Also sets llm_tokenizer.padding_side to "left".
-
-        Returns:
-            (inputs_embeds, attention_mask, prompt_list)
-        """
+        """Shared encoding pipeline for generate / generate_followup."""
         self.llm_tokenizer.padding_side = "left"
         prompt = samples.get("prompt", self.prompt)
         if isinstance(prompt, str):
             prompt = [prompt]
 
-        # Material encoding
         material_embed = self.material_encoder.predict_structure_embedding(
             samples["material_sample"]
         ).unsqueeze(0)
         material_att = paddle.ones(material_embed.shape[:-1], dtype=paddle.int64)
 
-        # Q-Former encoding
         query_tokens = self.query_tokens.expand([1, -1, -1])
-        query_output = self._run_qformer(query_tokens, material_embed, material_att, prompt)
+        query_output = self._run_qformer(
+            query_tokens, material_embed, material_att, prompt
+        )
 
-        # llm_proj mapping
-        inputs_llm = self.llm_proj(query_output.last_hidden_state[:, : query_tokens.shape[1], :])
+        inputs_llm = self.llm_proj(
+            query_output.last_hidden_state[:, : query_tokens.shape[1], :]
+        )
         atts_llm = paddle.ones(inputs_llm.shape[:-1], dtype=paddle.int64)
 
-        # Tokenizer encoding + concatenation
-        prompt_tokens = self.llm_tokenizer(prompt, return_tensors="pd", padding="longest")
+        prompt_tokens = self.llm_tokenizer(
+            prompt, return_tensors="pd", padding="longest"
+        )
         input_embeds = self.llm_model.get_input_embeddings()(prompt_tokens.input_ids)
         inputs_embeds = paddle.concat([inputs_llm, input_embeds], axis=1)
         attention_mask = paddle.concat([atts_llm, prompt_tokens.attention_mask], axis=1)
@@ -288,11 +271,14 @@ class Blip2MistralInstruct(Blip2Base):
         material_atts = paddle.stack(embedding_mask)
         query_tokens = self.query_tokens.expand([material_embeds.shape[0], -1, -1])
 
-        # Shared Q-Former encoding (handles qformer_text_input branching)
         text_list = samples.get("text_input", None)
-        query_output = self._run_qformer(query_tokens, material_embeds, material_atts, text_list)
+        query_output = self._run_qformer(
+            query_tokens, material_embeds, material_atts, text_list
+        )
 
-        inputs_llm = self.llm_proj(query_output.last_hidden_state[:, : query_tokens.shape[1], :])
+        inputs_llm = self.llm_proj(
+            query_output.last_hidden_state[:, : query_tokens.shape[1], :]
+        )
         atts_llm = paddle.ones(inputs_llm.shape[:-1], dtype=paddle.int64)
 
         self.llm_tokenizer.padding_side = "right"
@@ -360,21 +346,10 @@ class Blip2MistralInstruct(Blip2Base):
 
     @paddle.no_grad()
     def chat(self, structure, prompt, max_new_tokens=64):
-        """Single-turn dialogue: given a crystal structure and a text prompt,
-        return the generated answer (greedy decoding, fp32).
-
-        This is a convenience wrapper around the CHGNet -> Q-Former ->
-        llm_proj -> Mistral pipeline for inference / dialogue use.
-
-        Args:
-            structure: pymatgen ``Structure`` object.
-            prompt: text question, e.g. "what is the chemical formula?".
-            max_new_tokens: max number of new tokens to generate.
-
-        Returns:
-            str: decoded answer text.
-        """
-        embed = self.material_encoder.predict_structure_embedding(structure).unsqueeze(0)
+        """Single-turn dialogue over a crystal structure and a text prompt."""
+        embed = self.material_encoder.predict_structure_embedding(structure).unsqueeze(
+            0
+        )
         mask = paddle.ones(embed.shape[:-1], dtype=paddle.int64)
         qt = self.query_tokens.expand([1, -1, -1])
         qo = self._run_qformer(qt, embed, mask, [prompt])
@@ -426,7 +401,10 @@ class Blip2MistralInstruct(Blip2Base):
             )
 
         outputs[outputs == 0] = 2  # sanitize output
-        return [self.llm_tokenizer.decode(o, skip_special_tokens=True).strip() for o in outputs]
+        return [
+            self.llm_tokenizer.decode(o, skip_special_tokens=True).strip()
+            for o in outputs
+        ]
 
     def generate_followup(
         self,
@@ -460,7 +438,8 @@ class Blip2MistralInstruct(Blip2Base):
 
         outputs[outputs == 0] = 2  # sanitize output
         decoded_outputs = [
-            self.llm_tokenizer.decode(o, skip_special_tokens=True).strip() for o in outputs
+            self.llm_tokenizer.decode(o, skip_special_tokens=True).strip()
+            for o in outputs
         ]
 
         cleaned_outputs = []

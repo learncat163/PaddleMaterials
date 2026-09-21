@@ -12,13 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""CHGNet crystal graph neural network for material structure embedding.
-
-Cannot reuse Paddle built-in layers: crystal graph convolution (message passing
-between atoms, bonds, and angles), RBF basis expansions, and crystal graph batching
-(BatchedGraph) are domain-specific to materials science. PaddlePaddle has no
-equivalent graph operations for periodic crystal structures.
-"""
+"""CHGNet crystal graph neural network for material structure embedding."""
 
 from __future__ import annotations
 
@@ -57,9 +51,7 @@ if TYPE_CHECKING:
 
 
 class CHGNet(nn.Layer):
-    """Crystal Hamiltonian Graph neural Network
-    A model that takes in a crystal graph and outputs atom feature embeddings.
-    """
+    """Crystal Hamiltonian Graph neural Network."""
 
     def __init__(
         self,

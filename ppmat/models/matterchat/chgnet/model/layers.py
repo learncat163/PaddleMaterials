@@ -12,19 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Reference: raw-code/Model/chgnet_lib/model/layers.py
 from __future__ import annotations
 
 import paddle
-from paddle import Tensor, nn
+from paddle import Tensor
+from paddle import nn
 
-from ppmat.models.matterchat.chgnet.model.functions import (
-    MLP,
-    GatedMLP,
-    aggregate,
-    find_activation,
-    find_normalization,
-)
+from ppmat.models.matterchat.chgnet.model.functions import MLP
+from ppmat.models.matterchat.chgnet.model.functions import GatedMLP
+from ppmat.models.matterchat.chgnet.model.functions import find_activation
+from ppmat.models.matterchat.chgnet.model.functions import find_normalization
+from ppmat.utils.scatter import scatter
 
 
 class AtomConv(nn.Layer):
@@ -77,7 +75,7 @@ class AtomConv(nn.Layer):
         bond_weight = paddle.index_select(bond_weights, 0, directed2undirected)
         messages = messages * bond_weight
 
-        new_atom_feas = aggregate(messages, atom_graph[:, 0], average=False)
+        new_atom_feas = scatter(messages, atom_graph[:, 0], dim=0)
 
         if self.use_mlp_out:
             new_atom_feas = self.mlp_out(new_atom_feas)
@@ -142,8 +140,8 @@ class BondConv(nn.Layer):
         bond_weights_j = paddle.index_select(bond_weights, 0, bond_graph[:, 2])
         bond_update = bond_update * bond_weights_i * bond_weights_j
 
-        new_bond_feas = aggregate(
-            bond_update, bond_graph[:, 1], average=False, num_owner=len(bond_feas)
+        new_bond_feas = scatter(
+            bond_update, bond_graph[:, 1], dim=0, dim_size=len(bond_feas)
         )
 
         if self.use_mlp_out:
@@ -214,7 +212,7 @@ class GraphPooling(nn.Layer):
         self.average = average
 
     def forward(self, atom_feas: Tensor, atom_owner: Tensor) -> Tensor:
-        output = aggregate(atom_feas, atom_owner, average=False)
+        output = scatter(atom_feas, atom_owner, dim=0)
         if self.average:
             bc = paddle.bincount(atom_owner.cast("int32"))
             bc = paddle.where(bc != 0, bc, paddle.ones([1], dtype=bc.dtype))
