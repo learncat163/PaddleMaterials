@@ -132,7 +132,6 @@ null to skip the novelty metric.
 | chemeleon2_vae | mp20 | 1 | - | [chemeleon2_mp20_vae.yaml](chemeleon2_mp20_vae.yaml) | [checkpoint](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/Chemeleon2/chemeleon2_vae.zip) |
 | chemeleon2_ldm | mp20 | 1 | - | [chemeleon2_mp20_ldm.yaml](chemeleon2_mp20_ldm.yaml) | [checkpoint](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/Chemeleon2/chemeleon2_ldm.zip) |
 
-> **Note**: Both released checkpoints are unconditional (built without `condition_module`), so de novo generation by atom count is supported while conditional (CSP) sampling is not enabled. The RL stage is experimental and has no training entry in this repo. Original PyTorch checkpoints are available via [HuggingFace Hub](https://huggingface.co/hspark1212/chemeleon2-checkpoints).
 
 ---
 
@@ -184,10 +183,6 @@ python structure_generation/train.py -c structure_generation/configs/chemeleon2/
 # Mode 2: Use a custom configuration file and checkpoint.
 # Results are saved to the folder specified by --output_path (default: results).
 #
-# Note: the released chemeleon2_ldm checkpoint is unconditional. The
-# --condition mode of sample.py is not supported by this checkpoint. The
-# ``by_num_atoms`` mode builds its input batch from ``--num_atoms`` alone and
-# needs no data files.
 
 # Mode 1: pre-trained model
 python structure_generation/sample.py --model_name='chemeleon2_ldm' --weights_name='best.pdparams' --output_path='result_chemeleon2_ldm/' --mode='by_num_atoms' --num_atoms=20
