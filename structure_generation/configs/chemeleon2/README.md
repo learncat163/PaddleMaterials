@@ -127,10 +127,10 @@ null to skip the novelty metric.
 
 ## Results
 
-| Model | Dataset | GPUs | Training Time | Config | Checkpoint / Log |
-| --- | --- | --- | --- | --- | --- |
-| chemeleon2_vae | mp20 | 1 | - | [chemeleon2_mp20_vae.yaml](chemeleon2_mp20_vae.yaml) | [checkpoint](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/Chemeleon2/chemeleon2_vae.zip) |
-| chemeleon2_ldm | mp20 | 1 | - | [chemeleon2_mp20_ldm.yaml](chemeleon2_mp20_ldm.yaml) | [checkpoint](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/Chemeleon2/chemeleon2_ldm.zip) |
+| Model | Dataset | Val (loss) | Valid (%) | Unique (%) | Novel (%) | GPUs | Training Time | Config | Checkpoint / Log |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| chemeleon2_vae | mp20 | 0.2593 | - | - | - | 1 | - | [chemeleon2_mp20_vae.yaml](chemeleon2_mp20_vae.yaml) | [checkpoint](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/Chemeleon2/chemeleon2_vae.zip) |
+| chemeleon2_ldm | mp20 | 0.6704 | 95.97 | 86.12 | 99.89 | 1 | - | [chemeleon2_mp20_ldm.yaml](chemeleon2_mp20_ldm.yaml) | [checkpoint](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/Chemeleon2/chemeleon2_ldm.zip) |
 
 
 ---
