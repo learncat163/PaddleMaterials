@@ -62,6 +62,7 @@ and timings.
 | `NMRNetCLIP` | `graph_encoder`, `spectrum_encoder` | SOT | no standalone registered workflow |
 | `DiffPrior` | `denoise_step` | SOT | no standalone registered workflow |
 | `DiffNMR` | `spectrum_encoder`, `denoise_step` | SOT | reverse diffusion |
+| `PropMolFlow` | `denoise_step` | SOT | property-conditioned molecule sampling and training |
 | `InfGCN` | none | eager only | CINN unavailable |
 
 ## Adding CINN support
