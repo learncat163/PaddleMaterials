@@ -17,9 +17,15 @@ import argparse
 from omegaconf import OmegaConf
 
 from ppmat.sampler import StructureSampler
+from ppmat.sampler import Xrd2MofSampler
 from ppmat.utils import logger
 
 __all__ = ["StructureSampler", "build_parser", "main"]
+
+SAMPLER_REGISTRY = {
+    "StructureSampler": StructureSampler,
+    "Xrd2MofSampler": Xrd2MofSampler,
+}
 
 
 def build_parser():
@@ -64,6 +70,12 @@ def build_parser():
         ],
         default="by_chemical_formula",
     )
+    parser.add_argument(
+        "--sampler_type",
+        choices=sorted(SAMPLER_REGISTRY),
+        default="StructureSampler",
+        help="Sampler class dispatch for models with non-atomistic output.",
+    )
     return parser
 
 
@@ -86,7 +98,7 @@ def main():
             f"Sample.data.dataset.__init_params__.path={args.input_path}"
         )
 
-    sampler = StructureSampler(
+    sampler = SAMPLER_REGISTRY[args.sampler_type](
         model_name=args.model_name,
         weights_name=args.weights_name,
         config_path=args.config_path,
