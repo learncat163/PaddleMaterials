@@ -101,25 +101,9 @@ Every CIF string is converted once into the fixed-length representation
 
 ## Results
 
-Model size: 86,529,544 parameters (86,528,008 trainable; the 3x512 lattice
-positional embedding is frozen) (18 layers, d = 512, 8 heads), identical to
-the released torch checkpoint (330 MB, 197 tensors).
-
-| Check | Result |
-| --- | --- |
-| state_dict keys vs released checkpoint | 197 keys, 0 missing / 0 unexpected |
-| backbone forward vs torch reference (MP-20 samples) | max rel err < 6e-6 |
-| dataset preprocessing vs original (27,136 samples) | bit-exact (max diff 0.0) |
-| q_sample / DDPM posterior vs torch reference | max abs diff < 3.1e-6 |
-| training loss vs torch `training_losses` | diff < 3e-5 |
-| sampling (16 structures, registry weights) | 16/16 CIFs re-parseable, mean 11.2 atoms, mean volume 171.6 A^3 |
-
-Reference generation quality of the original release (100 samples,
-`tests/run_100.log` in the upstream repo): overall validity 79%, UN rate
-74.75%, mean 10.1 atoms per structure. Our migrated model reproduces the
-same sampling statistics (see the numbers above); the full 10,000-sample
-statistical study and CHGNet-based SUN/MSUN scoring remain out of scope,
-matching the coverage of the upstream test harness.
+| Model Name | Dataset | Val (loss) | Config | Checkpoint / Log |
+| --- | --- | --- | --- | --- |
+| crystaldit_mp20 | mp20 | 10.92 | [crystaldit_mp20.yaml](crystaldit_mp20.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/CrystalDiT/crystaldit_mp20.zip) |
 
 ---
 
