@@ -30,6 +30,8 @@ A crystal is represented as a fixed-length token sequence:
   f-block slot) and $(x, y, z)$ are fractional coordinates. Invalid padding
   atoms are $(-1,-1,-1,-1,-1)$.
 
+![CrystalDiT Architecture](../../docs/CrystalDiT-Architecture.png)
+
 ### Method
 
 #### 1) Joint DDPM diffusion
@@ -147,30 +149,6 @@ python structure_generation/sample.py --model_name='crystaldit_mp20' --output_pa
 # Mode 2: custom config + checkpoint
 python structure_generation/sample.py --config_path='structure_generation/configs/crystaldit/crystaldit_mp20.yaml' --checkpoint_path='./output/crystaldit_mp20/checkpoints/latest.pdparams' --output_path='result_crystaldit_mp20/' --mode=by_dataloader
 ```
-
-The model is an unconditional generator: sampling only consumes the batch
-size, `Sample.data.dataset` can be replaced by any dataset driving the batch
-size (e.g. `NumAtomsCrystalDataset`). Sampling accepts optional overrides
-through `Sample.model_sample_params`: `num_inference_steps` (default 1000),
-`filter_rare_gases` (default true) and `max_atomic_number` (default 94).
-
-### Unit tests
-```bash
-python -m pytest test/crystaldit/test_crystaldit.py -v
-```
-
----
-
-## Key configuration notes
-
-- `max_length: 46.7425` must stay identical between the dataset and the model
-  because the released weights are trained with this lattice normalization.
-- `beta_start / beta_end (1e-4 / 0.02)` reproduce the OpenAI linear schedule
-  used by the original `get_named_beta_schedule("linear", 1000)`; the betas
-  are computed in float64 and injected through `trained_betas` to keep the
-  schedule bit-faithful.
-- `atom_loss_weight: 100.0` and `feature_weights` are loss-side constants
-  from the original `training_losses`.
 
 ---
 
