@@ -26,6 +26,8 @@ from ppmat.schedulers import build_scheduler
 from ppmat.utils.crystal import lattice_params_to_matrix_paddle
 from ppmat.utils.scatter import scatter_mean
 
+# Not reusing DiffCSP: its differences live in the composed decoder, not the shell.
+
 
 def p_wrapped_normal(x, sigma, N=10, T=1.0):
     p_ = 0
