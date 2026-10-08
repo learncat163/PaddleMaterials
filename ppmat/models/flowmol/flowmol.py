@@ -32,11 +32,9 @@ import numpy as np
 import paddle
 import paddle.nn as nn
 
-from ppmat.datasets.graph_utils.flowmol_graph_utils import build_batched_complete_graph
 from ppmat.models.common.runtime import RuntimeMixin
+from ppmat.models.flowmol.graph_utils import build_batched_complete_graph
 from ppmat.models.flowmol.vector_field import CTMCVectorField
-from ppmat.models.flowmol.vector_field import align_prior
-from ppmat.models.flowmol.vector_field import centered_normal_prior
 from ppmat.models.flowmol.vector_field import centered_normal_prior_batched
 from ppmat.models.flowmol.vector_field import ctmc_masked_prior
 from ppmat.schedulers import build_scheduler
@@ -144,23 +142,6 @@ class FlowMol(RuntimeMixin, nn.Layer):
             use_amp=use_amp, world_size=world_size
         )
 
-    def _sample_prior_positions(self, batch: dict) -> paddle.Tensor:
-        place = batch["positions"].place
-        num_atoms = batch["structure_array"]["num_atoms"]
-
-        prior_list = []
-        positions_list = paddle.split(
-            batch["positions"], num_or_sections=num_atoms.tolist(), axis=0
-        )
-        for n, positions in zip(num_atoms.tolist(), positions_list):
-            prior = centered_normal_prior(
-                n, 3, **self.prior_config["positions"]["kwargs"]
-            ).to(place)
-            if self.prior_config["positions"]["align"]:
-                prior = align_prior(prior, positions, permutation=True, rigid_body=True)
-            prior_list.append(prior)
-        return paddle.concat(prior_list, axis=0)
-
     def _build_targets(self, batch: dict, state: dict, upper_edge_mask) -> dict:
         """Build the loss targets; already unmasked states are ignored.
 
@@ -183,6 +164,25 @@ class FlowMol(RuntimeMixin, nn.Layer):
             targets[feat] = target
         return targets
 
+    def _prepare_batch(self, batch: dict) -> dict:
+        """Convert the collated numpy batch into tensors and graph fields."""
+        structure = batch["structure_array"]
+        num_atoms = np.asarray(structure["num_atoms"], dtype="int64")
+        graph = build_batched_complete_graph(num_atoms)
+        return {
+            "batch_size": int(num_atoms.shape[0]),
+            "src": paddle.to_tensor(graph["src"], dtype="int64"),
+            "dst": paddle.to_tensor(graph["dst"], dtype="int64"),
+            "upper_edge_mask": paddle.to_tensor(graph["upper_edge_mask"]),
+            "node_batch_idx": paddle.to_tensor(graph["node_batch_idx"], dtype="int64"),
+            "edge_batch_idx": paddle.to_tensor(graph["edge_batch_idx"], dtype="int64"),
+            "positions": paddle.to_tensor(structure["positions"]),
+            "atom_types": paddle.to_tensor(structure["atom_types"]),
+            "atom_charges": paddle.to_tensor(structure["atom_charges"]),
+            "bond_types": paddle.to_tensor(structure["bond_types"]),
+            "prior_positions": paddle.to_tensor(batch["prior_positions"]),
+        }
+
     def forward(self, batch: dict) -> dict:
         """Compute the flow matching losses of a training batch.
 
@@ -190,16 +190,14 @@ class FlowMol(RuntimeMixin, nn.Layer):
         endpoints rather than per-attribute labels, so ``compute_metric_func_dict``
         does not apply to this model.
         """
+        batch = self._prepare_batch(batch)
         batch_size = batch["batch_size"]
         node_batch_idx = batch["node_batch_idx"]
         edge_batch_idx = batch["edge_batch_idx"]
         upper_edge_mask = batch["upper_edge_mask"]
 
         t = paddle.rand([batch_size])
-
-        prior_positions = batch.get("prior_positions")
-        if prior_positions is None:
-            prior_positions = self._sample_prior_positions(batch)
+        prior_positions = batch["prior_positions"]
 
         state = self.vector_field.sample_conditional_path(
             batch,

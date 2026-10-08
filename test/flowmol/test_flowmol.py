@@ -28,7 +28,8 @@ from cinn_workflow_harness import requires_gpu_cinn
 from cinn_workflow_harness import trainer_config
 from omegaconf import OmegaConf
 
-from ppmat.datasets.collate_fn import FlowMolCollator
+from ppmat.datasets.collate_fn import DefaultCollator
+from ppmat.datasets.custom_data_type import ConcatData
 from ppmat.datasets.flowmol_dataset import _FLOWMOL3_GEOM_ATOM_COUNTS
 from ppmat.datasets.flowmol_dataset import FlowMol3GeomSamplingDataset
 from ppmat.datasets.flowmol_dataset import FlowMolDataset
@@ -196,16 +197,20 @@ def _build_batch(num_atoms_list):
         samples.append(
             {
                 "structure_array": {
-                    "num_atoms": n_atoms,
-                    "positions": rng.standard_normal((n_atoms, 3)).astype("float32"),
-                    "atom_types": one_hot_a,
-                    "atom_charges": one_hot_c,
-                    "bond_types": one_hot_e,
+                    "num_atoms": ConcatData(np.array([n_atoms], dtype="int64")),
+                    "positions": ConcatData(
+                        rng.standard_normal((n_atoms, 3)).astype("float32")
+                    ),
+                    "atom_types": ConcatData(one_hot_a),
+                    "atom_charges": ConcatData(one_hot_c),
+                    "bond_types": ConcatData(
+                        np.concatenate((one_hot_e, one_hot_e), axis=0)
+                    ),
                 },
-                "prior_positions": prior,
+                "prior_positions": ConcatData(prior),
             }
         )
-    return FlowMolCollator()(samples)
+    return DefaultCollator()(samples)
 
 
 # ----------------------------- training chain -----------------------------
@@ -255,17 +260,19 @@ def test_train_data_pipeline_feeds_forward(tmp_path):
     assert len(dataset) == 6
 
     sample = dataset[0]
-    n_atoms = sample["structure_array"]["num_atoms"]
-    assert sample["structure_array"]["positions"].shape == (n_atoms, 3)
-    assert np.allclose(
-        sample["structure_array"]["positions"].sum(axis=0), 0.0, atol=1e-4
-    )
+    n_atoms = int(sample["structure_array"]["num_atoms"].data[0])
+    positions = sample["structure_array"]["positions"].data
+    assert positions.shape == (n_atoms, 3)
+    assert np.allclose(positions.sum(axis=0), 0.0, atol=1e-4)
 
-    batch = FlowMolCollator()([dataset[i] for i in range(3)])
-    assert batch["batch_size"] == 3
-    assert batch["upper_edge_mask"].sum() == batch["upper_edge_mask"].shape[0] // 2
+    batch = DefaultCollator()([dataset[i] for i in range(3)])
+    assert batch["structure_array"]["num_atoms"].shape[0] == 3
 
     model = _build_model()
+    prepared = model._prepare_batch(batch)
+    mask = prepared["upper_edge_mask"]
+    assert prepared["batch_size"] == 3
+    assert int(mask.sum()) == mask.shape[0] // 2
     assert np.isfinite(float(model(batch)["loss_dict"]["loss"]))
 
 
@@ -273,7 +280,7 @@ def test_ctmc_ignore_semantics():
     """Regression test: already-unmasked nodes must be ignored in the loss."""
     model = _build_model()
     vf = model.vector_field
-    batch = _build_batch([4])
+    batch = model._prepare_batch(_build_batch([4]))
     n_nodes = int(batch["positions"].shape[0])
 
     t = paddle.full([1], 0.0)
@@ -465,7 +472,7 @@ def _training_loader(dataset, batch_size=2):
         samples,
         batch_size=batch_size,
         shuffle=False,
-        collate_fn=FlowMolCollator(),
+        collate_fn=DefaultCollator(),
         return_list=True,
     )
 

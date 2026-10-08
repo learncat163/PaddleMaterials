@@ -30,6 +30,7 @@ import numpy as np
 from paddle.io import Dataset
 from scipy.optimize import linear_sum_assignment
 
+from ppmat.datasets.custom_data_type import ConcatData
 from ppmat.utils import download
 from ppmat.utils import logger
 
@@ -344,15 +345,16 @@ class FlowMolDataset(Dataset):
             prior_positions = _align_prior(prior_positions, positions)
 
         structure_array = {
-            "num_atoms": n_atoms,
-            "positions": positions,
-            "atom_types": atom_types,
-            "atom_charges": atom_charges,
-            "bond_types": bond_types,
+            "num_atoms": ConcatData(np.array([n_atoms], dtype="int64")),
+            "positions": ConcatData(positions),
+            "atom_types": ConcatData(atom_types),
+            "atom_charges": ConcatData(atom_charges),
+            # upper and lower triangle edges of a pair share the bond one-hot
+            "bond_types": ConcatData(np.concatenate((bond_types, bond_types), axis=0)),
         }
         return {
             "structure_array": structure_array,
-            "prior_positions": prior_positions,
+            "prior_positions": ConcatData(prior_positions),
         }
 
 

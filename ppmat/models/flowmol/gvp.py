@@ -16,7 +16,7 @@
 
 GVP splits features into scalar and vector channels and updates the vector
 channels with rotation-equivariant linear maps. The graph convolution replaces
-DGL message passing with direct edge indexing and paddle_scatter reduction.
+DGL message passing with direct edge indexing and ppmat scatter reduction.
 The implementation follows https://github.com/lucidrains/geometric-vector-perceptron.
 """
 
@@ -27,8 +27,9 @@ from typing import Union
 
 import paddle
 import paddle.nn as nn
-from paddle_scatter import scatter_mean
-from paddle_scatter import scatter_sum
+
+from ppmat.utils.scatter import scatter_mean
+from ppmat.utils.scatter import scatter_sum
 
 
 def norm_no_nan(x, axis=-1, keepdims=False, eps=1e-8, sqrt=True):

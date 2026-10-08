@@ -19,7 +19,7 @@ probability paths, positions follow linear interpolation paths. The
 endpoint is predicted by a GVP message passing network. Ported from the
 upstream PyTorch implementation (vector_field.py, ctmc_vector_field.py,
 self_conditioning.py, priors.py); DGL message passing is replaced by direct
-edge indexing plus paddle_scatter reductions.
+edge indexing plus ppmat scatter reductions.
 """
 
 from __future__ import annotations
@@ -28,15 +28,14 @@ import math
 
 import paddle
 import paddle.nn as nn
-from paddle_scatter import scatter_mean
-from paddle_scatter import scatter_sum
-from scipy.optimize import linear_sum_assignment
 
 from ppmat.models.common.runtime import RuntimeMixin
 from ppmat.models.common.runtime import runtime_boundary
 from ppmat.models.flowmol.gvp import GVP
 from ppmat.models.flowmol.gvp import GVPConv
 from ppmat.models.flowmol.gvp import norm_no_nan
+from ppmat.utils.scatter import scatter_mean
+from ppmat.utils.scatter import scatter_sum
 
 
 def _rbf(dist, d_max, d_count, d_min=0.0):
@@ -63,12 +62,6 @@ def get_time_embedding(timesteps, embedding_dim=256, max_positions=1000):
     return emb
 
 
-def centered_normal_prior(n: int, dim: int, std: float) -> paddle.Tensor:
-    """Sample a zero-mean Gaussian prior for one molecule."""
-    prior_feat = paddle.randn([n, dim]) * std
-    return prior_feat - prior_feat.mean(axis=0, keepdim=True)
-
-
 def centered_normal_prior_batched(
     num_nodes: int, node_batch_idx: paddle.Tensor, std: float
 ) -> paddle.Tensor:
@@ -89,44 +82,6 @@ def ctmc_masked_prior(n: int, n_classes: int) -> paddle.Tensor:
     return paddle.nn.functional.one_hot(tokens, num_classes=n_classes + 1).astype(
         "float32"
     )
-
-
-def rigid_alignment(x_0: paddle.Tensor, x_1: paddle.Tensor) -> paddle.Tensor:
-    """Align two point clouds with the Kabsch algorithm."""
-    if x_0.shape != x_1.shape:
-        raise ValueError("x_0 and x_1 must have the same shape")
-
-    x_0_mean = x_0.mean(axis=0, keepdim=True)
-    x_1_mean = x_1.mean(axis=0, keepdim=True)
-    x_0_c = x_0 - x_0_mean
-    x_1_c = x_1 - x_1_mean
-
-    h = paddle.matmul(x_0_c, x_1_c, transpose_x=True)
-    u, _, vh = paddle.linalg.svd(h, full_matrices=False)
-    v = vh.transpose([1, 0])
-    r = paddle.matmul(v, u, transpose_y=True)
-    t = x_1_mean - paddle.matmul(x_0_mean, r, transpose_y=True)
-
-    x_0_aligned = paddle.matmul(x_0_c, r, transpose_y=True)
-    x_0_aligned = x_0_aligned + x_0_mean
-    return x_0_aligned + t
-
-
-def align_prior(
-    prior_feat: paddle.Tensor,
-    dst_feat: paddle.Tensor,
-    permutation: bool = False,
-    rigid_body: bool = False,
-) -> paddle.Tensor:
-    if permutation:
-        cost_mat = paddle.cdist(dst_feat, prior_feat, p=2)
-        _, prior_idx = linear_sum_assignment(cost_mat.numpy())
-        prior_feat = prior_feat[paddle.to_tensor(prior_idx, dtype="int64")]
-
-    if rigid_body:
-        prior_feat = rigid_alignment(prior_feat, dst_feat)
-
-    return prior_feat
 
 
 def _categorical_sample(probs: paddle.Tensor) -> paddle.Tensor:
@@ -542,10 +497,23 @@ class CTMCVectorField(RuntimeMixin, nn.Layer):
             t,
             node_batch_idx,
             upper_edge_mask,
+            self_condition_now=self._should_self_condition(t, prev_dst_dict),
             apply_softmax=apply_softmax,
             remove_com=remove_com,
             prev_dst_dict=prev_dst_dict,
         )
+
+    def _should_self_condition(self, t: paddle.Tensor, prev_dst_dict: dict) -> bool:
+        """Decide whether to run the self-conditioning pass.
+
+        The decision draws a random trigger and reads host scalars, so it must
+        stay outside the compiled runtime boundary.
+        """
+        if not self.self_conditioning or prev_dst_dict is not None:
+            return False
+        if self.training:
+            return bool((paddle.rand([1]) > self.scprop).item())
+        return bool((t == 0).all().item())
 
     @runtime_boundary("denoise_step")
     def _runtime_denoise_step(
@@ -554,6 +522,7 @@ class CTMCVectorField(RuntimeMixin, nn.Layer):
         t: paddle.Tensor,
         node_batch_idx: paddle.Tensor,
         upper_edge_mask: paddle.Tensor,
+        self_condition_now: bool = False,
         apply_softmax: bool = False,
         remove_com: bool = False,
         prev_dst_dict: dict = None,
@@ -598,28 +567,22 @@ class CTMCVectorField(RuntimeMixin, nn.Layer):
             )
         edge_features = self.edge_embedding(edge_features)
 
-        if self.self_conditioning and prev_dst_dict is None:
-            train_self_condition = self.training and bool(
-                (paddle.rand([1]) > self.scprop).item()
-            )
-            inference_first_step = (not self.training) and bool((t == 0).all().item())
-
-            if train_self_condition or inference_first_step:
-                with paddle.no_grad():
-                    prev_dst_dict = self.denoise_graph(
-                        state,
-                        node_scalar_features.clone(),
-                        node_vec_features.clone(),
-                        node_positions.clone(),
-                        edge_features.clone(),
-                        src,
-                        dst,
-                        num_nodes,
-                        node_batch_idx,
-                        upper_edge_mask,
-                        apply_softmax=True,
-                        remove_com=False,
-                    )
+        if self_condition_now:
+            with paddle.no_grad():
+                prev_dst_dict = self.denoise_graph(
+                    state,
+                    node_scalar_features.clone(),
+                    node_vec_features.clone(),
+                    node_positions.clone(),
+                    edge_features.clone(),
+                    src,
+                    dst,
+                    num_nodes,
+                    node_batch_idx,
+                    upper_edge_mask,
+                    apply_softmax=True,
+                    remove_com=False,
+                )
 
         if self.self_conditioning and prev_dst_dict is not None:
             (
