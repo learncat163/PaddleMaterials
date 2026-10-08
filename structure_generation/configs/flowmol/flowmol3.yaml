@@ -79,7 +79,7 @@ Model:
       self_conditioning: True
       scprop: 0.5
     prior_config:
-      positions: {type: centered-normal, align: True, kwargs: {std: 1.0}}
+      positions: {type: centered-normal, kwargs: {std: 1.0}}
       atom_types: {type: ctmc}
       atom_charges: {type: ctmc}
       bond_types: {type: ctmc}

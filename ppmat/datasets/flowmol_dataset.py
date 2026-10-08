@@ -35,7 +35,8 @@ from ppmat.utils import download
 from ppmat.utils import logger
 
 DATASET_NAME = "flowmol_qm9"
-DATASET_URL = "https://paddle-org.bj.bcebos.com/paddlematerials/datasets/flowmol_qm9/flowmol_qm9.zip"  # noqa: E501
+# DATASET_URL = "https://paddle-org.bj.bcebos.com/paddlematerials/datasets/flowmol_qm9/flowmol_qm9.zip"
+DATASET_URL = "http://127.0.0.1/models/flowmol_qm9.zip"
 DATASET_MD5 = "91a65706ed27c5cd1ebf92faa9dab201"
 
 N_CHARGES = 6

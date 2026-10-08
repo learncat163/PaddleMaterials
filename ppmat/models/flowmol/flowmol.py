@@ -164,24 +164,37 @@ class FlowMol(RuntimeMixin, nn.Layer):
             targets[feat] = target
         return targets
 
+    def _build_graph_fields(self, num_atoms: np.ndarray, place=None) -> dict:
+        """Build the complete-graph bookkeeping shared by training and sampling."""
+        graph = build_batched_complete_graph(num_atoms)
+        return {
+            "batch_size": len(num_atoms),
+            "src": paddle.to_tensor(graph["src"], dtype="int64", place=place),
+            "dst": paddle.to_tensor(graph["dst"], dtype="int64", place=place),
+            "upper_edge_mask": paddle.to_tensor(graph["upper_edge_mask"], place=place),
+            "node_batch_idx": paddle.to_tensor(
+                graph["node_batch_idx"], dtype="int64", place=place
+            ),
+            "edge_batch_idx": paddle.to_tensor(
+                graph["edge_batch_idx"], dtype="int64", place=place
+            ),
+        }
+
     def _prepare_batch(self, batch: dict) -> dict:
         """Convert the collated numpy batch into tensors and graph fields."""
         structure = batch["structure_array"]
         num_atoms = np.asarray(structure["num_atoms"], dtype="int64")
-        graph = build_batched_complete_graph(num_atoms)
-        return {
-            "batch_size": int(num_atoms.shape[0]),
-            "src": paddle.to_tensor(graph["src"], dtype="int64"),
-            "dst": paddle.to_tensor(graph["dst"], dtype="int64"),
-            "upper_edge_mask": paddle.to_tensor(graph["upper_edge_mask"]),
-            "node_batch_idx": paddle.to_tensor(graph["node_batch_idx"], dtype="int64"),
-            "edge_batch_idx": paddle.to_tensor(graph["edge_batch_idx"], dtype="int64"),
-            "positions": paddle.to_tensor(structure["positions"]),
-            "atom_types": paddle.to_tensor(structure["atom_types"]),
-            "atom_charges": paddle.to_tensor(structure["atom_charges"]),
-            "bond_types": paddle.to_tensor(structure["bond_types"]),
-            "prior_positions": paddle.to_tensor(batch["prior_positions"]),
-        }
+        prepared = self._build_graph_fields(num_atoms)
+        prepared.update(
+            {
+                "positions": paddle.to_tensor(structure["positions"]),
+                "atom_types": paddle.to_tensor(structure["atom_types"]),
+                "atom_charges": paddle.to_tensor(structure["atom_charges"]),
+                "bond_types": paddle.to_tensor(structure["bond_types"]),
+                "prior_positions": paddle.to_tensor(batch["prior_positions"]),
+            }
+        )
+        return prepared
 
     def forward(self, batch: dict) -> dict:
         """Compute the flow matching losses of a training batch.
@@ -274,19 +287,7 @@ class FlowMol(RuntimeMixin, nn.Layer):
     def _build_sampling_state(self, num_atoms: np.ndarray, place) -> dict:
         num_atoms_np = np.asarray(num_atoms, dtype="int64")
 
-        graph = build_batched_complete_graph(num_atoms_np)
-        state = {
-            "src": paddle.to_tensor(graph["src"], dtype="int64", place=place),
-            "dst": paddle.to_tensor(graph["dst"], dtype="int64", place=place),
-            "upper_edge_mask": paddle.to_tensor(graph["upper_edge_mask"], place=place),
-            "node_batch_idx": paddle.to_tensor(
-                graph["node_batch_idx"], dtype="int64", place=place
-            ),
-            "edge_batch_idx": paddle.to_tensor(
-                graph["edge_batch_idx"], dtype="int64", place=place
-            ),
-            "batch_size": len(num_atoms_np),
-        }
+        state = self._build_graph_fields(num_atoms_np, place=place)
 
         num_nodes = int(state["node_batch_idx"].shape[0])
         num_edges = int(state["upper_edge_mask"].shape[0])
@@ -444,7 +445,6 @@ def build_rdkit_mol(molecule: dict):
         Chem.rdchem.BondType.SINGLE,
         Chem.rdchem.BondType.DOUBLE,
         Chem.rdchem.BondType.TRIPLE,
-        Chem.rdchem.BondType.AROMATIC,
     ]
 
     mol = Chem.RWMol()
@@ -457,10 +457,7 @@ def build_rdkit_mol(molecule: dict):
     for src_idx, dst_idx, bond_type in molecule["bonds"]:
         mol.AddBond(int(src_idx), int(dst_idx), bond_type_map[int(bond_type)])
 
-    try:
-        mol = mol.GetMol()
-    except Chem.KekulizeException:
-        return None
+    mol = mol.GetMol()
 
     conformer = Chem.Conformer(mol.GetNumAtoms())
     for i, (x, y, z) in enumerate(molecule["positions"]):

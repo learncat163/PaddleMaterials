@@ -42,6 +42,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 CONFIG_PATH = (
     REPO_ROOT / "structure_generation" / "configs" / "flowmol" / "flowmol_qm9.yaml"
 )
+FLOWMOL3_CONFIG_PATH = (
+    REPO_ROOT / "structure_generation" / "configs" / "flowmol" / "flowmol3.yaml"
+)
 
 PRIOR_CONFIG = {
     "positions": {"type": "centered-normal", "align": True, "kwargs": {"std": 1.0}},
@@ -83,7 +86,13 @@ SMALL_VECTOR_FIELD_RELEASED = {
     "e_token_dim": 8,
     "self_conditioning": True,
     "scprop": 0.5,
+    "high_confidence_threshold": 0.9,
 }
+
+# the released flowmol3 vector field, used for real CINN compilation coverage
+RELEASED_VECTOR_FIELD = OmegaConf.to_container(
+    OmegaConf.load(FLOWMOL3_CONFIG_PATH), resolve=True
+)["Model"]["__init_params__"]["vector_field_config"]
 
 
 def _build_model(vector_field_config=None, **overrides):
@@ -461,9 +470,9 @@ def test_geom_sampling_histogram_is_inlined():
 # ------------------------------- CINN runtime ------------------------------
 
 
-def _build_unique_model():
+def _build_unique_model(vector_field_config=None):
     with paddle.utils.unique_name.guard():
-        return _build_model()
+        return _build_model(vector_field_config=vector_field_config)
 
 
 def _training_loader(dataset, batch_size=2):
@@ -493,7 +502,12 @@ def _build_trainer(
     return trainer, optimizer
 
 
-def test_cinn_dispatch_is_numerically_identical(monkeypatch):
+@pytest.mark.parametrize(
+    "vector_field_config",
+    [SMALL_VECTOR_FIELD, SMALL_VECTOR_FIELD_RELEASED],
+    ids=["base", "released"],
+)
+def test_cinn_dispatch_is_numerically_identical(vector_field_config, monkeypatch):
     """Selecting the CINN backend must not change the eager numerics.
 
     The compiled runtime is mocked out so the test runs on CPU: the worker
@@ -501,9 +515,9 @@ def test_cinn_dispatch_is_numerically_identical(monkeypatch):
     """
 
     paddle.seed(7)
-    eager_model = _build_model()
+    eager_model = _build_model(vector_field_config=vector_field_config)
     paddle.seed(7)
-    cinn_model = _build_model()
+    cinn_model = _build_model(vector_field_config=vector_field_config)
 
     batch = _build_batch([4, 5])
     paddle.seed(11)
@@ -584,9 +598,13 @@ def test_cinn_trainer_resume_orchestration(tmp_path, monkeypatch):
 def test_gpu_cinn_matches_eager(tmp_path):
     """One real compiled training epoch must match the eager weights.
 
-    Compilation itself draws from the global RNG, so the compiled boundary is
-    warmed up before the seeding below; otherwise the eager and CINN runs would
-    sample different interpolation times and masks.
+    Only the base vector field is trained here: the released self-conditioning
+    configuration hits a Paddle CINN symbol-shape limitation on the training
+    (backward) path, so the documented sampling workflow is covered by
+    ``test_gpu_cinn_sampling_matches_eager`` instead. Compilation itself draws
+    from the global RNG, so the compiled boundary is warmed up before the
+    seeding below; otherwise the eager and CINN runs would sample different
+    interpolation times and masks.
     """
 
     gpu_cinn_or_skip()
@@ -641,4 +659,43 @@ def test_gpu_cinn_matches_eager(tmp_path):
             eager_state[key].numpy(),
             atol=2e-5,
             rtol=2e-5,
+        )
+
+
+@pytest.mark.parametrize(
+    "vector_field_config",
+    [SMALL_VECTOR_FIELD, RELEASED_VECTOR_FIELD],
+    ids=["base", "released"],
+)
+@requires_gpu_cinn
+def test_gpu_cinn_sampling_matches_eager(vector_field_config):
+    """The compiled sampling workflow must reproduce the eager molecules.
+
+    Sampling is the documented CINN workflow for FlowMol; the released
+    self-conditioning vector field is exercised here on real hardware.
+    """
+
+    gpu_cinn_or_skip()
+    eager_model = _build_unique_model(vector_field_config)
+    eager_model.eval()
+    cinn_model = _build_unique_model(vector_field_config)
+    cinn_model.set_state_dict(eager_model.state_dict())
+    cinn_model.eval()
+    cinn_model.set_execution_backend("cinn")
+
+    batch = {"structure_array": {"num_atoms": np.array([5, 6], dtype="int64")}}
+    cinn_model.sample(batch, num_inference_steps=2)
+    assert cinn_model.vector_field._runtime_cache, "CINN compiled no boundary"
+
+    paddle.seed(123)
+    eager_mols = eager_model.sample(batch, num_inference_steps=6)["pred"]
+    paddle.seed(123)
+    cinn_mols = cinn_model.sample(batch, num_inference_steps=6)["pred"]
+
+    for eager_mol, cinn_mol in zip(eager_mols, cinn_mols):
+        assert eager_mol["num_atoms"] == cinn_mol["num_atoms"]
+        np.testing.assert_allclose(
+            np.asarray(eager_mol["positions"]),
+            np.asarray(cinn_mol["positions"]),
+            atol=1e-5,
         )

@@ -99,7 +99,6 @@ Model:
     prior_config:
       positions:
         type: centered-normal
-        align: ${Global.prior_align}
         kwargs:
           std: ${Global.prior_std}
       atom_types: {type: ctmc}
