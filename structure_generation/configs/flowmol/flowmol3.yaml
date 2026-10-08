@@ -100,7 +100,6 @@ Sampler:
     dataset:
       __class_name__: FlowMol3GeomSamplingDataset
       __init_params__:
-        path: "./data/flowmol3_geom_hist/train_data_n_atoms_histogram.npz"
         total_num: 16
         seed: 42
     loader:

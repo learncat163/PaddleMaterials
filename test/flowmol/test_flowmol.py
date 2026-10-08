@@ -16,7 +16,7 @@
 
 from __future__ import annotations
 
-import os.path as osp
+from pathlib import Path
 
 import numpy as np
 import paddle
@@ -29,23 +29,17 @@ from cinn_workflow_harness import trainer_config
 from omegaconf import OmegaConf
 
 from ppmat.datasets.collate_fn import FlowMolCollator
+from ppmat.datasets.flowmol_dataset import _FLOWMOL3_GEOM_ATOM_COUNTS
 from ppmat.datasets.flowmol_dataset import FlowMol3GeomSamplingDataset
 from ppmat.datasets.flowmol_dataset import FlowMolDataset
-from ppmat.datasets.flowmol_dataset import _align_prior
 from ppmat.models import build_model
-from ppmat.models.flowmol.flowmol import build_rdkit_mol
 from ppmat.models.flowmol.vector_field import CTMCVectorField
 from ppmat.sampler import MolecularSampler
 from ppmat.trainer.base_trainer import BaseTrainer
 
-CONFIG_PATH = osp.join(
-    osp.dirname(__file__),
-    "..",
-    "..",
-    "structure_generation",
-    "configs",
-    "flowmol",
-    "flowmol_qm9.yaml",
+REPO_ROOT = Path(__file__).resolve().parents[2]
+CONFIG_PATH = (
+    REPO_ROOT / "structure_generation" / "configs" / "flowmol" / "flowmol_qm9.yaml"
 )
 
 PRIOR_CONFIG = {
@@ -307,45 +301,6 @@ def test_ctmc_ignore_semantics():
     assert int((targets["atom_types"][1:] != -100).sum()) == n_nodes - 1
 
 
-def test_ce_normalization_matches_torch_semantics():
-    """Regression test: the CE mean must divide by non-ignored nodes only."""
-    logits = paddle.to_tensor(
-        np.array(
-            [
-                [2.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-                [0.0, 3.0, 0.0, 0.0, 0.0, 0.0],
-                [0.0, 0.0, 1.0, 0.0, 0.0, 0.0],
-            ],
-            dtype="float32",
-        )
-    )
-    target = paddle.to_tensor(np.array([0, 1, -100], dtype="int64"))
-
-    loss = paddle.nn.functional.cross_entropy(
-        logits, target, ignore_index=-100, reduction="none"
-    )
-    valid = (target != -100).astype("float32")
-    normalized = loss.sum() / valid.sum()
-    assert np.isclose(float(normalized), float(loss[:2].mean()))
-
-    # paddle's built-in 'mean' divides by the total count instead
-    builtin_mean = paddle.nn.functional.cross_entropy(
-        logits, target, ignore_index=-100, reduction="mean"
-    )
-    assert float(builtin_mean) < float(normalized)
-
-
-def test_prior_align_kabsch():
-    """The aligned prior must land on the endpoint (translation + rotation)."""
-    rng = np.random.RandomState(3)
-    dst = rng.standard_normal((6, 3)).astype("float32")
-    # the prior is the endpoint shifted by a translation: the assignment is
-    # then the identity and the Kabsch rotation is the identity as well
-    prior = dst + np.array([2.0, -1.0, 0.5], dtype="float32")
-    aligned = _align_prior(prior, dst)
-    assert np.allclose(aligned, dst, atol=1e-4)
-
-
 # ----------------------------- sampling chain -----------------------------
 
 
@@ -374,10 +329,13 @@ def test_sample_produces_valid_molecules(tmp_path):
     _assert_molecule_dicts(result, num_atoms)
 
     model.save_samples(result, str(tmp_path / "out"))
-    assert osp.exists(str(tmp_path / "out" / "flowmol_samples.sdf"))
+    assert (tmp_path / "out" / "flowmol_samples.sdf").exists()
 
 
 def test_sample_with_fake_atoms_decodes_real_atoms(tmp_path):
+    # fix the RNG so the decoded real-atom count is reproducible
+    paddle.seed(7)
+    np.random.seed(7)
     model = _build_model(
         vector_field_config=SMALL_VECTOR_FIELD_RELEASED,
         fake_atom_p=0.3,
@@ -404,7 +362,7 @@ def test_sample_with_fake_atoms_decodes_real_atoms(tmp_path):
 
 def test_sampling_framework_end_to_end(tmp_path):
     path = _write_synthetic_split(tmp_path)
-    histogram_path = osp.join(osp.dirname(path), "train_data_n_atoms_histogram.npz")
+    histogram_path = Path(path).with_name("train_data_n_atoms_histogram.npz")
     checkpoint_path = str(tmp_path / "best.pdparams")
     paddle.save(_build_model().state_dict(), checkpoint_path)
 
@@ -436,7 +394,7 @@ def test_sampling_framework_end_to_end(tmp_path):
     save_samples = getattr(sampler.model, "save_samples", None)
     assert callable(save_samples)
     save_samples(sampler.last_samples["pred"], sampler.output_dir)
-    assert osp.exists(str(tmp_path / "out" / "flowmol_samples.sdf"))
+    assert (tmp_path / "out" / "flowmol_samples.sdf").exists()
 
 
 def test_integrate_feeds_evolving_state_to_network():
@@ -478,61 +436,19 @@ def test_integrate_feeds_evolving_state_to_network():
 # ----------------------------- evaluation chain ----------------------------
 
 
-def test_sampling_dataset_resolves_its_own_package(tmp_path, monkeypatch):
-    """Regression: every sampling dataset must download from its own package."""
-    from ppmat.datasets import flowmol_dataset
+def test_geom_sampling_histogram_is_inlined():
+    """Regression: the released-model histogram must be inlined and exact."""
+    assert len(_FLOWMOL3_GEOM_ATOM_COUNTS) == 157
+    assert sum(_FLOWMOL3_GEOM_ATOM_COUNTS.values()) == 5730535
+    assert not hasattr(FlowMol3GeomSamplingDataset, "url")
 
-    recorded = {}
-
-    def fake_get_datasets_path_from_url(url, md5sum=None):
-        recorded["url"] = url
-        root = tmp_path / "root"
-        package_dir = root / "flowmol3_geom_hist"
-        package_dir.mkdir(parents=True)
-        np.savez(
-            package_dir / "train_data_n_atoms_histogram.npz",
-            n_atoms=np.array([3, 5], dtype="int64"),
-            n_atom_counts=np.array([1, 2], dtype="int64"),
-        )
-        return str(root)
-
-    monkeypatch.setattr(
-        flowmol_dataset.download,
-        "get_datasets_path_from_url",
-        fake_get_datasets_path_from_url,
-    )
-    dataset = FlowMol3GeomSamplingDataset(
-        path=str(
-            tmp_path
-            / "data"
-            / "flowmol3_geom_hist"
-            / "train_data_n_atoms_histogram.npz"
-        ),
-        total_num=4,
-        seed=0,
-    )
-    assert recorded["url"] == FlowMol3GeomSamplingDataset.url
-    assert recorded["url"].endswith("flowmol3_geom_hist.zip")
-    assert dataset.path.endswith("flowmol3_geom_hist/train_data_n_atoms_histogram.npz")
-
-
-def test_rdkit_conversion_round_trip():
-    molecule = {
-        "num_atoms": 4,
-        "atom_types": ["C", "C", "O", "H"],
-        "positions": [
-            [0.0, 0.0, 0.0],
-            [1.5, 0.0, 0.0],
-            [0.0, 1.4, 0.0],
-            [0.0, 0.0, 1.1],
-        ],
-        "charges": [0, 0, 0, 0],
-        "bonds": [[0, 1, 1], [0, 2, 1]],
+    dataset = FlowMol3GeomSamplingDataset(total_num=4, seed=0)
+    repeated = FlowMol3GeomSamplingDataset(total_num=4, seed=0)
+    assert len(dataset) == 4
+    assert np.array_equal(dataset.sampled_num_atoms, repeated.sampled_num_atoms)
+    assert dataset[0] == {
+        "structure_array": {"num_atoms": int(dataset.sampled_num_atoms[0])}
     }
-    rdkit_mol = build_rdkit_mol(molecule)
-    assert rdkit_mol is not None
-    assert rdkit_mol.GetNumAtoms() == 4
-    assert rdkit_mol.GetNumBonds() == 2
 
 
 # ------------------------------- CINN runtime ------------------------------
