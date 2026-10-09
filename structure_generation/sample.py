@@ -20,7 +20,7 @@ from ppmat.sampler import StructureSampler
 from ppmat.sampler import Xrd2MofSampler
 from ppmat.utils import logger
 
-__all__ = ["StructureSampler", "build_parser", "main"]
+__all__ = ["StructureSampler", "Xrd2MofSampler", "build_parser", "main"]
 
 SAMPLER_REGISTRY = {
     "StructureSampler": StructureSampler,
@@ -61,13 +61,7 @@ def build_parser():
     )
     parser.add_argument(
         "--mode",
-        choices=[
-            "by_chemical_formula",
-            "by_num_atoms",
-            "by_condition",
-            "by_dataloader",
-            "compute_metric",
-        ],
+        choices=sorted(StructureSampler.supported_modes),
         default="by_chemical_formula",
     )
     parser.add_argument(
@@ -88,6 +82,12 @@ def main():
         parser.error("--weights_name can only be used with --model_name")
     if args.config_path is not None and args.checkpoint_path is None:
         parser.error("--checkpoint_path is required with --config_path")
+    supported_modes = SAMPLER_REGISTRY[args.sampler_type].supported_modes
+    if args.mode not in supported_modes:
+        parser.error(
+            f"--mode {args.mode} is not supported by {args.sampler_type}; "
+            f"choose from {sorted(supported_modes)}"
+        )
     invalid_overrides = [
         value for value in config_overrides if value.startswith("-") or "=" not in value
     ]

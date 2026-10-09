@@ -31,25 +31,27 @@ class Xrd2MofSampler(StructureSampler):
     ``--sampler_type Xrd2MofSampler``.
     """
 
+    supported_modes = frozenset({"by_dataloader"})
+
     def sample_by_dataloader(self, save_path=None):
         dataset_cfg = self.sample_config["data"]
         data_loader = build_dataloader(dataset_cfg)
 
         total_results = []
-        for batch_data in data_loader:
+        for iter_id, batch_data in enumerate(data_loader):
             pred_data = self.sample(batch_data)
             if save_path is not None:
-                self._save_results(pred_data["result"], save_path)
+                self._save_results(pred_data["result"], save_path, iter_id)
             total_results.extend(pred_data["result"])
         return total_results
 
     @staticmethod
-    def _save_results(results, save_path):
+    def _save_results(results, save_path, iter_id):
         os.makedirs(save_path, exist_ok=True)
         for index, result in enumerate(results):
-            mof_id = result.get("mof_id", f"sample_{index}")
+            mof_id = result.get("mof_id", "sample")
             np.savez(
-                os.path.join(save_path, f"{mof_id}.npz"),
+                os.path.join(save_path, f"{mof_id}_{iter_id + 1}_{index + 1}.npz"),
                 lattice=np.asarray(result["lattice"], dtype="float32"),
                 frac_coords=np.asarray(result["frac_coords"], dtype="float32"),
                 atom_types=np.asarray(result["atom_types"], dtype="int64"),

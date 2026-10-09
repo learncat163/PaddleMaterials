@@ -17,6 +17,12 @@ import paddle.nn.functional as F
 from ppmat.utils.scatter import scatter_mean
 from ppmat.utils.scatter import scatter_sum
 
+# Input contract of the upstream feature extractor; the encoder widths that
+# consume these dimensions are locked by the released checkpoint.
+_XRD_POOLED_LENGTH = 82
+_METAL_FEATURE_DIM = 65
+_LINKER_NODE_FEATURES = 37
+
 
 class GCNConv(paddle.nn.Layer):
     """Graph convolution with symmetric normalization.
@@ -58,7 +64,7 @@ class GCNConv(paddle.nn.Layer):
 class LinkerEncoder(paddle.nn.Layer):
     def __init__(self):
         super().__init__()
-        self.conv1 = GCNConv(in_channels=37, out_channels=64)
+        self.conv1 = GCNConv(in_channels=_LINKER_NODE_FEATURES, out_channels=64)
         self.conv2 = GCNConv(in_channels=64, out_channels=128)
         self.conv3 = GCNConv(in_channels=128, out_channels=64)
         self.fc1 = paddle.nn.Linear(in_features=64, out_features=128)
@@ -79,7 +85,7 @@ class LinkerEncoder(paddle.nn.Layer):
 class MetalEncoder(paddle.nn.Layer):
     def __init__(self):
         super().__init__()
-        self.ln_in = paddle.nn.LayerNorm(normalized_shape=65)
+        self.ln_in = paddle.nn.LayerNorm(normalized_shape=_METAL_FEATURE_DIM)
         self.conv1 = paddle.nn.Conv1D(
             in_channels=1, out_channels=16, kernel_size=3, padding=1
         )
@@ -92,7 +98,9 @@ class MetalEncoder(paddle.nn.Layer):
             in_channels=32, out_channels=32, kernel_size=3, padding=1
         )
         self.bn3 = paddle.nn.BatchNorm1D(num_features=32)
-        self.fc1 = paddle.nn.Linear(in_features=32 * 65, out_features=1024)
+        self.fc1 = paddle.nn.Linear(
+            in_features=32 * _METAL_FEATURE_DIM, out_features=1024
+        )
         self.fc2 = paddle.nn.Linear(in_features=1024, out_features=512)
         self.fc3 = paddle.nn.Linear(in_features=512, out_features=256)
         self.fc4 = paddle.nn.Linear(in_features=256, out_features=128)
@@ -138,7 +146,9 @@ class XrdEncoder(paddle.nn.Layer):
         )
         self.pool4 = paddle.nn.MaxPool1D(kernel_size=2, stride=2)
         self.bn4 = paddle.nn.BatchNorm1D(num_features=32)
-        self.fc = paddle.nn.Linear(in_features=32 * 82, out_features=1024)
+        self.fc = paddle.nn.Linear(
+            in_features=32 * _XRD_POOLED_LENGTH, out_features=1024
+        )
 
     def forward(self, x):
         x = x.unsqueeze(1)

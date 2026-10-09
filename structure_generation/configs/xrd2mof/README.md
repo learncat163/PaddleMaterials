@@ -199,9 +199,9 @@ the config does not declare `Sample.build_structure_cfg` (CIF assembly does not
 apply to coarse-grained sites). Pass
 `--sampler_type Xrd2MofSampler` to dispatch to `Xrd2MofSampler`
 (declared in `ppmat/sampler/xrd2mof_sampler.py`), which reuses the shared
-`StructureSampler` loading contract and writes one npz per sample, named after
-`mof_id`, with the same fields as the dataset (`lattice`, `frac_coords`,
-`atom_types`, `num_atoms`, `mof_id`):
+`StructureSampler` loading contract and writes one npz per sample, named
+`<mof_id>_<batch>_<index>.npz`, with the same fields as the dataset (`lattice`,
+`frac_coords`, `atom_types`, `num_atoms`, `mof_id`):
 
 ```bash
 python structure_generation/sample.py \
@@ -223,6 +223,19 @@ python structure_generation/sample.py \
     --output_path results/xrd2mof
 ```
 
+> Note: `--sampler_type Xrd2MofSampler` must be passed explicitly. The default
+> `StructureSampler` assembles CIF files through `Sample.build_structure_cfg`,
+> which this config intentionally does not declare (coarse-grained sites carry
+> no atomic species), so running the command without it fails with
+> `KeyError: 'build_structure_cfg'` by design.
+>
+> Likewise, `by_chemical_formula` and `by_num_atoms` target fully atomistic
+> models: this model expects coarse-grained atom types (`0` metal node, `1`
+> organic linker) plus a per-sample XRD `feature_embedding`, so element/atom
+> count inputs are not applicable and the model fails fast on the missing
+> `feature_embedding` key. `--mode by_dataloader` with `Xrd2MofSampler` is the
+> only supported sampling path.
+
 There is no CIF-based evaluation command; correctness is checked by
 deterministic numerical alignment with the original PyTorch implementation (see
 below).
@@ -232,7 +245,9 @@ below).
 ## Verification Results
 
 Deterministic forward alignment against the original PyTorch implementation
-(reference checkpoint `epoch=2284-step=162234.ckpt`):
+(reference checkpoint `epoch=2284-step=162234.ckpt`). These numbers document the
+migration-time cross-check against the upstream reference; they are not produced
+by a script shipped in this repository.
 
 | Component | Metric | Value |
 |-----------|--------|-------|

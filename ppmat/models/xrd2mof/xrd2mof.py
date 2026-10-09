@@ -26,8 +26,6 @@ from ppmat.schedulers import build_scheduler
 from ppmat.utils.crystal import lattice_params_to_matrix_paddle
 from ppmat.utils.scatter import scatter_mean
 
-# Not reusing DiffCSP: its differences live in the composed decoder, not the shell.
-
 
 def p_wrapped_normal(x, sigma, N=10, T=1.0):
     p_ = 0
@@ -441,12 +439,11 @@ class Xrd2Mof(RuntimeMixin, paddle.nn.Layer):
 
         time_emb = self.time_embedding(steps)
 
-        if "lattice" in structure_array.keys():
-            lattices = structure_array["lattice"]
-        else:
-            lattices = lattice_params_to_matrix_paddle(
-                structure_array["lengths"], structure_array["angles"]
-            )
+        # forward is only driven by train/val batches, which always carry
+        # lattice parameters; there is no input path carrying a prebuilt matrix.
+        lattices = lattice_params_to_matrix_paddle(
+            structure_array["lengths"], structure_array["angles"]
+        )
 
         frac_coords = structure_array["frac_coords"]
         rand_l, rand_x = paddle.randn(
