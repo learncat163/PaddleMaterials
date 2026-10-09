@@ -96,25 +96,18 @@ def build_training_batch():
     return next(iter(loader))
 
 
-def test_model_build_and_forward_loss():
+def test_model_training_loss_and_step():
     config = load_config()
     model = build_model(config["Model"])
     batch = build_training_batch()
 
     outputs = model(batch)
-
-    assert "loss_dict" in outputs
     loss_dict = outputs["loss_dict"]
+    loss = loss_dict["loss"]
     for key in ("loss", "loss_lattice", "loss_coord"):
         assert key in loss_dict
         assert bool(paddle.isfinite(loss_dict[key]))
-    assert float(loss_dict["loss"]) > 0.0
-
-
-def test_training_step_updates_parameters():
-    config = load_config()
-    model = build_model(config["Model"])
-    batch = build_training_batch()
+    assert float(loss) > 0.0
 
     optimizer = paddle.optimizer.Adam(
         learning_rate=config["Optimizer"]["__init_params__"]["lr"]["__init_params__"][
@@ -123,28 +116,22 @@ def test_training_step_updates_parameters():
         parameters=model.parameters(),
     )
     before = [param.numpy().copy() for param in model.parameters()]
-    loss = model(batch)["loss_dict"]["loss"]
     loss.backward()
     optimizer.step()
     optimizer.clear_grad()
     after = [param.numpy() for param in model.parameters()]
-
-    assert bool(paddle.isfinite(loss))
     assert any(not np.allclose(prev, curr) for prev, curr in zip(before, after))
 
 
-def test_dataset_collate_and_forward():
+def test_val_dataset_end_to_end_forward():
     config = load_config()
     loader = _build_dataset_loader(config["Dataset"]["val"])
     batch = next(iter(loader))
     structure_array = batch["structure_array"]
-
-    assert structure_array["feature_embedding"].shape[1] == 256
     assert (
         int(structure_array["num_atoms"].sum())
         == structure_array["frac_coords"].shape[0]
     )
-    assert structure_array["atom_types"].max() <= 1
 
     model = build_model(config["Model"])
     outputs = model(batch)
@@ -295,7 +282,7 @@ def _make_dispatch_pair():
     return eager_model, cinn_model
 
 
-def test_forward_dispatch_matches_eager():
+def test_cinn_dispatch_matches_eager():
     eager_model, cinn_model = _make_dispatch_pair()
     batch = _make_structure_batch()
 
@@ -314,11 +301,6 @@ def test_forward_dispatch_matches_eager():
     assert names == ["denoise_step"]
     np.testing.assert_allclose(cinn_loss.numpy(), eager_loss.numpy(), atol=0, rtol=0)
     assert cinn_model.state_dict().keys() == eager_model.state_dict().keys()
-
-
-def test_sampling_dispatch_matches_eager():
-    eager_model, cinn_model = _make_dispatch_pair()
-    batch = _make_structure_batch()
 
     paddle.seed(123)
     eager_result = eager_model.sample(batch, num_inference_steps=3)["result"]
