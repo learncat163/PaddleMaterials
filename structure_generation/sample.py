@@ -17,15 +17,9 @@ import argparse
 from omegaconf import OmegaConf
 
 from ppmat.sampler import StructureSampler
-from ppmat.sampler import Xrd2MofSampler
 from ppmat.utils import logger
 
-__all__ = ["StructureSampler", "Xrd2MofSampler", "build_parser", "main"]
-
-SAMPLER_REGISTRY = {
-    "StructureSampler": StructureSampler,
-    "Xrd2MofSampler": Xrd2MofSampler,
-}
+__all__ = ["StructureSampler", "build_parser", "main"]
 
 
 def build_parser():
@@ -61,14 +55,14 @@ def build_parser():
     )
     parser.add_argument(
         "--mode",
-        choices=sorted(StructureSampler.supported_modes),
+        choices=[
+            "by_chemical_formula",
+            "by_num_atoms",
+            "by_condition",
+            "by_dataloader",
+            "compute_metric",
+        ],
         default="by_chemical_formula",
-    )
-    parser.add_argument(
-        "--sampler_type",
-        choices=sorted(SAMPLER_REGISTRY),
-        default="StructureSampler",
-        help="Sampler class dispatch for models with non-atomistic output.",
     )
     return parser
 
@@ -82,12 +76,6 @@ def main():
         parser.error("--weights_name can only be used with --model_name")
     if args.config_path is not None and args.checkpoint_path is None:
         parser.error("--checkpoint_path is required with --config_path")
-    supported_modes = SAMPLER_REGISTRY[args.sampler_type].supported_modes
-    if args.mode not in supported_modes:
-        parser.error(
-            f"--mode {args.mode} is not supported by {args.sampler_type}; "
-            f"choose from {sorted(supported_modes)}"
-        )
     invalid_overrides = [
         value for value in config_overrides if value.startswith("-") or "=" not in value
     ]
@@ -98,7 +86,7 @@ def main():
             f"Sample.data.dataset.__init_params__.path={args.input_path}"
         )
 
-    sampler = SAMPLER_REGISTRY[args.sampler_type](
+    sampler = StructureSampler(
         model_name=args.model_name,
         weights_name=args.weights_name,
         config_path=args.config_path,

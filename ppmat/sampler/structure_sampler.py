@@ -66,16 +66,6 @@ class StructureSampler:
             `model_name`. Defaults to None.
     """
 
-    supported_modes = frozenset(
-        {
-            "by_chemical_formula",
-            "by_num_atoms",
-            "by_condition",
-            "by_dataloader",
-            "compute_metric",
-        }
-    )
-
     def __init__(
         self,
         model_name: Optional[str] = None,

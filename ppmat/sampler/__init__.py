@@ -14,6 +14,5 @@
 
 from ppmat.sampler.molecular_sampler import MolecularSampler
 from ppmat.sampler.structure_sampler import StructureSampler
-from ppmat.sampler.xrd2mof_sampler import Xrd2MofSampler
 
-__all__ = ["MolecularSampler", "StructureSampler", "Xrd2MofSampler"]
+__all__ = ["MolecularSampler", "StructureSampler"]

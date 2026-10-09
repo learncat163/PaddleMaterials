@@ -191,50 +191,47 @@ for item in outputs["result"]:
 Sampling settings: 1000 inference steps, predictor-corrector step size
 (`snr`) 1e-5.
 
-### Command line sampling
+### Sampling
 
-Sampling goes through the shared CLI `structure_generation/sample.py`. The model
-output is a coarse-grained structure rather than a fully atomistic crystal, so
-the config does not declare `Sample.build_structure_cfg` (CIF assembly does not
-apply to coarse-grained sites). Pass
-`--sampler_type Xrd2MofSampler` to dispatch to `Xrd2MofSampler`
-(declared in `ppmat/sampler/xrd2mof_sampler.py`), which reuses the shared
-`StructureSampler` loading contract and writes one npz per sample, named
-`<mof_id>_<batch>_<index>.npz`, with the same fields as the dataset (`lattice`,
-`frac_coords`, `atom_types`, `num_atoms`, `mof_id`):
+Sampling goes through the model's own `sample` method. The model output is a
+coarse-grained structure (metal-node / linker sites) rather than a fully
+atomistic crystal, so it is not converted to a CIF here and the config
+intentionally does not declare `Sample.build_structure_cfg` (CIF assembly does
+not apply to coarse-grained sites). Persistence is caller-side as well; the
+fields of each result item (`lattice`, `frac_coords`, `atom_types`,
+`num_atoms`, `mof_id`) mirror the dataset npz schema:
 
-```bash
-python structure_generation/sample.py \
-    --model_name xrd2mof_cgmof50 \
-    --mode by_dataloader \
-    --sampler_type Xrd2MofSampler \
-    --output_path results/xrd2mof
+```python
+import os
+
+import numpy as np
+from ppmat.datasets import build_dataloader
+from ppmat.models import build_model_from_name
+
+output_dir = "results/xrd2mof"
+os.makedirs(output_dir, exist_ok=True)
+
+model, config = build_model_from_name("xrd2mof_cgmof50")
+model.eval()
+loader = build_dataloader(config["Sample"]["data"])
+batch = next(iter(loader))
+result = model.sample(batch, num_inference_steps=1000)["result"]
+for index, item in enumerate(result):
+    np.savez(
+        os.path.join(output_dir, f"{item['mof_id']}_{index + 1}.npz"),
+        lattice=np.asarray(item["lattice"], dtype="float32"),
+        frac_coords=np.asarray(item["frac_coords"], dtype="float32"),
+        atom_types=np.asarray(item["atom_types"], dtype="int64"),
+        num_atoms=np.asarray(item["num_atoms"], dtype="int64"),
+        mof_id=str(item["mof_id"]),
+    )
 ```
 
-For a local checkpoint:
-
-```bash
-python structure_generation/sample.py \
-    --config_path structure_generation/configs/xrd2mof/xrd2mof_cgmof50.yaml \
-    --checkpoint_path <checkpoint_dir_or_file> \
-    --mode by_dataloader \
-    --sampler_type Xrd2MofSampler \
-    --input_path ./data/xrd2mof_cgmof50/test.npz \
-    --output_path results/xrd2mof
-```
-
-> Note: `--sampler_type Xrd2MofSampler` must be passed explicitly. The default
-> `StructureSampler` assembles CIF files through `Sample.build_structure_cfg`,
-> which this config intentionally does not declare (coarse-grained sites carry
-> no atomic species), so running the command without it fails with
-> `KeyError: 'build_structure_cfg'` by design.
->
-> Likewise, `by_chemical_formula` and `by_num_atoms` target fully atomistic
-> models: this model expects coarse-grained atom types (`0` metal node, `1`
-> organic linker) plus a per-sample XRD `feature_embedding`, so element/atom
-> count inputs are not applicable and the model fails fast on the missing
-> `feature_embedding` key. `--mode by_dataloader` with `Xrd2MofSampler` is the
-> only supported sampling path.
+> Note: the `StructureSampler` modes other than dataloader-driven sampling
+> target fully atomistic models: this model expects coarse-grained atom types
+> (`0` metal node, `1` organic linker) plus a per-sample XRD
+> `feature_embedding`, so element/count inputs are not applicable and the
+> model fails fast on the missing `feature_embedding` key.
 
 There is no CIF-based evaluation command; correctness is checked by
 deterministic numerical alignment with the original PyTorch implementation (see

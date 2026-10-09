@@ -14,8 +14,6 @@
 import copy
 import os
 import os.path as osp
-import subprocess
-import sys
 from unittest import mock
 
 import numpy as np
@@ -228,45 +226,6 @@ def test_registered_model_full_chain():
     batch = next(iter(loader))
     outputs = model.sample(batch, num_inference_steps=2)
     assert len(outputs["result"]) > 0
-
-
-def test_shared_cli_dispatches_sampler(tmp_path):
-    output_dir = tmp_path / "results"
-    command = [
-        sys.executable,
-        "structure_generation/sample.py",
-        "--model_name",
-        MODEL_NAME,
-        "--mode",
-        "by_dataloader",
-        "--sampler_type",
-        "Xrd2MofSampler",
-        "--output_path",
-        str(output_dir),
-    ]
-    try:
-        subprocess.run(
-            command,
-            capture_output=True,
-            check=True,
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError) as exc:
-        pytest.skip(f"shared sampling CLI unavailable: {exc}")
-
-    files = sorted(output_dir.glob("*.npz"))
-    assert files
-    sample = np.load(files[0], allow_pickle=True)
-    assert set(sample.files) == {
-        "lattice",
-        "frac_coords",
-        "atom_types",
-        "num_atoms",
-        "mof_id",
-    }
-    assert sample["lattice"].shape == (3, 3)
-    assert sample["frac_coords"].shape[1] == 3
-    assert sample["atom_types"].shape[0] == sample["frac_coords"].shape[0]
-    assert sample["atom_types"].shape[0] == sample["num_atoms"]
 
 
 def _make_tiny_model(execution_backend="eager"):
