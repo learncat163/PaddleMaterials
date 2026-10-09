@@ -4,29 +4,34 @@
 
 ## Abstract
 
-Xrd2Mof is a crystal structure generation framework that interprets powder X-ray
-diffraction (PXRD) patterns and reconstructs coarse-grained (CG) metal-organic
-framework (MOF) structures from them. A CLIP-style feature extractor aligns PXRD
-patterns, metal nodes and organic linkers with the structural features (lattice
-and atom positions) of the corresponding MOFs; a DiffCSP-style diffusion model then
-generates the CG building-block sites (metal nodes and linkers) conditioned on the
-extracted PXRD embedding. The generated CG structures are the input of a downstream
-atomic assembly step, which is not part of this repository.
+Xrd2Mof presents a crystal structure generation framework designed to enable
+intelligent, high-throughput interpretation of powder X-ray diffraction (PXRD)
+patterns and subsequent reconstruction of atomic-level crystal structures for
+metal-organic frameworks (MOFs). It leverages pretrained models to extract
+salient features from PXRD spectra alongside essential prior information (metal
+nodes and organic linkers), facilitating the generation of structural
+building-block sites within the unit cell. By employing a coarse-grained (CG)
+strategy, Xrd2Mof overcomes the limitations traditionally imposed by atom count
+in crystal structure prediction (CSP), and the generated CG structures are the
+input of a downstream atomic assembly step, which is not part of this
+repository.
 
-This directory contains the PaddlePaddle implementation of:
-
-- `ppmat/models/xrd2mof/feature_extractor.py`: PXRD feature extractor (CLIP-style
-  contrastive model, `Xrd2MofFeatureExtractor`).
-- `ppmat/models/xrd2mof/xrd2mof.py`: CG structure generation model (`Xrd2Mof`),
-  a DiffCSP variant with an additional per-sample XRD feature conditioning.
+![Xrd2Mof Overview](../../docs/xrd2mof.png)
 
 ---
 
 ## Model Description
 
-### Feature extractor
+### Overview
 
-Five encoders are fused into two 256-dim embeddings:
+A coarse-grained MOF unit cell is represented as:
+- CG atom types (metal node / organic linker): $A = (a_1,\ldots,a_N)$
+- fractional coordinates: $X = (x_1,\ldots,x_N),\; x_i \in [0,1)^3$
+- lattice matrix: $L \in \mathbb{R}^{3 \times 3}$
+
+Generation is conditioned on a per-sample 256-dim embedding $C$ produced by a
+CLIP-style feature extractor. Its five encoders are fused into two 256-dim
+embeddings:
 
 | Encoder | Input | Output |
 |---------|-------|--------|
@@ -37,171 +42,224 @@ Five encoders are fused into two 256-dim embeddings:
 | `LinkerEncoder` | linker graph (GCN) | 64 |
 
 `cif_features = lattice(32) + atom(256) = 288`, and
-`combined_features = xrd(1024) + metal(64) + linker(64) = 1152`. Both branches are
-projected to a shared 256-dim space and trained with an in-batch contrastive loss.
-For generation only the `feature_embedding` (PXRD + metal + linker branch) is used.
+`combined_features = xrd(1024) + metal(64) + linker(64) = 1152`. Both branches
+are projected to a shared 256-dim space and trained with an in-batch contrastive
+loss; for generation only the `feature_embedding` (PXRD + metal + linker branch)
+is used. The pipeline of the original repository is
+`create_data/ -> pretrained_model/ -> generation_model/`; this repository
+reimplements the last two stages and consumes the CG npz data produced by the
+first.
 
-### Generation model
+### Method
 
-The lattice is diffused with a DDPM Gaussian process (`DDPMScheduler`,
-`squaredcos_cap_v2`), while the fractional coordinates are diffused on a torus with
-wrapped Gaussian noise (`ScoreSdeVeSchedulerWrapped`). The denoiser is a CSPNet
-whose node features fuse the atom type embedding, the per-atom PXRD embedding and
-the time embedding before message passing. Sampling uses the predictor-corrector
-scheme of the original implementation.
+#### 1) Forward diffusion (corruption)
 
-The CG atom types are `0` (metal node) and `1` (organic linker).
+##### (a) Lattice diffusion (DDPM on $L$)
+The lattice is diffused with a standard DDPM Gaussian process
+(`DDPMScheduler`, `squaredcos_cap_v2`):
+
+$$
+L_t = \sqrt{\bar{\alpha}_t}\,L_0 + \sqrt{1 - \bar{\alpha}_t}\,\epsilon_L,
+\qquad
+\epsilon_L \sim \mathcal{N}(0, I).
+$$
+
+##### (b) Fractional-coordinate diffusion on a torus
+The fractional coordinates live on a 3D torus
+(`ScoreSdeVeSchedulerWrapped`); Gaussian noise is added and wrapped back into
+the unit cell:
+
+$$
+X_t = w(X_0 + \sigma_t\,\epsilon_X),
+\qquad
+\epsilon_X \sim \mathcal{N}(0, I),
+\qquad
+X_t = X_t \bmod 1.
+$$
+
+As $\sigma_t$ increases, the wrapped normal distribution approaches the uniform
+distribution over $[0,1)^{3}$.
+
+#### 2) Feature-conditioned denoiser (CSPNet)
+
+The denoiser is a DiffCSP-style CSPNet whose node initialization fuses the CG
+atom type embedding, the per-sample PXRD embedding $C$ and the time embedding:
+
+$$
+h_i^{(0)} = \rho\left(f_{\text{atom}}(a_i) \oplus C \oplus f_{\text{time}}(t)\right).
+$$
+
+Message passing operates on a fully connected CG graph with periodic Fourier
+features and the lattice inner product for O(3)-invariance:
+
+$$
+m_{ij}^{(s)} = \phi_m\left(
+h_i^{(s-1)},\, h_j^{(s-1)},\, \mathrm{vec}(L^\top L),\,
+\psi_{\mathrm{FT}}(x_j - x_i)
+\right),
+$$
+
+$$
+h_i^{(s)} = h_i^{(s-1)} + \phi_h\left(h_i^{(s-1)},\,
+\sum_j m_{ij}^{(s)}\right).
+$$
+
+Outputs are the coordinate score $\hat{\epsilon}_X$ per node and the lattice
+noise $\hat{\epsilon}_L$ from the graph-pooled features, rotated by $L$ to keep
+$\mathrm{O}(3)$ invariance.
+
+#### 3) Training objective
+
+The lattice branch is trained with plain MSE towards the injected noise; the
+coordinate branch regresses the normalized score of the wrapped normal
+distribution:
+
+$$
+\mathcal{L}
+= \lambda_L\,\| \hat{\epsilon}_L - \epsilon_L \|_2^2
++ \lambda_X\,\| \hat{\epsilon}_X - \nabla_{X_t}\log q(X_t \mid X_0) / \mathrm{sigmas\_norm}_t \|_2^2,
+\quad
+\lambda_L = 0.1,\; \lambda_X = 1.0.
+$$
+
+#### 4) Sampling
+
+Sampling follows the predictor-corrector scheme of the original implementation:
+1000 inference steps; each step runs a Langevin corrector with step size
+(`snr`) 1e-5 followed by an ancestral predictor, the lattice branch takes the
+ancestral DDPM step, and the final coordinates are wrapped into $[0,1)$.
 
 ---
 
-## Data Preparation
+## Dataset Description
 
-### Bundled test dataset
+- **BIFWIY, DAKZAS, DUDZOR, VAWXAS01**: four experimental PXRD test cases of
+  CSD-derived MOFs. The packaged dataset (`xrd2mof_cgmof50_data.zip`, downloaded
+  automatically on first use) contains 16 CG samples covering the
+  valence-consistent atom-count configurations of each MOF.
 
-The packaged dataset (`xrd2mof_cgmof50_data.zip`) contains 16 CG samples derived
-from the four bundled PXRD test cases (BIFWIY, DAKZAS, DUDZOR, VAWXAS01), covering
-the valence-consistent atom-count configurations of each MOF:
+| Split | Samples |
+| --- | --- |
+| train | 12 |
+| val | 4 |
+| test | 16 |
 
-| File | Content | Samples |
-|------|---------|---------|
-| `train.npz` | CG structures + PXRD embeddings | 12 |
-| `val.npz` | CG structures + PXRD embeddings | 4 |
-| `test.npz` | PXRD embeddings + CG atom types + ids | 16 |
+> Since the reference CG coordinates are not distributed with the test cases,
+> the bundled training/validation structures are synthesized with a fixed seed
+> and are intended for smoke training and alignment analysis only. Real
+> training requires the full CSD-derived dataset.
 
-The archive is downloaded automatically on first use. Each npz file stores the
-variable-length fields (`atom_types`, `frac_coords`) concatenated over samples,
-with per-sample sizes in `num_atoms`:
+Recommended data fields for each sample:
+- `feature_embedding`: $[N, 256]$ PXRD embedding from the pretrained feature extractor
+- `num_atoms`: $[N]$ CG site count per sample
+- `atom_types`: $[\sum \text{num\_atoms}]$, `0` metal node, `1` organic linker
+- `frac_coords`: $[\sum \text{num\_atoms}, 3]$ fractional coordinates in $[0,1)$ (train/val only)
+- `lengths` / `angles`: $[N, 3]$ lattice parameters (train/val only)
+- `mof_id`: $[N]$ sample identifier (test only)
 
-| Field | Shape | Notes |
-|-------|-------|-------|
-| `feature_embedding` | `[N, 256]` | PXRD embedding |
-| `num_atoms` | `[N]` | CG atom count per sample |
-| `atom_types` | `[sum(num_atoms)]` | `0` metal node, `1` linker |
-| `frac_coords` | `[sum(num_atoms), 3]` | training/validation only |
-| `lengths` | `[N, 3]` | training/validation only |
-| `angles` | `[N, 3]` | training/validation only |
-| `mof_id` | `[N]` | test only |
+### Data preparation
 
-> Note: the bundled training/validation structures are synthesized with a fixed
-> seed (the reference CG coordinates are not distributed with the test cases) and
-> are intended for smoke training and loss analysis only. Real training requires
-> the full CSD-derived dataset.
-
-### Preparing custom data
-
-1. Run the original preprocessing pipeline (`create_data/` and `pretrained_model/`
-   in the upstream repository) to obtain `dataset_emb.pt`, which stores one
+1. Run the original preprocessing pipeline (`create_data/` and
+   `pretrained_model/` in the upstream repository) to obtain the raw records:
+   the feature extractor below converts them into one
    `{mof_id, feature_embedding}` record per PXRD pattern.
 2. Compute the valence-consistent CG configurations for each MOF (see
    `cal_num_type_to_diffusion_single.py` upstream) to obtain `num_atoms` and
    `atom_types`.
-3. Store the arrays as npz files following the table above, place them under
-   `./data/xrd2mof_cgmof50/`, and the dataset classes will pick them up.
+3. Store the arrays as npz files following the field list above, place them
+   under `./data/xrd2mof_cgmof50/`, and the dataset classes will pick them up.
 
-### Feature extraction (optional)
-
-`Xrd2MofFeatureExtractor` can be used to compute embeddings from raw PXRD data
-(`dataset.pt` produced by `create_data/`). The pretrained weights ship inside the
-model package at `checkpoints/feature_extractor.pdparams`:
+The pretrained feature extractor weights ship inside the model package at
+`checkpoints/feature_extractor.pdparams`; the input batch keys and shapes are
+`cif_lattice [B, 3, 3]`, `cif_atom_positions [B, 50, 3]`, `xrd [B, 5250]`,
+`metal [B, 65]` and
+`linker {x: [N, 37], edge_index: [2, E], batch: [N]}`:
 
 ```python
+import os.path as osp
+
 import paddle
+from ppmat.models import MODEL_REGISTRY, build_model_from_name
+from ppmat.models import resolve_model_package_dir
 from ppmat.models.xrd2mof.feature_extractor import Xrd2MofFeatureExtractor
+from ppmat.utils import download
 
-model = Xrd2MofFeatureExtractor()
-model.set_state_dict(paddle.load("checkpoints/feature_extractor.pdparams"))
-model.eval()
-outputs = model.extract(batch)  # batch: cif_lattice/cif_atom_positions/xrd/metal/linker
-feature_embedding = outputs["feature_embedding"]
+path = download.get_weights_path_from_url(MODEL_REGISTRY["xrd2mof_cgmof50"])
+package_dir = resolve_model_package_dir("xrd2mof_cgmof50", path)
+
+extractor = Xrd2MofFeatureExtractor()
+extractor.set_state_dict(
+    paddle.load(osp.join(package_dir, "checkpoints", "feature_extractor.pdparams"))
+)
+extractor.eval()
+outputs = extractor.extract(batch)
+feature_embedding = outputs["feature_embedding"]  # [B, 256]
 ```
 
 ---
 
-## Environment
+## Results
 
-- PaddlePaddle 3.0+ (tested with 3.3.0)
-- pymatgen, numpy
+| Model Name | Dataset | Val (loss) | Config | Checkpoint / Log |
+| --- | --- | --- | --- | --- |
+| xrd2mof_cgmof50 | cgmof50 | 4.37 | [xrd2mof_cgmof50.yaml](xrd2mof_cgmof50.yaml) | pending |
 
-The generation model reuses `ppmat/schedulers` (`DDPMScheduler`,
-`ScoreSdeVeSchedulerWrapped`) and `ppmat/utils/crystal.py`.
+Val (loss) is the evaluation loss of the bundled 2-epoch smoke run
+(`6.49` at epoch 1 descending to `4.37` at epoch 2); the checkpoint link is
+published together with the registry entry.
+
+Deterministic alignment against the original PyTorch implementation
+(reference checkpoint `epoch=2284-step=162234.ckpt`):
+
+| Component | Metric | Value |
+|-----------|--------|-------|
+| Generation decoder (t=100/200/500/800) | pred max abs diff | 3.34e-6 |
+| Training loss (fixed timestep/noise, `sigmas_norm` aligned) | max abs diff | 2.0e-5 |
+| Feature extractor (`cif_embedding`) | max abs diff | 9.18e-6 |
+| Feature extractor (`feature_embedding`) | max abs diff | 1.25e-5 |
+
+These numbers document the migration-time cross-check; the residual gap comes
+from scheduler differences (the upstream cosine beta clip `0.9999` vs the shared
+`DDPMScheduler` bound `0.999`, and the Monte-Carlo `sigmas_norm` table, which is
+re-sampled per framework build).
 
 ---
 
-## Training
+## Command
 
+### Training
 ```bash
-python structure_generation/train.py \
-    -c structure_generation/configs/xrd2mof/xrd2mof_cgmof50.yaml \
-    Trainer.max_epochs=4000
+# multi-gpu training (example with 4 GPUs)
+python -m paddle.distributed.launch --gpus="0,1,2,3" structure_generation/train.py -c structure_generation/configs/xrd2mof/xrd2mof_cgmof50.yaml
+# single-gpu training
+python structure_generation/train.py -c structure_generation/configs/xrd2mof/xrd2mof_cgmof50.yaml
 ```
 
-Training configuration:
-
-| Setting | Value |
-|---------|-------|
-| Optimizer | Adam, lr 1e-3, beta (0.9, 0.999) |
-| LR scheduler | ReduceLROnPlateau (factor 0.6, patience 30, min lr 1e-4) |
-| Lattice loss weight | 0.1 |
-| Coordinate loss weight | 1.0 |
-| Diffusion steps | 1000 |
-| Batch size | 4 |
-
-### Loss analysis
-
-With the bundled dataset the evaluation loss decreases from `6.49` (epoch 1) to
-`4.37` (epoch 2). A deterministic 15-step training comparison against the original
-PyTorch implementation (identical initial weights, data, optimizer and fixed
-timestep/noise schedule) gives:
-
-| Metric | Value |
-|--------|-------|
-| loss max abs diff | 1.39e-3 |
-| loss mean abs diff | 2.49e-4 |
-| final loss (PD / PT) | 1.08313 / 1.08308 |
-
-The remaining difference comes from the independently estimated wrapped-normal
-normalization table (`sigmas_norm`), which is sampled with the framework RNG at
-scheduler construction time.
-
----
-
-## Inference
-
-The model output is a coarse-grained structure (metal-node / linker sites), so it
-is not converted to CIF here; downstream atomic assembly consumes the raw result.
-
-```python
-import numpy as np
-import paddle
-from ppmat.datasets import build_dataloader
-from ppmat.models import build_model_from_name
-
-model, config = build_model_from_name("xrd2mof_cgmof50")
-model.eval()
-loader = build_dataloader(config["Sample"]["data"])
-batch = next(iter(loader))
-outputs = model.sample(batch, num_inference_steps=1000)
-for item in outputs["result"]:
-    lattice = np.asarray(item["lattice"])       # [3, 3]
-    frac_coords = np.asarray(item["frac_coords"])  # [num_atoms, 3]
-    atom_types = item["atom_types"]             # 0 metal node, 1 linker
-    mof_id = item["mof_id"]
+### Validation
+```bash
+# Adjust program behavior on the fly using command-line parameters without modifying the configuration file directly.
+# Example: --Global.do_eval=True
+python structure_generation/train.py -c structure_generation/configs/xrd2mof/xrd2mof_cgmof50.yaml Global.do_eval=True Global.do_train=False Global.do_test=False Trainer.pretrained_model_path='path/to/model.pdparams'
 ```
 
-Sampling settings: 1000 inference steps, predictor-corrector step size
-(`snr`) 1e-5.
+### Testing
+```bash
+# Since the bundled test split provides PXRD embeddings only (no reference
+# coarse-grained structures to compute the loss), this model does not use the
+# test command.
+```
 
-### Sampling
-
-Sampling goes through the model's own `sample` method. The model output is a
-coarse-grained structure (metal-node / linker sites) rather than a fully
-atomistic crystal, so it is not converted to a CIF here and the config
-intentionally does not declare `Sample.build_structure_cfg` (CIF assembly does
-not apply to coarse-grained sites). Persistence is caller-side as well; the
-fields of each result item (`lattice`, `frac_coords`, `atom_types`,
-`num_atoms`, `mof_id`) mirror the dataset npz schema:
-
+### Sample
 ```python
+# Predict coarse-grained CG structures using a trained model.
+# Mode 1: Use a pre-trained model (downloads automatically).
+# Mode 2: Use a custom configuration file and checkpoint.
+# Results are saved to the folder specified by output_dir below; CIF assembly
+# does not apply to the coarse-grained output, so each item is persisted as npz
+# with the same fields as the dataset (`lattice`, `frac_coords`, `atom_types`,
+# `num_atoms`, `mof_id`). Sampling settings: 1000 inference steps, `snr` 1e-5.
+
+# Mode 1: pre-trained model
 import os
 
 import numpy as np
@@ -225,42 +283,19 @@ for index, item in enumerate(result):
         num_atoms=np.asarray(item["num_atoms"], dtype="int64"),
         mof_id=str(item["mof_id"]),
     )
+
+# Mode 2: custom config + checkpoint
+from omegaconf import OmegaConf
+
+from ppmat.models import build_model
+from ppmat.utils import save_load
+
+config = OmegaConf.load("structure_generation/configs/xrd2mof/xrd2mof_cgmof50.yaml")
+model = build_model(OmegaConf.to_container(config["Model"], resolve=True))
+save_load.load_pretrain(model, "path/to/model.pdparams")
+model.eval()
+# ... same sampling loop as Mode 1 on the batch you build.
 ```
-
-> Note: the `StructureSampler` modes other than dataloader-driven sampling
-> target fully atomistic models: this model expects coarse-grained atom types
-> (`0` metal node, `1` organic linker) plus a per-sample XRD
-> `feature_embedding`, so element/count inputs are not applicable and the
-> model fails fast on the missing `feature_embedding` key.
-
-There is no CIF-based evaluation command; correctness is checked by
-deterministic numerical alignment with the original PyTorch implementation (see
-below).
-
----
-
-## Verification Results
-
-Deterministic forward alignment against the original PyTorch implementation
-(reference checkpoint `epoch=2284-step=162234.ckpt`). These numbers document the
-migration-time cross-check against the upstream reference; they are not produced
-by a script shipped in this repository.
-
-| Component | Metric | Value |
-|-----------|--------|-------|
-| Generation decoder (t=100/200/500/800) | pred max abs diff | 3.34e-6 |
-| Training loss (fixed timestep/noise, `sigmas_norm` aligned) | max abs diff | 2.0e-5 |
-| Feature extractor (`cif_embedding`) | max abs diff | 9.18e-6 |
-| Feature extractor (`feature_embedding`) | max abs diff | 1.25e-5 |
-
-Scheduler notes:
-
-- `alphas_cumprod` differs by at most `3.84e-4` because the original cosine beta
-  schedule clips betas to `[1e-4, 0.9999]` while the shared `DDPMScheduler` uses a
-  `0.999` upper bound. The effect on the deterministic loss is below `2e-3`.
-- `sigmas_norm` is a Monte-Carlo estimate drawn at scheduler construction time, so
-  it differs between frameworks by a few percent. Injecting the PyTorch table
-  reproduces the training loss within `2.5e-4` on average.
 
 ---
 
