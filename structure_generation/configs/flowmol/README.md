@@ -109,7 +109,7 @@ flow matching training path.
 #### flowmol_qm9 split (download link)
 | Dataset | Train | Val | Test |
 | --- | --- | --- | --- |
-| [flowmol_qm9](https://paddle-org.bj.bcebos.com/paddlematerials/datasets/flowmol_qm9/flowmol_qm9.zip) | 96334 | 19775 | 12903 |
+| [flowmol_qm9](https://paddle-org.bj.bcebos.com/paddlematerials/datasets/qm9/flowmol_qm9.zip) | 96334 | 19775 | 12903 |
 
 ---
 

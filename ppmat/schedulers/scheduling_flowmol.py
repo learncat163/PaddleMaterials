@@ -22,6 +22,9 @@ import paddle
 class FlowMolInterpolantScheduler:
     """Schedules the interpolation progress alpha(t) of every feature.
 
+    Not reused: the existing noise/transition schedulers act on discrete
+    timesteps and expose neither continuous alpha(t) nor its analytic derivative.
+
     ``schedule_type`` may be a single schedule name applied to all features or
     a per-feature mapping. Cosine schedules additionally require the ``nu``
     exponent of every feature in ``cosine_params``.
