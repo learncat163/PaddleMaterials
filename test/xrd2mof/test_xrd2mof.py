@@ -14,6 +14,7 @@
 import copy
 import os
 import os.path as osp
+from pathlib import Path
 from unittest import mock
 
 import numpy as np
@@ -33,14 +34,12 @@ from ppmat.models.xrd2mof.xrd2mof import Xrd2Mof
 from ppmat.trainer.base_trainer import BaseTrainer
 from ppmat.utils import download
 
-CONFIG_PATH = osp.join(
-    osp.dirname(osp.abspath(__file__)),
-    "..",
-    "..",
-    "structure_generation",
-    "configs",
-    "xrd2mof",
-    "xrd2mof_cgmof50.yaml",
+CONFIG_PATH = (
+    Path(__file__).resolve().parents[2]
+    / "structure_generation"
+    / "configs"
+    / "xrd2mof"
+    / "xrd2mof_cgmof50.yaml"
 )
 
 MODEL_NAME = "xrd2mof_cgmof50"
