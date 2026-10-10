@@ -180,7 +180,7 @@ The pretrained feature extractor weights ship inside the model package at
 import os.path as osp
 
 import paddle
-from ppmat.models import MODEL_REGISTRY, build_model_from_name
+from ppmat.models import MODEL_REGISTRY
 from ppmat.models import resolve_model_package_dir
 from ppmat.models.xrd2mof.feature_extractor import Xrd2MofFeatureExtractor
 from ppmat.utils import download
@@ -193,8 +193,19 @@ extractor.set_state_dict(
     paddle.load(osp.join(package_dir, "checkpoints", "feature_extractor.pdparams"))
 )
 extractor.eval()
+batch = {
+    "cif_lattice": paddle.randn([1, 3, 3]),
+    "cif_atom_positions": paddle.randn([1, 50, 3]),
+    "xrd": paddle.randn([1, 5250]),
+    "metal": paddle.randn([1, 65]),
+    "linker": {
+        "x": paddle.randn([9, 37]),
+        "edge_index": paddle.randint(0, 9, [2, 12]),
+        "batch": paddle.zeros([9], dtype="int64"),
+    },
+}
 outputs = extractor.extract(batch)
-feature_embedding = outputs["feature_embedding"]  # [B, 256]
+feature_embedding = outputs["feature_embedding"]  # [1, 256]
 ```
 
 ---
@@ -250,19 +261,13 @@ python structure_generation/train.py -c structure_generation/configs/xrd2mof/xrd
 ```
 
 ### Sample
-```python
-# Predict coarse-grained CG structures using a trained model.
-# Mode 1: Use a pre-trained model (downloads automatically).
-# Mode 2: Use a custom configuration file and checkpoint.
-# Results are saved to the folder specified by output_dir below; CIF assembly
-# does not apply to the coarse-grained output, so each item is persisted as npz
-# with the same fields as the dataset (`lattice`, `frac_coords`, `atom_types`,
-# `num_atoms`, `mof_id`). Sampling settings: 1000 inference steps, `snr` 1e-5.
 
-# Mode 1: pre-trained model
+```python
+# Mode 1: use a pre-trained model (downloads automatically).
 import os
 
 import numpy as np
+
 from ppmat.datasets import build_dataloader
 from ppmat.models import build_model_from_name
 
@@ -271,8 +276,7 @@ os.makedirs(output_dir, exist_ok=True)
 
 model, config = build_model_from_name("xrd2mof_cgmof50")
 model.eval()
-loader = build_dataloader(config["Sample"]["data"])
-batch = next(iter(loader))
+batch = next(iter(build_dataloader(config["Sample"]["data"])))
 result = model.sample(batch, num_inference_steps=1000)["result"]
 for index, item in enumerate(result):
     np.savez(
@@ -283,19 +287,43 @@ for index, item in enumerate(result):
         num_atoms=np.asarray(item["num_atoms"], dtype="int64"),
         mof_id=str(item["mof_id"]),
     )
+```
 
-# Mode 2: custom config + checkpoint
+```python
+# Mode 2: use a custom configuration file and checkpoint.
+import os
+
+import numpy as np
 from omegaconf import OmegaConf
 
+from ppmat.datasets import build_dataloader
 from ppmat.models import build_model
 from ppmat.utils import save_load
 
+output_dir = "results/xrd2mof"
+os.makedirs(output_dir, exist_ok=True)
+
 config = OmegaConf.load("structure_generation/configs/xrd2mof/xrd2mof_cgmof50.yaml")
 model = build_model(OmegaConf.to_container(config["Model"], resolve=True))
-save_load.load_pretrain(model, "path/to/model.pdparams")
+save_load.load_pretrain(model, "path/to/best.pdparams")
 model.eval()
-# ... same sampling loop as Mode 1 on the batch you build.
+sample_cfg = OmegaConf.to_container(config["Sample"], resolve=True)
+batch = next(iter(build_dataloader(sample_cfg["data"])))
+result = model.sample(batch, num_inference_steps=1000)["result"]
+for index, item in enumerate(result):
+    np.savez(
+        os.path.join(output_dir, f"{item['mof_id']}_{index + 1}.npz"),
+        lattice=np.asarray(item["lattice"], dtype="float32"),
+        frac_coords=np.asarray(item["frac_coords"], dtype="float32"),
+        atom_types=np.asarray(item["atom_types"], dtype="int64"),
+        num_atoms=np.asarray(item["num_atoms"], dtype="int64"),
+        mof_id=str(item["mof_id"]),
+    )
 ```
+
+> `mof_id` is produced only by the bundled test split (`Xrd2MofTestDataset`).
+> Batches built from other sources must supply their own identifier or drop the
+> `mof_id` key.
 
 ---
 
