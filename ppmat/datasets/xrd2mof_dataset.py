@@ -23,7 +23,7 @@ from ppmat.utils import download
 from ppmat.utils import logger
 
 XRD2MOF_DATA_NAME = "xrd2mof_cgmof50"
-XRD2MOF_DATA_URL = "http://127.0.0.1/models/xrd2mof_cgmof50_data.zip"
+XRD2MOF_DATA_URL = "https://paddle-org.bj.bcebos.com/paddlematerials/datasets/MOF_PXRD/xrd2mof_cgmof50_data.zip"  # noqa
 XRD2MOF_DATA_MD5 = "e14457945570dd577e4fcaef82cc5232"
 
 

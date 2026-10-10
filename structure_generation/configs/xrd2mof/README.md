@@ -134,8 +134,9 @@ ancestral DDPM step, and the final coordinates are wrapped into $[0,1)$.
 ## Dataset Description
 
 - **BIFWIY, DAKZAS, DUDZOR, VAWXAS01**: four experimental PXRD test cases of
-  CSD-derived MOFs. The packaged dataset (`xrd2mof_cgmof50_data.zip`, downloaded
-  automatically on first use) contains 16 CG samples covering the
+  CSD-derived MOFs. The packaged dataset
+  ([xrd2mof_cgmof50_data.zip](https://paddle-org.bj.bcebos.com/paddlematerials/datasets/MOF_PXRD/xrd2mof_cgmof50_data.zip),
+  downloaded automatically on first use) contains 16 CG samples covering the
   valence-consistent atom-count configurations of each MOF.
 
 | Split | Samples |
@@ -202,11 +203,10 @@ feature_embedding = outputs["feature_embedding"]  # [B, 256]
 
 | Model Name | Dataset | Val (loss) | Config | Checkpoint / Log |
 | --- | --- | --- | --- | --- |
-| xrd2mof_cgmof50 | cgmof50 | 4.37 | [xrd2mof_cgmof50.yaml](xrd2mof_cgmof50.yaml) | pending |
+| xrd2mof_cgmof50 | cgmof50 | 4.37 | [xrd2mof_cgmof50.yaml](xrd2mof_cgmof50.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/spectrum_elucidation/xrd2mof/xrd2mof_cgmof50.zip) |
 
 Val (loss) is the evaluation loss of the bundled 2-epoch smoke run
-(`6.49` at epoch 1 descending to `4.37` at epoch 2); the checkpoint link is
-published together with the registry entry.
+(`6.49` at epoch 1 descending to `4.37` at epoch 2).
 
 Deterministic alignment against the original PyTorch implementation
 (reference checkpoint `epoch=2284-step=162234.ckpt`):
