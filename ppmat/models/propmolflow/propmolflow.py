@@ -28,10 +28,9 @@ import copy
 import os
 import os.path as osp
 
+import numpy as np
 import paddle
 import paddle.nn as nn
-from paddle_scatter import scatter_mean
-from paddle_scatter import scatter_sum
 from scipy.optimize import linear_sum_assignment
 
 from ppmat.models.common.runtime import RuntimeMixin
@@ -41,10 +40,43 @@ from ppmat.models.propmolflow.gvp import GVPConv
 from ppmat.models.propmolflow.gvp import norm_no_nan
 from ppmat.schedulers import build_scheduler
 from ppmat.utils import logger
-from ppmat.utils.graph import build_batched_complete_graph
+from ppmat.utils.scatter import scatter_mean
+from ppmat.utils.scatter import scatter_sum
 
 FEATURE_NAMES = ["positions", "atom_types", "atom_charges", "bond_types"]
 MASK_ATOM_SYMBOL = "Se"
+
+
+def build_batched_complete_graph(num_atoms: np.ndarray) -> dict:
+    """Build complete molecular graphs with upper edges before reverse edges."""
+    num_atoms = np.asarray(num_atoms, dtype="int64")
+    edge_idxs_list = []
+    for n in num_atoms:
+        upper = np.stack(np.triu_indices(int(n), k=1))
+        edge_idxs_list.append(np.concatenate((upper, upper[::-1]), axis=1))
+    num_edges = np.array([e.shape[1] for e in edge_idxs_list], dtype="int64")
+
+    node_offsets = np.concatenate([[0], np.cumsum(num_atoms)[:-1]])
+    src = np.concatenate([e[0] for e in edge_idxs_list]) + np.repeat(
+        node_offsets, num_edges
+    )
+    dst = np.concatenate([e[1] for e in edge_idxs_list]) + np.repeat(
+        node_offsets, num_edges
+    )
+
+    upper_edge_mask = np.zeros(int(num_edges.sum()), dtype=bool)
+    offset = 0
+    for n_edges in num_edges:
+        upper_edge_mask[offset : offset + n_edges // 2] = True
+        offset += n_edges
+
+    return {
+        "src": src,
+        "dst": dst,
+        "upper_edge_mask": upper_edge_mask,
+        "node_batch_idx": np.repeat(np.arange(len(num_atoms)), num_atoms),
+        "edge_batch_idx": np.repeat(np.arange(len(num_atoms)), num_edges),
+    }
 
 
 def _rbf(D, D_max, D_count, D_min=0.0):
@@ -307,6 +339,16 @@ class CTMCVectorField(RuntimeMixin, nn.Layer):
         super().__init__()
         self._init_runtime(execution_backend, runtime_options)
 
+        if n_recycles < 1 or n_molecule_updates < 1 or convs_per_update < 1:
+            raise ValueError(
+                "n_recycles, n_molecule_updates and convs_per_update must be positive"
+            )
+        if n_molecule_updates == 1 and convs_per_update == 1:
+            raise ValueError(
+                "The released update schedule requires at least two convolutions "
+                "to update molecular coordinates"
+            )
+
         if properties_handle_method not in [
             "concatenate",
             "sum",
@@ -321,7 +363,7 @@ class CTMCVectorField(RuntimeMixin, nn.Layer):
             )
         if property_embedder is None:
             raise ValueError("property_embedder must be provided")
-        if properties_handle_method in ["sum", "multiply"] and (
+        if properties_handle_method in ["sum", "multiply", "concatenate_multiply"] and (
             property_embedding_dim != n_hidden_scalars
         ):
             raise ValueError(
@@ -420,6 +462,18 @@ class CTMCVectorField(RuntimeMixin, nn.Layer):
                 for _ in range(n_updaters)
             ]
         )
+
+        # Frozen checkpoint-only layers preserve the released parameter layout.
+        checkpoint_only_layers = []
+        if properties_handle_method not in ["concatenate", "concatenate_sum"]:
+            checkpoint_only_layers.append(self.scalar_embedding_cond)
+        if separate_mol_updaters and convs_per_update == 1:
+            checkpoint_only_layers.extend(
+                [self.node_position_updaters[0], self.edge_updaters[0]]
+            )
+        for layer in checkpoint_only_layers:
+            for parameter in layer.parameters():
+                parameter.stop_gradient = True
 
         self.node_output_head = nn.Sequential(
             nn.Linear(n_hidden_scalars, n_hidden_scalars),
@@ -606,7 +660,8 @@ class CTMCVectorField(RuntimeMixin, nn.Layer):
             "positions"
         ]
 
-        for feat, feat_idx in zip(["atom_types", "atom_charges"], [1, 2]):
+        for feat in ["atom_types", "atom_charges"]:
+            feat_idx = self.feature_names.index(feat)
             tokens = batch[feat].argmax(-1)
             alpha_feat = alpha_t[:, feat_idx][node_batch_idx]
             mask = paddle.rand(tokens.shape, dtype=alpha_feat.dtype) < (1 - alpha_feat)
@@ -1065,9 +1120,8 @@ class PropMolFlow(RuntimeMixin, nn.Layer):
         batch_size = num_atoms.shape[0]
         place = next(iter(self.parameters())).place
 
-        properties = paddle.to_tensor(
-            batch_data["properties"], dtype="float32", place=place
-        ).reshape([batch_size, 1])
+        properties = batch_data["properties"].astype("float32")
+        properties = properties.reshape([batch_size, 1]).to(place)
 
         state = self._build_sampling_state(num_atoms, place)
         state = self.vector_field.integrate(
@@ -1093,9 +1147,7 @@ class PropMolFlow(RuntimeMixin, nn.Layer):
         writer = Chem.SDWriter(sdf_path)
         writer.SetKekulize(False)
         for molecule in molecules:
-            rdkit_mol = build_rdkit_mol(molecule)
-            if rdkit_mol is not None:
-                writer.write(rdkit_mol)
+            writer.write(build_rdkit_mol(molecule))
         writer.close()
         logger.info(f"Saved {len(molecules)} molecules to {sdf_path}")
 

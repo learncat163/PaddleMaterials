@@ -56,23 +56,9 @@ PROPERTY_MAP = {
     "g298_atom": 18,
 }
 
-DATASET_NAME = "propmolflow_qm9"
-# Local test URL, replace with the online address before submitting.
-DATASET_URL = "http://127.0.0.1/models/propmolflow_qm9.zip"
-DATASET_MD5 = "51a812b6992dc6996ec7d012a54a7857"
-
 N_CHARGES = 6
 N_BOND_TYPES = 5
 CHARGE_OFFSET = 2
-
-
-def _resolve_split_path(path: str) -> str:
-    """Resolve a split path, downloading the package when it is missing."""
-    if osp.exists(path):
-        return path
-    logger.message("The dataset is not found. Will download it now.")
-    root_path = download.get_datasets_path_from_url(DATASET_URL, DATASET_MD5)
-    return osp.join(root_path, DATASET_NAME, osp.basename(path))
 
 
 def _default_normalization_path(path: str) -> str:
@@ -80,17 +66,30 @@ def _default_normalization_path(path: str) -> str:
     return osp.join(osp.dirname(path), "train_data_property_normalization.npz")
 
 
-class PropMolFlowDataset(Dataset):
+class _PropMolFlowSplitDataset(Dataset):
+    """Shared download and split resolution of the PropMolFlow npz package."""
+
+    name = "propmolflow_qm9"
+    # Local test URL, replace with the online address before submitting.
+    url = "http://127.0.0.1/models/propmolflow_qm9.zip"
+    md5 = "51a812b6992dc6996ec7d012a54a7857"
+
+    def _resolve_split_path(self, path: str) -> str:
+        """Resolve a split path, downloading the package when it is missing."""
+        if osp.exists(path):
+            return path
+        logger.message("The dataset is not found. Will download it now.")
+        root_path = download.get_datasets_path_from_url(self.url, self.md5)
+        return osp.join(root_path, self.name, osp.basename(path))
+
+
+class PropMolFlowDataset(_PropMolFlowSplitDataset):
     """PropMolFlow molecule dataset backed by preprocessed npz splits.
 
     Every sample provides the endpoint features (positions, one-hot atom types,
     one-hot charges and upper-triangle one-hot bond types) and, when
     conditioning is enabled, the normalized property value.
     """
-
-    name = DATASET_NAME
-    url = DATASET_URL
-    md5 = DATASET_MD5
 
     def __init__(
         self,
@@ -109,7 +108,7 @@ class PropMolFlowDataset(Dataset):
         self.atom_map = list(atom_map)
         self.conditioning = conditioning_cfg
 
-        path = _resolve_split_path(path)
+        path = self._resolve_split_path(path)
         self.path = path
 
         if normalization_path is None:
@@ -184,7 +183,7 @@ class PropMolFlowDataset(Dataset):
         return sample
 
 
-class PropMolFlowSamplingDataset(Dataset):
+class PropMolFlowSamplingDataset(_PropMolFlowSplitDataset):
     """Sampling inputs for PropMolFlow: number of atoms and property values.
 
     ``n_atoms`` and ``property_value`` are orthogonal pins: an explicit value
@@ -195,10 +194,6 @@ class PropMolFlowSamplingDataset(Dataset):
     explicit ``property_value`` and draws atom counts from the molecules whose
     property lies in the top quantile range.
     """
-
-    name = DATASET_NAME
-    url = DATASET_URL
-    md5 = DATASET_MD5
 
     def __init__(
         self,
@@ -236,7 +231,7 @@ class PropMolFlowSamplingDataset(Dataset):
                 "property_value must be provided for out_of_distribution sampling"
             )
 
-        path = _resolve_split_path(path)
+        path = self._resolve_split_path(path)
         if normalization_path is None:
             normalization_path = _default_normalization_path(path)
 

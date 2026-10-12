@@ -26,8 +26,9 @@ from typing import Union
 
 import paddle
 import paddle.nn as nn
-from paddle_scatter import scatter_mean
-from paddle_scatter import scatter_sum
+
+from ppmat.utils.scatter import scatter_mean
+from ppmat.utils.scatter import scatter_sum
 
 
 def norm_no_nan(x, axis=-1, keepdims=False, eps=1e-8, sqrt=True):

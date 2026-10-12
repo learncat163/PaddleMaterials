@@ -1,4 +1,4 @@
-# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,7 +30,6 @@ from ppmat.datasets.custom_data_type import ConcatNumpyWarper
 from ppmat.datasets.geometric_data_type.batch import Batch
 from ppmat.datasets.geometric_data_type.data import Data
 from ppmat.utils import logger
-from ppmat.utils.graph import build_batched_complete_graph
 from ppmat.utils.pgl_compat import patch_pgl_empty_edge_batch
 
 patch_pgl_empty_edge_batch()
@@ -104,6 +103,8 @@ class PropMolFlowCollator:
     EDGE_FEATS = ("bond_types",)
 
     def __call__(self, batch: List[Any]) -> Any:
+        from ppmat.models.propmolflow.propmolflow import build_batched_complete_graph
+
         num_atoms = np.array(
             [sample["structure_array"]["num_atoms"] for sample in batch], dtype="int64"
         )

@@ -35,24 +35,25 @@ class InterpolantScheduler:
     ):
         self.feature_names = feature_names
 
-        if not isinstance(schedule_type, (str, dict)):
+        if isinstance(schedule_type, str):
+            schedule_dict = {feat: schedule_type for feat in self.feature_names}
+        elif isinstance(schedule_type, dict):
+            schedule_dict = schedule_type
+        else:
             raise ValueError("schedule_type must be a string or a dictionary")
 
-        if isinstance(schedule_type, str):
-            if schedule_type not in self.supported_schedule_types:
-                raise ValueError(f"unsupported schedule_type: {schedule_type}")
-            self.schedule_dict = {feat: schedule_type for feat in self.feature_names}
-        else:
-            for feat in self.feature_names:
-                if feat not in schedule_type:
-                    raise ValueError(f"must specify schedule_type for feature {feat}")
-            self.schedule_dict = schedule_type
+        for feat in self.feature_names:
+            if feat not in schedule_dict:
+                raise ValueError(f"must specify schedule_type for feature {feat}")
 
-        self.cosine_params = cosine_params
-
-        for feat, feat_schedule_type in self.schedule_dict.items():
-            if feat_schedule_type == "cosine" and feat not in self.cosine_params:
+        for feat, feat_schedule_type in schedule_dict.items():
+            if feat_schedule_type not in self.supported_schedule_types:
+                raise ValueError(f"unsupported schedule_type: {feat_schedule_type}")
+            if feat_schedule_type == "cosine" and feat not in cosine_params:
                 raise ValueError(f"must specify cosine_params for feature {feat}")
+
+        self.schedule_dict = schedule_dict
+        self.cosine_params = cosine_params
 
     def interpolant_weights(self, t: paddle.Tensor):
         """Return the weights of the prior and the endpoint at time ``t``."""
@@ -64,10 +65,10 @@ class InterpolantScheduler:
         for feat in self.feature_names:
             schedule_type = self.schedule_dict[feat]
             if schedule_type == "cosine":
-                alpha_t = self.cosine_alpha_t(t, nu=self.cosine_params[feat])
-            elif schedule_type == "linear":
-                alpha_t = self.linear_alpha_t(t)
-            per_feat_alpha.append(alpha_t)
+                alpha = self.cosine_alpha_t(t, nu=self.cosine_params[feat])
+            else:
+                alpha = self.linear_alpha_t(t)
+            per_feat_alpha.append(alpha)
         return paddle.concat(per_feat_alpha, axis=1)
 
     def alpha_t_prime(self, t: paddle.Tensor) -> paddle.Tensor:
@@ -75,12 +76,10 @@ class InterpolantScheduler:
         for feat in self.feature_names:
             schedule_type = self.schedule_dict[feat]
             if schedule_type == "cosine":
-                alpha_t_prime = self.cosine_alpha_t_prime(
-                    t, nu=self.cosine_params[feat]
-                )
-            elif schedule_type == "linear":
-                alpha_t_prime = self.linear_alpha_t_prime(t)
-            per_feat_alpha_prime.append(alpha_t_prime)
+                alpha_prime = self.cosine_alpha_t_prime(t, nu=self.cosine_params[feat])
+            else:
+                alpha_prime = self.linear_alpha_t_prime(t)
+            per_feat_alpha_prime.append(alpha_prime)
         return paddle.concat(per_feat_alpha_prime, axis=1)
 
     def cosine_alpha_t(self, t: paddle.Tensor, nu) -> paddle.Tensor:

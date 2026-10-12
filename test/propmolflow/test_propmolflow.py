@@ -24,13 +24,16 @@ import paddle
 import pytest
 from omegaconf import OmegaConf
 
+from ppmat.datasets import build_dataloader
 from ppmat.datasets.collate_fn import PropMolFlowCollator
-from ppmat.datasets.propmolflow_dataset import PropMolFlowDataset
+from ppmat.datasets.propmolflow_dataset import PROPERTY_MAP
 from ppmat.datasets.propmolflow_dataset import PropMolFlowSamplingDataset
 from ppmat.metrics import PropMolFlowMoleculeMetric
 from ppmat.models import CTMCVectorField
 from ppmat.models import build_model
+from ppmat.optimizer import build_optimizer
 from ppmat.sampler import MolecularSampler
+from ppmat.trainer.base_trainer import BaseTrainer
 
 CONFIG_PATH = osp.join(
     osp.dirname(__file__),
@@ -194,15 +197,6 @@ def _build_batch(num_atoms_list):
     return PropMolFlowCollator()(samples)
 
 
-def _training_dataset(tmp_path):
-    path, _ = _write_synthetic_split(tmp_path)
-    return PropMolFlowDataset(
-        path=path,
-        atom_map=["C", "H", "N", "O", "F"],
-        conditioning_cfg={"enabled": True, "property": "alpha", "normalize": True},
-    )
-
-
 def _sampling_dataset(tmp_path, **kwargs):
     path, _ = _write_synthetic_split(tmp_path)
     dataset_kwargs = {
@@ -272,10 +266,22 @@ def test_train_forward_from_config():
     }
     for value in output["loss_dict"].values():
         assert np.isfinite(float(value))
+    output["loss_dict"]["loss"].backward()
+    assert all(
+        parameter.grad is not None
+        for parameter in model.parameters()
+        if not parameter.stop_gradient
+    )
 
     # Training-forward variants over the released configuration space.
     for overrides in (
         {"gaussian_expansion": True, "gaussian_start": 6.31, "gaussian_stop": 196.62},
+        {
+            "vector_field_config": dict(
+                SMALL_VECTOR_FIELD, n_molecule_updates=1, convs_per_update=2
+            )
+        },
+        {"vector_field_config": dict(SMALL_VECTOR_FIELD, separate_mol_updaters=False)},
         *(
             {"properties_handle_method": method}
             for method in [
@@ -288,26 +294,44 @@ def test_train_forward_from_config():
         ),
     ):
         variant = _build_model(**overrides)
-        assert np.isfinite(float(variant(batch)["loss_dict"]["loss"]))
+        loss = variant(batch)["loss_dict"]["loss"]
+        assert np.isfinite(float(loss))
+        loss.backward()
+        assert all(
+            parameter.grad is not None
+            for parameter in variant.parameters()
+            if not parameter.stop_gradient
+        )
 
     with pytest.raises(ValueError):
         _build_model(gaussian_expansion=True, gaussian_start=None, gaussian_stop=None)
     with pytest.raises(ValueError):
         _build_model(properties_handle_method="unsupported")
+    with pytest.raises(ValueError, match="at least two convolutions"):
+        _build_model(vector_field_config=dict(SMALL_VECTOR_FIELD, n_molecule_updates=1))
+    for name in ("n_recycles", "n_molecule_updates", "convs_per_update"):
+        with pytest.raises(ValueError, match="must be positive"):
+            _build_model(vector_field_config=dict(SMALL_VECTOR_FIELD, **{name: 0}))
 
 
 def test_train_data_pipeline_feeds_forward(tmp_path):
-    dataset = _training_dataset(tmp_path)
-    assert len(dataset) == 6
+    path, properties = _write_synthetic_split(tmp_path)
 
-    batch = PropMolFlowCollator()([dataset[i] for i in range(3)])
-    assert batch["batch_size"] == 3
+    config = OmegaConf.to_container(OmegaConf.load(CONFIG_PATH), resolve=True)
+    config["Dataset"]["train"]["dataset"]["__init_params__"]["path"] = path
+    config["Dataset"]["train"]["sampler"]["__init_params__"]["shuffle"] = False
+    data_loader = build_dataloader(config["Dataset"]["train"])
+    batch = next(iter(data_loader))
+
+    assert batch["batch_size"] == 6
     assert batch["upper_edge_mask"].sum() == batch["upper_edge_mask"].shape[0] // 2
-    expected = (float(dataset[0]["prop"]) * dataset.property_std) + (
-        dataset.property_mean
-    )
-    raw_value = float(np.load(dataset.path)["properties"][0, 4])
-    assert np.isclose(expected, raw_value, atol=1e-5)
+
+    normalization = np.load(osp.join(tmp_path, "train_data_property_normalization.npz"))
+    property_idx = PROPERTY_MAP["alpha"]
+    restored = float(batch["prop"][0]) * float(
+        normalization["std"][property_idx]
+    ) + float(normalization["mean"][property_idx])
+    assert np.isclose(restored, float(properties[0, property_idx]), atol=1e-5)
 
     model = _build_model()
     assert np.isfinite(float(model(batch)["loss_dict"]["loss"]))
@@ -397,17 +421,36 @@ def test_sampling_framework_end_to_end(tmp_path):
 # ---------------------------- evaluation chain ----------------------------
 
 
-def test_metric_one_shot_matches_streaming(tmp_path):
-    model = _build_model()
-    batch_data = _sampling_inputs(_sampling_dataset(tmp_path))
-    molecules = model.sample(batch_data, num_inference_steps=2)["pred"]
-
+def test_metric_one_shot_matches_streaming():
+    hydrogen = {
+        "atom_types": ["H", "H"],
+        "charges": [0, 0],
+        "positions": [[0.0, 0.0, 0.0], [0.7, 0.0, 0.0]],
+        "bonds": [[0, 1, 1]],
+    }
+    invalid_carbon = {
+        "atom_types": ["C"] + ["H"] * 6,
+        "charges": [0] * 7,
+        "positions": [[0.0, 0.0, 0.0]] * 7,
+        "bonds": [[0, index, 1] for index in range(1, 7)],
+    }
+    molecules = [hydrogen, invalid_carbon, hydrogen]
     one_shot = PropMolFlowMoleculeMetric()(molecules)
+    assert one_shot == pytest.approx(
+        {
+            "rdkit_valid": 2 / 3,
+            "valid_and_unique": 1 / 3,
+            "close_shell_ratio": 1.0,
+            "atom_stable": 10 / 11,
+            "mol_stable": 2 / 3,
+        }
+    )
 
     streaming = PropMolFlowMoleculeMetric()
-    streaming.update_step(
-        result={"samples": {"pred": molecules}}, batch=None, stage="sample"
-    )
+    for batch in (molecules[:2], molecules[2:]):
+        streaming.update_step(
+            result={"samples": {"pred": batch}}, batch=None, stage="sample"
+        )
     streamed = streaming.compute_epoch(stage="sample")
 
     assert set(one_shot) == set(streamed)
@@ -424,27 +467,107 @@ def test_metric_one_shot_matches_streaming(tmp_path):
 # ------------------------ runtime orchestration (CINN) ------------------------
 
 
-def test_checkpoint_restore_reproduces_training_forward(tmp_path):
-    model = _build_model()
-    batch = _build_batch([4, 5])
-
-    paddle.seed(42)
-    reference = {
-        name: float(value) for name, value in model(batch)["loss_dict"].items()
+def test_trainer_checkpoint_resume_restores_training_state(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        CTMCVectorField, "validate_execution_backend", lambda self, **kwargs: None
+    )
+    monkeypatch.setattr(
+        CTMCVectorField,
+        "_run_runtime",
+        lambda self, name, function, *args, **kwargs: function(*args, **kwargs),
+    )
+    path, _ = _write_synthetic_split(tmp_path)
+    config = OmegaConf.to_container(OmegaConf.load(CONFIG_PATH), resolve=True)
+    data_config = config["Dataset"]["train"]
+    data_config["dataset"]["__init_params__"]["path"] = path
+    data_config["sampler"]["__init_params__"].update(batch_size=3, shuffle=False)
+    loader = build_dataloader(data_config)
+    optimizer_config = config["Optimizer"]
+    optimizer_config["__init_params__"]["lr"] = {
+        "__class_name__": "ExponentialDecay",
+        "__init_params__": {
+            "learning_rate": 0.00025,
+            "gamma": 0.9,
+            "decay_steps": 1,
+        },
     }
 
-    checkpoint = tmp_path / "best.pdparams"
-    paddle.save(model.state_dict(), str(checkpoint))
-    restored = _build_model()
-    restored.set_state_dict(paddle.load(str(checkpoint)))
-    restored.eval()
-
-    paddle.seed(42)
-    restored_losses = restored(batch)["loss_dict"]
-    for name, value in reference.items():
-        np.testing.assert_allclose(
-            float(restored_losses[name]), value, rtol=0.0, atol=1e-6
+    def build_trainer(name, max_epochs, backend):
+        with paddle.utils.unique_name.guard():
+            model = _build_model()
+            optimizer, scheduler = build_optimizer(
+                optimizer_config,
+                (model,),
+                epochs=max_epochs,
+                iters_per_epoch=len(loader),
+            )
+        trainer_config = dict(
+            config["Trainer"],
+            output_dir=str(tmp_path / name),
+            max_epochs=max_epochs,
+            save_freq=1,
         )
+        return BaseTrainer(
+            trainer_config,
+            model,
+            train_dataloader=loader,
+            val_dataloader=loader,
+            optimizer=optimizer,
+            lr_scheduler=scheduler,
+            execution_config={"backend": backend},
+        )
+
+    first = build_trainer("first", 1, "cinn")
+    with paddle.utils.unique_name.guard():
+        first.train()
+    checkpoint_dir = tmp_path / "first" / "checkpoints"
+    for prefix in ("epoch_1", "latest", "best"):
+        for suffix in ("pdparams", "pdopt", "pdstates"):
+            assert (checkpoint_dir / f"{prefix}.{suffix}").is_file()
+    weights = paddle.load(str(checkpoint_dir / "latest.pdparams"))
+    optimizer_state = paddle.load(str(checkpoint_dir / "latest.pdopt"))
+    assert weights.keys() == first.model.state_dict().keys()
+
+    resumed = build_trainer("resumed", 2, "cinn")
+    restored_steps = []
+
+    def check_restored_state(model, inputs):
+        if restored_steps:
+            return
+        assert resumed.state.global_step == first.state.global_step == len(loader)
+        assert resumed.state.epoch == first.state.epoch + 1
+        assert resumed.optimizer.get_lr() == first.optimizer.get_lr()
+        actual = resumed.optimizer.state_dict()
+        assert actual.keys() == optimizer_state.keys()
+        for name, value in optimizer_state.items():
+            if isinstance(value, paddle.Tensor):
+                np.testing.assert_array_equal(actual[name].numpy(), value.numpy())
+            else:
+                assert actual[name] == value
+        for name, value in weights.items():
+            np.testing.assert_array_equal(
+                model.state_dict()[name].numpy(), value.numpy()
+            )
+        restored_steps.append(resumed.state.global_step)
+
+    hook = resumed.model.register_forward_pre_hook(check_restored_state)
+    with paddle.utils.unique_name.guard():
+        resumed.train(resume_from_checkpoint=str(checkpoint_dir / "latest"))
+    hook.remove()
+    assert restored_steps == [len(loader)]
+
+    straight = build_trainer("straight", 2, "eager")
+    with paddle.utils.unique_name.guard():
+        straight.train()
+    assert resumed.model.execution_backend == "cinn"
+    assert resumed.state.global_step == straight.state.global_step == 2 * len(loader)
+    assert resumed.state.epoch == straight.state.epoch == 2
+    assert resumed.optimizer.get_lr() == straight.optimizer.get_lr()
+    assert resumed.lr_scheduler.state_dict() == straight.lr_scheduler.state_dict()
+    assert (
+        resumed.optimizer.state_dict().keys() == straight.optimizer.state_dict().keys()
+    )
+    assert resumed.model.state_dict().keys() == straight.model.state_dict().keys()
 
 
 def test_cinn_dispatch_boundary_and_eager_equivalence(monkeypatch):

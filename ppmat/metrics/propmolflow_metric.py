@@ -127,14 +127,12 @@ class PropMolFlowMoleculeMetric(StreamingMetricBase):
         RDLogger.DisableLog("rdApp.*")
         for molecule in molecules:
             self._n_molecules += 1
+            self._n_atoms += len(molecule["atom_types"])
             try:
                 rdkit_mol = build_rdkit_mol(molecule)
-                Chem.SanitizeMol(rdkit_mol)
+                rdkit_mol.UpdatePropertyCache(strict=False)
             except (IndexError, RuntimeError, ValueError):
                 continue
-
-            self._n_valid += 1
-            self._unique_smiles.add(Chem.MolToSmiles(rdkit_mol))
 
             atoms = rdkit_mol.GetAtoms()
             total_charge = sum(atom.GetFormalCharge() for atom in atoms)
@@ -157,8 +155,14 @@ class PropMolFlowMoleculeMetric(StreamingMetricBase):
                         valid = effective_valence == 4
                 self._n_stable_atoms += int(valid)
                 molecule_stable = molecule_stable and valid
-            self._n_atoms += len(atoms)
             self._n_stable_molecules += int(molecule_stable)
+
+            try:
+                Chem.SanitizeMol(rdkit_mol)
+            except (RuntimeError, ValueError):
+                continue
+            self._n_valid += 1
+            self._unique_smiles.add(Chem.MolToSmiles(rdkit_mol))
 
     def update_step(self, *, result: Dict[str, Any], batch: Any, stage: str):
         if stage != "sample":

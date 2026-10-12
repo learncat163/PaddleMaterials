@@ -1,98 +1,150 @@
 # PropMolFlow
 
-## 1. Introduction
+[PropMolFlow: property-guided molecule generation with geometry-complete flow matching](https://www.nature.com/articles/s43588-025-00946-y)
 
-Property-guided molecule generation with geometry-complete flow matching.
+## Abstract
 
-- **Task**: generate 3D molecules conditioned on a target molecular property
-  (e.g. `alpha`, `mu`, `gap`).
-- **Dataset**: corrected QM9 (rQM9_v0), elements C/H/N/O/F, five bond types,
-  100000 training molecules.
-- **Paper**: Zeng et al., *Nature Computational Science*, 2026.
-- **Upstream repository**: https://github.com/Liu-Group-UF/PropMolFlow
+Molecule generation is advancing rapidly in chemical discovery and drug design. Flow-matching methods have recently set the state of the art (SOTA) in unconditional molecule generation, surpassing score-based diffusion models. However, diffusion models still lead in property-guided generation. In this work, we introduce PropMolFlow, an approach for property-guided molecule generation based on geometry-complete SE(3)-equivariant flow matching. Integrating five different property embedding methods with a Gaussian expansion of scalar properties, PropMolFlow achieves competitive performance against previous SOTA diffusion models in conditional molecule generation while maintaining high structural stability and validity. Additionally, it enables higher sampling speed with fewer time steps compared with baseline models. We highlight the importance of validating the properties of generated molecules through density functional theory calculations. Furthermore, we introduce a task to assess the model's ability to propose molecules with under-represented property values, assessing its capacity for out-of-distribution generalization.
 
-The model uses CTMC (continuous-time Markov chain) probability paths for the
-discrete features (atom types, charges, bond types) and linear interpolation
-paths for coordinates. A GVP (Geometric Vector Perceptron) message passing
-network predicts the trajectory endpoints. The conditioned property is injected
-through a property embedder; five injection strategies are supported
-(`concatenate`, `sum`, `multiply`, `concatenate_sum`, `concatenate_multiply`).
+![PropMolFlow Overview](../../docs/propmolflow_overview_page.jpg)
 
-## 2. Data preparation
+---
 
-The `propmolflow_qm9` data package is downloaded and extracted automatically by
-`download.get_datasets_path_from_url` into `~/.paddlemat/datasets/`. The package
-provides the four splits consumed by the configs plus the shared property
-normalization:
+## Model Description
 
-```text
-propmolflow_qm9/
-|-- train_a_data_processed.npz              # default train split (50000 molecules)
-|-- train_b_data_processed.npz              # the other half of the training set
-|-- val_data_processed.npz                  # validation split
-|-- test_data_processed.npz                 # test split
-`-- train_data_property_normalization.npz   # per-property mean/std of the train split
-```
+### Overview
+A molecule is represented as a complete atom graph with:
+- atom types (composition): $A = (a_1,\ldots,a_N)$
+- formal charges: $C = (c_1,\ldots,c_N)$
+- 3D coordinates: $X = (x_1,\ldots,x_N),\; x_i \in \mathbb{R}^3$
+- bond types: $E$ over every atom pair
 
-The splits derive from the corrected rQM9_v0 release of the upstream repository
-(https://github.com/Liu-Group-UF/PropMolFlow): the property table
-`gdb9.sdf.csv` is committed there under `data/qm9_raw/`, and the geometry file
-`all_fixed_gdb9.sdf` comes from the same rQM9_v0 correction release (see the
-upstream README for download instructions). Every split is normalized with the
-train-split statistics, so `normalization_path` defaults to
-`train_data_property_normalization.npz` for all splits.
+PropMolFlow is a geometry-complete SE(3)-equivariant flow matching model for **property-guided molecule generation**. It defines separate flow-matching probability paths for the discrete features (atom types, charges, bond types) and the continuous coordinates, and trains a GVP (Geometric Vector Perceptron) message passing network to predict the trajectory endpoint. The target molecular property is injected into the network through a property embedding module.
 
-## 3. Training
+### Method
 
+#### 1) Geometry-complete probability paths
+The interpolant scheduler assigns a time-dependent weight $\alpha_t \in [0,1]$ to every feature. Coordinates follow linear interpolation between a centered-normal prior $x_0$ and the data coordinate $x_1$:
+
+$$
+x_t = (1 - \alpha_t)\, x_0 + \alpha_t\, x_1,
+\qquad
+v_t = \frac{\alpha_t'}{1 - \alpha_t}\,(x_1 - x_t).
+$$
+
+The categorical features (atom types, charges, bond types) follow CTMC (continuous-time Markov chain) probability paths. A masked state $\mathrm{[MASK]}$ is introduced, and each token either stays at its endpoint or becomes masked:
+
+$$
+x_t =
+\begin{cases}
+x_1, & \text{with probability } \alpha_t, \\
+\mathrm{[MASK]}, & \text{with probability } 1 - \alpha_t.
+\end{cases}
+$$
+
+The weight follows a linear ($\alpha_t = t$) or a cosine ($\alpha_t = 1 - \cos(\frac{\pi}{2} t^{\nu})^2$) schedule.
+
+#### 2) SE(3)-equivariant GVP network
+The endpoint is predicted by a GVP message passing network. Node scalar features are initialized from the atom types, the formal charges and the time, and edge features from the bond types; the property embedding is fused into the node scalars. A stack of GVP convolutions performs message passing, and every `convs_per_update` convolutions a position updater and an edge updater refresh the coordinates and the edge features. The output heads predict:
+- **invariant** logits for atom types and formal charges
+- **invariant** logits for bond types (from the summed features of both edge directions)
+- **equivariant** updated coordinates
+
+#### 3) Property conditioning
+The scalar property is embedded by an optional Gaussian expansion followed by an MLP. Five injection strategies connect the embedding to the node scalar features: `concatenate`, `sum`, `multiply`, `concatenate_sum` and `concatenate_multiply`.
+
+#### 4) Training objective
+The training objective is a weighted sum of a coordinate loss and the categorical cross-entropy losses:
+
+$$
+\mathcal{L} =
+w_X\, \lVert x_1 - \hat{x}_1 \rVert_2^2
++ w_A\, \mathcal{L}_{\mathrm{CE}}(A, \hat{A})
++ w_C\, \mathcal{L}_{\mathrm{CE}}(C, \hat{C})
++ w_E\, \mathcal{L}_{\mathrm{CE}}(E, \hat{E}),
+$$
+
+where the coordinate loss is evaluated on every atom and the cross-entropy terms on the masked tokens only.
+
+#### 5) Sampling
+Sampling integrates the learned vector field from $t = 0$ to $t = 1$. At every step the network predicts the endpoint, the coordinates are advanced along the linear velocity $v_t$ and the categorical tokens transition according to the CTMC path. An optional purity (high-confidence) threshold and a configurable stochasticity control the trajectory.
+
+---
+
+## Dataset Description
+
+- **rQM9_v0 (corrected QM9)**: 133,174 small molecules with elements C, H, N, O and F. It provides the 15 QM9 property columns (A, B, C, mu, alpha, homo, lumo, gap, r2, zpve, U0, U, H, G, Cv) plus four per-atom energy columns. The released split is 100,000 / 19,857 / 13,317 for train / val / test, and the training set is additionally split into two halves `train_a` and `train_b` of 50,000 molecules each.
+- **Bonds and charges**: five bond types over the complete atom graph and formal atom charges. The generation model supervises these fields, which the plain QM9 dataset does not provide.
+- **Normalization**: every property is normalized with the train-split statistics, so the shared `train_data_property_normalization.npz` is used by all splits.
+
+Recommended data fields for each sample:
+- `atom_types`: length-$N$ atom types (C, H, N, O, F)
+- `atom_charges`: length-$N$ formal charges
+- `positions`: $N \times 3$ centered Cartesian coordinates
+- `bond_types`: bond-type labels over the complete graph
+- `property`: the conditioned scalar property (for example `alpha`, `mu`, `gap`)
+
+Optional fields include `num_atoms`.
+
+#### QM9 split (download link)
+| Dataset | Train | Val | Test |
+| --- | --- | --- | --- |
+| [rQM9_v0](https://paddle-org.bj.bcebos.com/paddlematerial/datasets/propmolflow_qm9/propmolflow_qm9.zip) | 100000 | 19857 | 13317 |
+
+---
+
+## Results
+
+| Model Name | Dataset | Property | Property Handling | Distribution | RDKit Valid | Valid & Unique | Config | Checkpoint / Log |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| propmolflow_qm9_alpha_sum | qm9 | alpha | sum | in-distribution | 0.9844 | 0.9844 | [propmolflow_qm9_alpha_sum.yaml](propmolflow_qm9_alpha_sum.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_alpha_sum.zip) |
+| propmolflow_qm9_Cv_sum | qm9 | Cv | sum | in-distribution | 0.9844 | 0.9844 | [propmolflow_qm9_Cv_sum.yaml](propmolflow_qm9_Cv_sum.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_Cv_sum.zip) |
+| propmolflow_qm9_gap_concatenate_sum | qm9 | gap | concatenate_sum | in-distribution | 1.0000 | 1.0000 | [propmolflow_qm9_gap_concatenate_sum.yaml](propmolflow_qm9_gap_concatenate_sum.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_gap_concatenate_sum.zip) |
+| propmolflow_qm9_homo_concatenate | qm9 | homo | concatenate | in-distribution | 1.0000 | 1.0000 | [propmolflow_qm9_homo_concatenate.yaml](propmolflow_qm9_homo_concatenate.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_homo_concatenate.zip) |
+| propmolflow_qm9_lumo_concatenate_sum | qm9 | lumo | concatenate_sum | in-distribution | 0.9688 | 0.9688 | [propmolflow_qm9_lumo_concatenate_sum.yaml](propmolflow_qm9_lumo_concatenate_sum.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_lumo_concatenate_sum.zip) |
+| propmolflow_qm9_mu_multiply | qm9 | mu | multiply | in-distribution | 0.9844 | 0.9844 | [propmolflow_qm9_mu_multiply.yaml](propmolflow_qm9_mu_multiply.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_mu_multiply.zip) |
+| propmolflow_qm9_gap_concatenate_ood | qm9 | gap | concatenate | out-of-distribution | 0.9688 | 0.9688 | [propmolflow_qm9_gap_concatenate_ood.yaml](propmolflow_qm9_gap_concatenate_ood.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_gap_concatenate_ood.zip) |
+| propmolflow_qm9_homo_concatenate_sum_ood | qm9 | homo | concatenate_sum | out-of-distribution | 1.0000 | 1.0000 | [propmolflow_qm9_homo_concatenate_sum_ood.yaml](propmolflow_qm9_homo_concatenate_sum_ood.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_homo_concatenate_sum_ood.zip) |
+| propmolflow_qm9_lumo_concatenate_multiply_ood | qm9 | lumo | concatenate_multiply | out-of-distribution | 1.0000 | 1.0000 | [propmolflow_qm9_lumo_concatenate_multiply_ood.yaml](propmolflow_qm9_lumo_concatenate_multiply_ood.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_lumo_concatenate_multiply_ood.zip) |
+| propmolflow_qm9_mu_sum_ood | qm9 | mu | sum | out-of-distribution | 0.9844 | 0.9844 | [propmolflow_qm9_mu_sum_ood.yaml](propmolflow_qm9_mu_sum_ood.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_mu_sum_ood.zip) |
+
+---
+
+## Command
+
+### Training
 ```bash
-python structure_generation/train.py \
-    -c structure_generation/configs/propmolflow/propmolflow_qm9_alpha_sum.yaml
+# single-gpu training
+python structure_generation/train.py -c structure_generation/configs/propmolflow/propmolflow_qm9_alpha_sum.yaml
+
+# multi-gpu training (example with 4 GPUs)
+python -m paddle.distributed.launch --gpus="0,1,2,3" structure_generation/train.py -c structure_generation/configs/propmolflow/propmolflow_qm9_alpha_sum.yaml
 ```
 
-Minimal smoke run (5 steps):
-
+### Validation
 ```bash
-python structure_generation/train.py \
-    -c structure_generation/configs/propmolflow/propmolflow_qm9_alpha_sum.yaml \
-    Trainer.max_iter=5 Global.do_eval=False Trainer.output_dir=./output/propmolflow_smoke
+# Adjust program behavior on the fly using command-line parameters without modifying the configuration file directly.
+# Example: --Global.do_eval=True
+python structure_generation/train.py -c structure_generation/configs/propmolflow/propmolflow_qm9_alpha_sum.yaml Global.do_eval=True Global.do_train=False Global.do_test=False Trainer.pretrained_model_path='path/to/model.pdparams'
 ```
 
-Key configuration entries (`propmolflow_qm9_alpha_sum.yaml`):
+### Testing
+```bash
+# Evaluate the model on the test dataset.
+python structure_generation/train.py -c structure_generation/configs/propmolflow/propmolflow_qm9_alpha_sum.yaml Global.do_eval=False Global.do_train=False Global.do_test=True Trainer.pretrained_model_path='path/to/model.pdparams'
+```
 
-| Section | Description |
-|---|---|
-| `Global.property_name` | Conditioned property name (`alpha`) |
-| `Global.num_inference_steps` | Number of integration steps (100) |
-| `Model.__init_params__.vector_field_config` | GVP network structure (defaults to the released checkpoint structure) |
-| `Model.__init_params__.prior_config` | Prior configuration (x: centered-normal with alignment; a/c/e: ctmc mask) |
-| `Model.__init_params__.properties_handle_method` | Property injection strategy (`sum`) |
-| `Model.__init_params__.gaussian_expansion` | Gaussian expansion of the property (`false`) |
-| `Optimizer` | Adam(lr=2.5e-4, weight_decay=1e-12) with clip_value=1.0 |
-| `Dataset.train/val` | Training/validation splits (`data/propmolflow_qm9/*.npz`) |
-| `Sampler.data` | Sampling inputs (molecule sampling dataset) |
-
-Sampling and evaluation run on the framework-level molecular sampling
-interface; see section 4.
-
-## 4. Sampling and evaluation
-
-Sampling runs on the framework-level molecular sampling interface
-(``MolecularSampler``); the molecules, the SDF export and the validity metrics
-are three one-line API calls. The following snippet covers all scenarios:
-
+### Sample
 ```python
-from ppmat.metrics import PropMolFlowMoleculeMetric
 from ppmat.sampler import MolecularSampler
 
+# Mode 1: Use a pre-trained model (downloads automatically).
+# Mode 2: Use a custom configuration file and checkpoint.
 sampler = MolecularSampler(
-    # Registered package (downloaded automatically):
     model_name="propmolflow_qm9_alpha_sum",
-    # or a local config plus checkpoint (the training output dir carries a
-    # timestamp suffix, e.g. ./output/propmolflow_qm9_alpha_sum_t_<time>_s_42):
     # config_path="structure_generation/configs/propmolflow/propmolflow_qm9_alpha_sum.yaml",
-    # checkpoint_path="./output/propmolflow_qm9_alpha_sum_t_<time>_s_42/checkpoints/best.pdparams",
+    # checkpoint_path="./output/propmolflow_qm9_alpha_sum/checkpoints/latest.pdparams",
     config_overrides=[
-        # Molecule models have no registered dataset infos class.
         "Dataset.train=null",
         "Sampler.data.dataset.__init_params__.total_num=64",
         "Sampler.model_sample_params.num_inference_steps=100",
@@ -100,14 +152,9 @@ sampler = MolecularSampler(
     ],
 )
 results = sampler.sample_by_dataloader()
-molecules = results["pred"]
-metrics = PropMolFlowMoleculeMetric()(molecules)
-print(metrics)
-sampler.model.save_samples(molecules, sampler.output_dir)
 ```
 
-Out-of-distribution sampling with a single target value adds two overrides:
-
+Out-of-distribution sampling with a single target value:
 ```python
     config_overrides=[
         "Sampler.data.dataset.__init_params__.mode=out_of_distribution",
@@ -116,131 +163,24 @@ Out-of-distribution sampling with a single target value adds two overrides:
 ```
 
 Sampling with a fixed number of atoms:
-
 ```python
     config_overrides=[
         "Sampler.data.dataset.__init_params__.n_atoms=18",
     ],
 ```
 
-``n_atoms`` and ``property_value`` are orthogonal pins: an explicit value
-fixes that side for every sample, while the sampler mode selects the training
-distribution of the unpinned side. Setting both pins fixes the atom count and
-the property value at the same time.
+---
 
-The molecules are written to ``propmolflow_samples.sdf`` under
-``Sampler.output_dir`` and the following RDKit metrics are returned by
-``PropMolFlowMoleculeMetric``:
-
-| Metric | Description |
-|---|---|
-| `rdkit_valid` | Fraction of generated molecules that pass RDKit sanitization |
-| `valid_and_unique` | Fraction of unique valid SMILES |
-| `close_shell_ratio` | Fraction of molecules with an even number of valence electrons |
-| `atom_stable` | Fraction of atoms whose valence matches the expected valence |
-| `mol_stable` | Fraction of molecules whose atoms are all valence-consistent and whose total charge is zero |
-
-## 5. Registered checkpoints
-
-All released checkpoints use `gaussian_expansion: false`. The property handling
-strategy and the training distribution follow the upstream best-combination
-tables (`data/property_mae_results/{in,out}_distribution_best_combo.csv`).
-Replace `alpha` with any property in the table to sample another target.
-
-| Registered name | Property | Property handling | Distribution |
-|---|---|---|---|
-| `propmolflow_qm9_alpha_sum` | alpha | sum | in-distribution |
-| `propmolflow_qm9_Cv_sum` | Cv | sum | in-distribution |
-| `propmolflow_qm9_gap_concatenate_sum` | gap | concatenate_sum | in-distribution |
-| `propmolflow_qm9_homo_concatenate` | homo | concatenate | in-distribution |
-| `propmolflow_qm9_lumo_concatenate_sum` | lumo | concatenate_sum | in-distribution |
-| `propmolflow_qm9_mu_multiply` | mu | multiply | in-distribution |
-| `propmolflow_qm9_gap_concatenate_ood` | gap | concatenate | out-of-distribution |
-| `propmolflow_qm9_homo_concatenate_sum_ood` | homo | concatenate_sum | out-of-distribution |
-| `propmolflow_qm9_lumo_concatenate_multiply_ood` | lumo | concatenate_multiply | out-of-distribution |
-| `propmolflow_qm9_mu_sum_ood` | mu | sum | out-of-distribution |
-
-## 6. Reference results
-
-Released alpha in-distribution checkpoint, 64 molecules with 100 integration
-steps:
-
-| Metric | Value |
-|---|---|
-| rdkit_valid | 0.9844 |
-| valid_and_unique | 0.9844 |
-| close_shell_ratio | 0.9531 |
-| atom_stable | 0.9964 |
-| mol_stable | 0.9375 |
-
-Training for 3 epochs on `train_a` (50000 molecules): total loss decreases from
-1.099 to 0.783 with a validation loss of 0.765.
-
-## 7. CINN compiled execution
-
-The model supports the optional CINN compiled backend. The runtime boundary is
-`denoise_step` on `CTMCVectorField` (SOT capture); the top-level model only
-forwards the backend to it. Compilation requires a CUDA Paddle build with CINN
-support, a single GPU and `use_amp=False`.
-
-```python
-sampler = MolecularSampler(
-    model_name="propmolflow_qm9_alpha_sum",
-    config_overrides=[
-        "Dataset.train=null",
-        "Execution.backend=cinn",
-    ],
-)
-results = sampler.sample_by_dataloader()
+## Citation
 ```
-
-## 8. Unit tests
-
-The model tests are organized along the training / sampling / evaluation
-chains and the CINN runtime orchestration:
-
-```bash
-python -m pytest test/propmolflow/test_propmolflow.py -v
-```
-
-## 9. Differences from the upstream implementation
-
-- Only the `ctmc` parameterization is supported (all 61 upstream configs use `ctmc`).
-- Priors are sampled inside the model instead of the dataset. The semantics are
-  unchanged and deterministic prior injection is supported for alignment runs.
-- Property normalization is handled by the dataset instead of the model reading
-  the normalization file.
-- Random number-of-atoms sampling is provided by `PropMolFlowSamplingDataset`.
-- The dataset is built from the corrected rQM9_v0 release because the model
-  supervises covalent bond orders and formal charges, which the framework
-  `QM9Dataset` (original QM9) does not provide; the shared download and caching
-  infrastructure is reused unchanged.
-- The total-charge check of `mol_stable` is fixed (the upstream check was a dead
-  condition that was never evaluated).
-- The dead `scalar_embedding_cond` call of the upstream `concatenate_multiply`
-  conditioning is removed (its output was discarded); the remaining semantics
-  are numerically identical.
-- The unused `InterpolantScheduler.loss_weights` schedule and the unused
-  prior `align` fields of the categorical features are dropped.
-- Sampling runs on the framework-level `MolecularSampler` API untouched by
-  this PR; the entry-side overrides skip the training-split statistics pass
-  (`Dataset.train=null`, unused by molecular models without a registered
-  infos class). The model returns `{"pred": ...}` and the one-line
-  `save_samples` call serializes the molecules to SDF.
-- No top-level `Metric` section is shipped in the configs: the
-  `structure_generation/train.py` per-key metric interface does not apply to
-  a generation model (evaluation reports losses only, like the other models
-  of this task), so `PropMolFlowMoleculeMetric` is consumed at the sampling
-  API level.
-
-## 10. Citation
-
-```bibtex
-@article{zeng_propmolflow_2026,
-  title = {{PropMolFlow}: property-guided molecule generation with geometry-complete flow matching},
-  journal = {Nature Computational Science},
-  author = {Zeng, Cheng and Jin, Jirui and Ambrose, Connor and Karypis, George and Transtrum, Mark and Tadmor, Ellad B. and Hennig, Richard G. and Roitberg, Adrian and Martiniani, Stefano and Liu, Mingjie},
-  year = {2026},
-  doi = {10.1038/s43588-025-00946-y},
+@article{zeng2026propmolflow,
+  title={PropMolFlow: property-guided molecule generation with geometry-complete flow matching},
+  author={Zeng, Cheng and Jin, Jirui and Ambrose, Connor and Karypis, George and Transtrum, Mark and Tadmor, Ellad B. and Hennig, Richard G. and Roitberg, Adrian and Martiniani, Stefano and Liu, Mingjie},
+  journal={Nature Computational Science},
+  volume={6},
+  pages={233--242},
+  year={2026},
+  publisher={Nature Publishing Group},
+  doi={10.1038/s43588-025-00946-y}
 }
 ```
