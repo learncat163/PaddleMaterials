@@ -31,6 +31,12 @@ from ppmat.utils.scatter import scatter_mean
 from ppmat.utils.scatter import scatter_sum
 
 
+class StableSiLU(nn.SiLU):
+    def forward(self, x):
+        # Paddle 3.3 CPU fused SiLU backward overflows for large negative inputs.
+        return x * paddle.nn.functional.sigmoid(x)
+
+
 def norm_no_nan(x, axis=-1, keepdims=False, eps=1e-8, sqrt=True):
     """L2 norm of a tensor clamped above a minimum value ``eps``."""
     out = paddle.clip(
@@ -49,7 +55,7 @@ class GVP(nn.Layer):
         dim_feats_in,
         dim_feats_out,
         n_cp_feats,
-        feats_activation=nn.SiLU(),
+        feats_activation=StableSiLU(),
         vectors_activation=nn.Sigmoid(),
     ):
         super().__init__()
@@ -174,7 +180,7 @@ class GVPConv(nn.Layer):
         rbf_dim: int,
         edge_feat_size: int,
         message_norm: Union[float, str],
-        scalar_activation=nn.SiLU,
+        scalar_activation=StableSiLU,
         vector_activation=nn.Sigmoid,
         dropout: float = 0.0,
     ):

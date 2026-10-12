@@ -37,6 +37,7 @@ from ppmat.models.common.runtime import RuntimeMixin
 from ppmat.models.common.runtime import runtime_boundary
 from ppmat.models.propmolflow.gvp import GVP
 from ppmat.models.propmolflow.gvp import GVPConv
+from ppmat.models.propmolflow.gvp import StableSiLU
 from ppmat.models.propmolflow.gvp import norm_no_nan
 from ppmat.schedulers import build_scheduler
 from ppmat.utils import logger
@@ -115,7 +116,7 @@ class PropertyEmbedder(nn.Layer):
         self.embedding_dim = embedding_dim
         self.mlp = nn.Sequential(
             nn.Linear(n_gaussians, embedding_dim),
-            nn.SiLU(),
+            StableSiLU(),
             nn.Linear(embedding_dim, embedding_dim),
         )
         self.gaussian_expansion = GaussianExpansion(
@@ -236,9 +237,9 @@ class EdgeUpdate(nn.Layer):
 
         self.edge_update_fn = nn.Sequential(
             nn.Linear(input_dim, n_edge_feats),
-            nn.SiLU(),
+            StableSiLU(),
             nn.Linear(n_edge_feats, n_edge_feats),
-            nn.SiLU(),
+            StableSiLU(),
         )
         self.edge_norm = nn.LayerNorm(n_edge_feats)
 
@@ -402,23 +403,23 @@ class CTMCVectorField(RuntimeMixin, nn.Layer):
             nn.Linear(
                 n_atom_types + n_charges + 1 + 2 * n_mask_feats, n_hidden_scalars
             ),
-            nn.SiLU(),
+            StableSiLU(),
             nn.Linear(n_hidden_scalars, n_hidden_scalars),
-            nn.SiLU(),
+            StableSiLU(),
             nn.LayerNorm(n_hidden_scalars),
         )
 
         self.scalar_embedding_cond = nn.Sequential(
             nn.Linear(n_hidden_scalars + property_embedding_dim, n_hidden_scalars),
-            nn.SiLU(),
+            StableSiLU(),
             nn.Linear(n_hidden_scalars, n_hidden_scalars),
         )
 
         self.edge_embedding = nn.Sequential(
             nn.Linear(n_bond_types + n_mask_feats, n_hidden_edge_feats),
-            nn.SiLU(),
+            StableSiLU(),
             nn.Linear(n_hidden_edge_feats, n_hidden_edge_feats),
-            nn.SiLU(),
+            StableSiLU(),
             nn.LayerNorm(n_hidden_edge_feats),
         )
 
@@ -477,13 +478,13 @@ class CTMCVectorField(RuntimeMixin, nn.Layer):
 
         self.node_output_head = nn.Sequential(
             nn.Linear(n_hidden_scalars, n_hidden_scalars),
-            nn.SiLU(),
+            StableSiLU(),
             nn.Linear(n_hidden_scalars, n_atom_types + n_charges),
         )
 
         self.to_edge_logits = nn.Sequential(
             nn.Linear(n_hidden_edge_feats, n_hidden_edge_feats),
-            nn.SiLU(),
+            StableSiLU(),
             nn.Linear(n_hidden_edge_feats, n_bond_types),
         )
 
@@ -707,6 +708,8 @@ class CTMCVectorField(RuntimeMixin, nn.Layer):
         high_confidence_threshold: float = None,
     ) -> dict:
         """Integrate the molecule trajectories from the prior to the endpoint."""
+        if n_timesteps < 2:
+            raise ValueError("num_inference_steps must be at least 2")
         t = paddle.linspace(0, 1, n_timesteps)
         alpha_t = self.interpolant_scheduler.alpha_t(t)
         alpha_t_prime = self.interpolant_scheduler.alpha_t_prime(t)
@@ -926,7 +929,7 @@ class PropMolFlow(RuntimeMixin, nn.Layer):
         else:
             self.property_embedder = nn.Sequential(
                 nn.Linear(1, property_embedding_dim),
-                nn.SiLU(),
+                StableSiLU(),
                 nn.Linear(property_embedding_dim, property_embedding_dim),
                 nn.LayerNorm(property_embedding_dim),
             )

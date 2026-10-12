@@ -73,9 +73,9 @@ Sampling integrates the learned vector field from $t = 0$ to $t = 1$. At every s
 
 ## Dataset Description
 
-- **rQM9_v0 (corrected QM9)**: 133,174 small molecules with elements C, H, N, O and F. It provides the 15 QM9 property columns (A, B, C, mu, alpha, homo, lumo, gap, r2, zpve, U0, U, H, G, Cv) plus four per-atom energy columns. The released split is 100,000 / 19,857 / 13,317 for train / val / test, and the training set is additionally split into two halves `train_a` and `train_b` of 50,000 molecules each.
-- **Bonds and charges**: five bond types over the complete atom graph and formal atom charges. The generation model supervises these fields, which the plain QM9 dataset does not provide.
-- **Normalization**: every property is normalized with the train-split statistics, so the shared `train_data_property_normalization.npz` is used by all splits.
+- **QM9 (official release)**: 130,831 small molecules with elements C, H, N, O and F, split into 110,000 / 10,000 / 10,831 for train / val / test. The official package ships the XYZ geometries and the property tables (A, B, C, mu, alpha, homo, lumo, gap, r2, zpve, U0, U, H, G, Cv) only.
+- **Bonds and charges**: the five bond types over the complete atom graph and the formal atom charges supervised by the generation model are perceived from the geometry with RDKit (`DetermineBonds`). Perception and encoding remain in the dataset adapter. Derived features default to `~/.paddlemat/datasets/propmolflow/`; an explicit `cache_dir` can override that location. Cache keys include the CSV content, atom map, feature version and RDKit version. Cache files are published atomically, and failed molecule perception is reported.
+- **Normalization**: every property is normalized with population mean/std from the train split. All splits use the sibling `train.csv` or an explicit `normalization_source`. Missing training statistics, nonfinite properties and zero variance raise errors instead of falling back to evaluation data. Custom split names require an explicit `normalization_source` when no sibling `train.csv` exists.
 
 Recommended data fields for each sample:
 - `atom_types`: length-$N$ atom types (C, H, N, O, F)
@@ -84,16 +84,23 @@ Recommended data fields for each sample:
 - `bond_types`: bond-type labels over the complete graph
 - `property`: the conditioned scalar property (for example `alpha`, `mu`, `gap`)
 
-Optional fields include `num_atoms`.
+The CSV may omit `num_atoms`; it is derived from each XYZ header. Returned
+samples always include `structure_array.num_atoms`.
 
 #### QM9 split (download link)
 | Dataset | Train | Val | Test |
 | --- | --- | --- | --- |
-| [rQM9_v0](https://paddle-org.bj.bcebos.com/paddlematerial/datasets/propmolflow_qm9/propmolflow_qm9.zip) | 100000 | 19857 | 13317 |
+| [QM9](https://paddle-org.bj.bcebos.com/paddlematerials/datasets/qm9/qm9.zip) | 110000 | 10000 | 10831 |
 
 ---
 
 ## Results
+
+The registered weights were trained using the upstream rQM9 preprocessing.
+The table below records earlier sampling runs. The official-QM9 geometries,
+perceived labels, split statistics and sampling distribution used here differ
+from that pipeline; these reference results must be re-evaluated rather than
+treated as numerical equivalence guarantees for the new data pipeline.
 
 | Model Name | Dataset | Property | Property Handling | Distribution | RDKit Valid | Valid & Unique | Config | Checkpoint / Log |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -152,6 +159,7 @@ sampler = MolecularSampler(
     ],
 )
 results = sampler.sample_by_dataloader()
+sampler.model.save_samples(results["pred"], sampler.output_dir)
 ```
 
 Out-of-distribution sampling with a single target value:
@@ -168,6 +176,10 @@ Sampling with a fixed number of atoms:
         "Sampler.data.dataset.__init_params__.n_atoms=18",
     ],
 ```
+
+`num_inference_steps` must be at least 2. An explicit `normalization_source`
+must point to an existing CSV; a missing path raises an error instead of
+downloading a replacement statistics file.
 
 ---
 

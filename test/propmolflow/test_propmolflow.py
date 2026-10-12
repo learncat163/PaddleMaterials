@@ -16,17 +16,19 @@
 
 from __future__ import annotations
 
+import csv
 import os
 import os.path as osp
 
 import numpy as np
 import paddle
+import pandas as pd
 import pytest
 from omegaconf import OmegaConf
 
 from ppmat.datasets import build_dataloader
 from ppmat.datasets.collate_fn import PropMolFlowCollator
-from ppmat.datasets.propmolflow_dataset import PROPERTY_MAP
+from ppmat.datasets.propmolflow_dataset import PropMolFlowDataset
 from ppmat.datasets.propmolflow_dataset import PropMolFlowSamplingDataset
 from ppmat.metrics import PropMolFlowMoleculeMetric
 from ppmat.models import CTMCVectorField
@@ -122,51 +124,49 @@ def _build_model(vector_field_config=None, **overrides):
     return model
 
 
-def _write_synthetic_split(tmp_path, num_molecules=6, seed=0):
+_SYNTHETIC_SMILES = (
+    "C",
+    "O",
+    "N",
+    "C#N",
+    "CCO",
+    "CC(=O)O",
+    "c1ccccc1",
+    "CCN",
+    "CO",
+    "C=C",
+)
+_SYNTHETIC_PROPERTIES = ("alpha", "mu", "Cv", "gap", "homo", "lumo")
+
+
+def _write_synthetic_qm9(tmp_path, num_molecules=6, seed=0):
+    """Write an official-QM9-shaped split CSV with embedded 3D molecules."""
+    from rdkit import Chem
+    from rdkit.Chem import AllChem
+
+    rows = []
+    for index, smiles in enumerate(_SYNTHETIC_SMILES[:num_molecules]):
+        mol = Chem.AddHs(Chem.MolFromSmiles(smiles))
+        AllChem.EmbedMolecule(mol, randomSeed=seed + index)
+        conformer = mol.GetConformer()
+        lines = [str(mol.GetNumAtoms()), f"synthetic {index}"]
+        for atom in mol.GetAtoms():
+            position = conformer.GetAtomPosition(atom.GetIdx())
+            lines.append(
+                f"{atom.GetSymbol()} {position.x:.8f} {position.y:.8f} {position.z:.8f}"
+            )
+        rows.append((index + 1, "\n".join(lines)))
+
     rng = np.random.RandomState(seed)
-    positions, atom_types, atom_charges = [], [], []
-    bond_types, bond_idxs = [], []
-    node_idx_array = []
-    edge_idx_array = []
-    node_offset = 0
-    edge_offset = 0
-    for _ in range(num_molecules):
-        n_atoms = int(rng.randint(3, 6))
-        positions.append(rng.standard_normal((n_atoms, 3)).astype("float32"))
-        one_hot = np.zeros((n_atoms, 5), dtype=bool)
-        one_hot[np.arange(n_atoms), rng.randint(0, 5, n_atoms)] = True
-        atom_types.append(one_hot)
-        atom_charges.append(rng.randint(-2, 4, n_atoms).astype("int32"))
-
-        upper_i, upper_j = np.triu_indices(n_atoms, k=1)
-        keep = rng.rand(upper_i.shape[0]) < 0.4
-        mol_bond_idxs = np.stack((upper_i[keep], upper_j[keep]), axis=1).astype("int32")
-        bond_idxs.append(mol_bond_idxs)
-        bond_types.append(rng.randint(0, 5, mol_bond_idxs.shape[0]).astype("int32"))
-
-        node_idx_array.append([node_offset, node_offset + n_atoms])
-        edge_idx_array.append([edge_offset, edge_offset + mol_bond_idxs.shape[0]])
-        node_offset += n_atoms
-        edge_offset += mol_bond_idxs.shape[0]
-
-    properties = rng.standard_normal((num_molecules, 19)).astype("float32")
-    path = tmp_path / "train_a_data_processed.npz"
-    np.savez(
-        path,
-        positions=np.concatenate(positions, axis=0),
-        atom_types=np.concatenate(atom_types, axis=0),
-        atom_charges=np.concatenate(atom_charges, axis=0),
-        bond_types=np.concatenate(bond_types, axis=0),
-        bond_idxs=np.concatenate(bond_idxs, axis=0),
-        node_idx_array=np.array(node_idx_array, dtype="int32"),
-        edge_idx_array=np.array(edge_idx_array, dtype="int32"),
-        properties=properties,
+    properties = (
+        rng.rand(len(rows), len(_SYNTHETIC_PROPERTIES)).astype("float64") * 10.0
     )
-    np.savez(
-        tmp_path / "train_data_property_normalization.npz",
-        mean=properties.mean(axis=0),
-        std=properties.std(axis=0, ddof=1) + 1e-6,
-    )
+    path = tmp_path / "train.csv"
+    with open(path, "w", newline="", encoding="utf-8") as stream:
+        writer = csv.writer(stream)
+        writer.writerow(["standard_xyz", "molecule_id", *_SYNTHETIC_PROPERTIES])
+        for row_index, (molecule_id, xyz) in enumerate(rows):
+            writer.writerow([xyz, molecule_id, *properties[row_index].tolist()])
     return str(path), properties
 
 
@@ -198,7 +198,7 @@ def _build_batch(num_atoms_list):
 
 
 def _sampling_dataset(tmp_path, **kwargs):
-    path, _ = _write_synthetic_split(tmp_path)
+    path, _ = _write_synthetic_qm9(tmp_path)
     dataset_kwargs = {
         "path": path,
         "property_name": "alpha",
@@ -303,6 +303,18 @@ def test_train_forward_from_config():
             if not parameter.stop_gradient
         )
 
+    saturated_batch = _build_batch([4, 5])
+    saturated_batch["prop"] = paddle.to_tensor([-1000.0, 1000.0])
+    saturated_model = _build_model()
+    saturated_loss = saturated_model(saturated_batch)["loss_dict"]["loss"]
+    saturated_loss.backward()
+    assert np.isfinite(float(saturated_loss))
+    assert all(
+        np.isfinite(parameter.grad.numpy()).all()
+        for parameter in saturated_model.parameters()
+        if not parameter.stop_gradient
+    )
+
     with pytest.raises(ValueError):
         _build_model(gaussian_expansion=True, gaussian_start=None, gaussian_stop=None)
     with pytest.raises(ValueError):
@@ -314,11 +326,12 @@ def test_train_forward_from_config():
             _build_model(vector_field_config=dict(SMALL_VECTOR_FIELD, **{name: 0}))
 
 
-def test_train_data_pipeline_feeds_forward(tmp_path):
-    path, properties = _write_synthetic_split(tmp_path)
+def test_train_data_pipeline_feeds_forward(tmp_path, monkeypatch):
+    path, properties = _write_synthetic_qm9(tmp_path)
 
     config = OmegaConf.to_container(OmegaConf.load(CONFIG_PATH), resolve=True)
-    config["Dataset"]["train"]["dataset"]["__init_params__"]["path"] = path
+    dataset_params = config["Dataset"]["train"]["dataset"]["__init_params__"]
+    dataset_params.update(path=path, cache_dir=str(tmp_path / "cache"))
     config["Dataset"]["train"]["sampler"]["__init_params__"]["shuffle"] = False
     data_loader = build_dataloader(config["Dataset"]["train"])
     batch = next(iter(data_loader))
@@ -326,15 +339,116 @@ def test_train_data_pipeline_feeds_forward(tmp_path):
     assert batch["batch_size"] == 6
     assert batch["upper_edge_mask"].sum() == batch["upper_edge_mask"].shape[0] // 2
 
-    normalization = np.load(osp.join(tmp_path, "train_data_property_normalization.npz"))
-    property_idx = PROPERTY_MAP["alpha"]
-    restored = float(batch["prop"][0]) * float(
-        normalization["std"][property_idx]
-    ) + float(normalization["mean"][property_idx])
+    property_idx = _SYNTHETIC_PROPERTIES.index("alpha")
+    mean = float(properties[:, property_idx].mean())
+    std = float(properties[:, property_idx].std())
+    restored = float(batch["prop"][0]) * std + mean
     assert np.isclose(restored, float(properties[0, property_idx]), atol=1e-5)
 
     model = _build_model()
     assert np.isfinite(float(model(batch)["loss_dict"]["loss"]))
+
+    original_cache = data_loader.dataset.cache_path
+    frame = pd.read_csv(path)
+    frame = frame.iloc[[1, 0, *range(2, len(frame))]]
+    frame.to_csv(path, index=False)
+    changed_loader = build_dataloader(config["Dataset"]["train"])
+    changed_batch = next(iter(changed_loader))
+    assert changed_loader.dataset.cache_path != original_cache
+    assert osp.isfile(original_cache)
+    assert int(batch["structure_array"]["num_atoms"][0]) == 5
+    assert int(changed_batch["structure_array"]["num_atoms"][0]) == 3
+    restored = float(changed_batch["prop"][0]) * std + mean
+    assert np.isclose(restored, float(properties[1, property_idx]), atol=1e-5)
+    assert np.isfinite(float(model(changed_batch)["loss_dict"]["loss"]))
+
+    cached_loader = build_dataloader(config["Dataset"]["train"])
+    assert cached_loader.dataset.cache_path == changed_loader.dataset.cache_path
+    np.testing.assert_array_equal(
+        cached_loader.dataset.positions, changed_loader.dataset.positions
+    )
+    assert not cached_loader.dataset.raw_data
+    assert len(list((tmp_path / "cache").glob("*.npz"))) == 2
+
+    with monkeypatch.context() as context:
+        context.setattr(
+            "ppmat.datasets.propmolflow_dataset.dist.is_initialized", lambda: True
+        )
+        rank = [0]
+        broadcasts = []
+        context.setattr(
+            "ppmat.datasets.propmolflow_dataset.dist.get_rank", lambda: rank[0]
+        )
+
+        def broadcast_status(status, src):
+            assert src == 0
+            if rank[0] == 0:
+                broadcasts.append(status[0])
+            else:
+                status[0] = broadcasts[-1]
+
+        context.setattr(
+            "ppmat.datasets.propmolflow_dataset.dist.broadcast_object_list",
+            broadcast_status,
+        )
+        for rank[0] in (0, 1):
+            distributed_loader = build_dataloader(config["Dataset"]["train"])
+            distributed_batch = next(iter(distributed_loader))
+            assert np.isfinite(float(model(distributed_batch)["loss_dict"]["loss"]))
+        assert broadcasts == [None]
+
+        broken_path = tmp_path / "broken.csv"
+        broken_frame = frame.copy()
+        broken_frame["standard_xyz"] = "1\ninvalid\nX 0 0 0"
+        broken_frame.to_csv(broken_path, index=False)
+        for rank[0] in (0, 1):
+            with pytest.raises(RuntimeError, match="construction failed on rank 0"):
+                PropMolFlowDataset(**dict(dataset_params, path=str(broken_path)))
+        assert "No molecule could be featurized" in broadcasts[-1]
+
+    val_path = tmp_path / "val.csv"
+    frame.iloc[:2].to_csv(val_path, index=False)
+    val_dataset = PropMolFlowDataset(**dict(dataset_params, path=str(val_path)))
+    assert val_dataset.property_mean == changed_loader.dataset.property_mean
+    assert val_dataset.property_std == changed_loader.dataset.property_std
+
+    isolated_dir = tmp_path / "isolated"
+    isolated_dir.mkdir()
+    isolated_path = isolated_dir / "val.csv"
+    frame.iloc[:2].to_csv(isolated_path, index=False)
+    sampling_params = dict(
+        path=str(isolated_path),
+        property_name="alpha",
+        mode="in_distribution",
+        total_num=2,
+        seed=42,
+    )
+    with pytest.raises(FileNotFoundError, match="normalization_source"):
+        PropMolFlowSamplingDataset(**sampling_params)
+    sampling_dataset = PropMolFlowSamplingDataset(
+        **sampling_params, normalization_source=path
+    )
+    assert sampling_dataset.property_mean == val_dataset.property_mean
+    assert sampling_dataset.property_std == val_dataset.property_std
+
+    def unexpected_download(*args, **kwargs):
+        pytest.fail("An explicit normalization source must not trigger a download")
+
+    with monkeypatch.context() as context:
+        context.setattr(
+            "ppmat.datasets.propmolflow_dataset.download.get_datasets_path_from_url",
+            unexpected_download,
+        )
+        with pytest.raises(FileNotFoundError, match="normalization_source"):
+            PropMolFlowSamplingDataset(
+                **sampling_params,
+                normalization_source=str(tmp_path / "missing" / "train.csv"),
+            )
+
+    frame["alpha"] = 7.0
+    frame.to_csv(isolated_dir / "train.csv", index=False)
+    with pytest.raises(ValueError, match="positive variance"):
+        PropMolFlowSamplingDataset(**sampling_params)
 
 
 # ----------------------------- sampling chain -----------------------------
@@ -354,6 +468,9 @@ def test_sample_produces_valid_molecules(tmp_path):
 
     for dataset in sampling_datasets:
         batch_data = _sampling_inputs(dataset)
+        for invalid_steps in (0, 1):
+            with pytest.raises(ValueError, match="at least 2"):
+                model.sample(batch_data, num_inference_steps=invalid_steps)
         for sample_kwargs in (
             {},
             {"stochasticity": 8.0, "high_confidence_threshold": 0.9},
@@ -365,7 +482,7 @@ def test_sample_produces_valid_molecules(tmp_path):
 
 
 def test_sampling_framework_end_to_end(tmp_path):
-    path, _ = _write_synthetic_split(tmp_path)
+    path, _ = _write_synthetic_qm9(tmp_path)
     checkpoint_path = str(tmp_path / "best.pdparams")
     paddle.save(_build_model().state_dict(), checkpoint_path)
 
@@ -422,6 +539,9 @@ def test_sampling_framework_end_to_end(tmp_path):
 
 
 def test_metric_one_shot_matches_streaming():
+    from rdkit import rdBase
+
+    log_status = rdBase.LogStatus()
     hydrogen = {
         "atom_types": ["H", "H"],
         "charges": [0, 0],
@@ -462,6 +582,10 @@ def test_metric_one_shot_matches_streaming():
     streaming.update_step(result={"loss_dict": {}}, batch=None, stage="eval")
     with pytest.raises(ValueError):
         streaming.compute_epoch(stage="sample")
+    assert rdBase.LogStatus() == log_status
+    with pytest.raises(KeyError):
+        PropMolFlowMoleculeMetric()([{"atom_types": ["H"]}])
+    assert rdBase.LogStatus() == log_status
 
 
 # ------------------------ runtime orchestration (CINN) ------------------------
@@ -476,10 +600,12 @@ def test_trainer_checkpoint_resume_restores_training_state(tmp_path, monkeypatch
         "_run_runtime",
         lambda self, name, function, *args, **kwargs: function(*args, **kwargs),
     )
-    path, _ = _write_synthetic_split(tmp_path)
+    path, _ = _write_synthetic_qm9(tmp_path)
     config = OmegaConf.to_container(OmegaConf.load(CONFIG_PATH), resolve=True)
     data_config = config["Dataset"]["train"]
-    data_config["dataset"]["__init_params__"]["path"] = path
+    data_config["dataset"]["__init_params__"].update(
+        path=path, cache_dir=str(tmp_path / "cache")
+    )
     data_config["sampler"]["__init_params__"].update(batch_size=3, shuffle=False)
     loader = build_dataloader(data_config)
     optimizer_config = config["Optimizer"]

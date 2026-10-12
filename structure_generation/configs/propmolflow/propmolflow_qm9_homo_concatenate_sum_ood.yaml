@@ -125,7 +125,7 @@ Dataset:
     dataset:
       __class_name__: PropMolFlowDataset
       __init_params__:
-        path: "./data/propmolflow_qm9/train_a_data_processed.npz"
+        path: "./data/qm9/train.csv"
         atom_map: ["C", "H", "N", "O", "F"]
         conditioning_cfg:
           enabled: True
@@ -145,7 +145,7 @@ Dataset:
     dataset:
       __class_name__: PropMolFlowDataset
       __init_params__:
-        path: "./data/propmolflow_qm9/val_data_processed.npz"
+        path: "./data/qm9/val.csv"
         atom_map: ["C", "H", "N", "O", "F"]
         conditioning_cfg:
           enabled: True
@@ -165,7 +165,7 @@ Dataset:
     dataset:
       __class_name__: PropMolFlowDataset
       __init_params__:
-        path: "./data/propmolflow_qm9/test_data_processed.npz"
+        path: "./data/qm9/test.csv"
         atom_map: ["C", "H", "N", "O", "F"]
         conditioning_cfg:
           enabled: True
@@ -187,7 +187,7 @@ Sampler:
     dataset:
       __class_name__: PropMolFlowSamplingDataset
       __init_params__:
-        path: "./data/propmolflow_qm9/train_a_data_processed.npz"
+        path: "./data/qm9/train.csv"
         property_name: ${Global.property_name}
         mode: in_distribution
         total_num: 64

@@ -120,49 +120,51 @@ class PropMolFlowMoleculeMetric(StreamingMetricBase):
 
     def _ingest(self, molecules: List[Dict]) -> None:
         from rdkit import Chem
-        from rdkit import RDLogger
+        from rdkit import rdBase
 
         from ppmat.models.propmolflow.molecule_builder import build_rdkit_mol
 
-        RDLogger.DisableLog("rdApp.*")
-        for molecule in molecules:
-            self._n_molecules += 1
-            self._n_atoms += len(molecule["atom_types"])
-            try:
-                rdkit_mol = build_rdkit_mol(molecule)
-                rdkit_mol.UpdatePropertyCache(strict=False)
-            except (IndexError, RuntimeError, ValueError):
-                continue
+        with rdBase.BlockLogs():
+            for molecule in molecules:
+                self._n_molecules += 1
+                self._n_atoms += len(molecule["atom_types"])
+                try:
+                    rdkit_mol = build_rdkit_mol(molecule)
+                    rdkit_mol.UpdatePropertyCache(strict=False)
+                except (IndexError, RuntimeError, ValueError):
+                    continue
 
-            atoms = rdkit_mol.GetAtoms()
-            total_charge = sum(atom.GetFormalCharge() for atom in atoms)
-            total_valence = sum(
-                VALENCE_ELECTRONS.get(atom.GetSymbol(), 0) for atom in atoms
-            )
-            if total_valence % 2 == 0:
-                self._n_close_shell += 1
+                atoms = rdkit_mol.GetAtoms()
+                total_charge = sum(atom.GetFormalCharge() for atom in atoms)
+                total_valence = sum(
+                    VALENCE_ELECTRONS.get(atom.GetSymbol(), 0) for atom in atoms
+                )
+                if total_valence % 2 == 0:
+                    self._n_close_shell += 1
 
-            molecule_stable = total_charge == 0
-            for atom in atoms:
-                symbol = atom.GetSymbol()
-                effective_valence = atom.GetExplicitValence() - atom.GetFormalCharge()
-                valid = False
-                if symbol in EXPECTED_VALENCES:
-                    valid = effective_valence == EXPECTED_VALENCES[symbol]
-                    if not valid and symbol in ALTERNATIVE_VALENCES:
-                        valid = effective_valence == ALTERNATIVE_VALENCES[symbol]
-                    if not valid and symbol == "Se":
-                        valid = effective_valence == 4
-                self._n_stable_atoms += int(valid)
-                molecule_stable = molecule_stable and valid
-            self._n_stable_molecules += int(molecule_stable)
+                molecule_stable = total_charge == 0
+                for atom in atoms:
+                    symbol = atom.GetSymbol()
+                    effective_valence = (
+                        atom.GetExplicitValence() - atom.GetFormalCharge()
+                    )
+                    valid = False
+                    if symbol in EXPECTED_VALENCES:
+                        valid = effective_valence == EXPECTED_VALENCES[symbol]
+                        if not valid and symbol in ALTERNATIVE_VALENCES:
+                            valid = effective_valence == ALTERNATIVE_VALENCES[symbol]
+                        if not valid and symbol == "Se":
+                            valid = effective_valence == 4
+                    self._n_stable_atoms += int(valid)
+                    molecule_stable = molecule_stable and valid
+                self._n_stable_molecules += int(molecule_stable)
 
-            try:
-                Chem.SanitizeMol(rdkit_mol)
-            except (RuntimeError, ValueError):
-                continue
-            self._n_valid += 1
-            self._unique_smiles.add(Chem.MolToSmiles(rdkit_mol))
+                try:
+                    Chem.SanitizeMol(rdkit_mol)
+                except (RuntimeError, ValueError):
+                    continue
+                self._n_valid += 1
+                self._unique_smiles.add(Chem.MolToSmiles(rdkit_mol))
 
     def update_step(self, *, result: Dict[str, Any], batch: Any, stage: str):
         if stage != "sample":
