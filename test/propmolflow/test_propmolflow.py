@@ -27,7 +27,8 @@ import pytest
 from omegaconf import OmegaConf
 
 from ppmat.datasets import build_dataloader
-from ppmat.datasets.collate_fn import PropMolFlowCollator
+from ppmat.datasets.collate_fn import DefaultCollator
+from ppmat.datasets.custom_data_type import ConcatData
 from ppmat.datasets.propmolflow_dataset import PropMolFlowDataset
 from ppmat.datasets.propmolflow_dataset import PropMolFlowSamplingDataset
 from ppmat.metrics import PropMolFlowMoleculeMetric
@@ -194,7 +195,15 @@ def _build_batch(num_atoms_list):
                 "prop": float(rng.standard_normal()),
             }
         )
-    return PropMolFlowCollator()(samples)
+    for sample in samples:
+        structure_array = sample["structure_array"]
+        structure_array["num_atoms"] = np.array(
+            [structure_array["num_atoms"]], dtype="int64"
+        )
+        sample["structure_array"] = {
+            key: ConcatData(value) for key, value in structure_array.items()
+        }
+    return DefaultCollator()(samples)
 
 
 def _sampling_dataset(tmp_path, **kwargs):
@@ -211,22 +220,12 @@ def _sampling_dataset(tmp_path, **kwargs):
 
 
 def _sampling_inputs(dataset):
-    num_atoms = paddle.to_tensor(
-        np.concatenate(
-            [
-                dataset[i]["structure_array"]["num_atoms"].data
-                for i in range(len(dataset))
-            ]
-        ).astype("int64")
-    )
-    properties = paddle.to_tensor(
-        np.concatenate(
-            [dataset[i]["properties"].data for i in range(len(dataset))]
-        ).astype("float32")
-    )
+    batch = DefaultCollator()([dataset[i] for i in range(len(dataset))])
     return {
-        "structure_array": {"num_atoms": num_atoms},
-        "properties": properties,
+        "structure_array": {
+            "num_atoms": paddle.to_tensor(batch["structure_array"]["num_atoms"])
+        },
+        "properties": paddle.to_tensor(batch["properties"]),
     }
 
 
@@ -336,8 +335,13 @@ def test_train_data_pipeline_feeds_forward(tmp_path, monkeypatch):
     data_loader = build_dataloader(config["Dataset"]["train"])
     batch = next(iter(data_loader))
 
-    assert batch["batch_size"] == 6
-    assert batch["upper_edge_mask"].sum() == batch["upper_edge_mask"].shape[0] // 2
+    atom_counts = batch["structure_array"]["num_atoms"].numpy()
+    assert len(atom_counts) == 6
+    assert len(set(atom_counts.tolist())) > 1
+    assert batch["structure_array"]["positions"].shape[0] == atom_counts.sum()
+    assert batch["structure_array"]["bond_types"].shape[0] == sum(
+        n * (n - 1) // 2 for n in atom_counts
+    )
 
     property_idx = _SYNTHETIC_PROPERTIES.index("alpha")
     mean = float(properties[:, property_idx].mean())
@@ -577,6 +581,27 @@ def test_metric_one_shot_matches_streaming():
     for name, value in one_shot.items():
         assert np.isclose(value, streamed[name])
 
+    hydride = {
+        "atom_types": ["H"],
+        "charges": [-1],
+        "positions": [[0.0, 0.0, 0.0]],
+        "bonds": [],
+    }
+    hydrogen_radical = dict(hydride, charges=[0])
+    hydrogen_ion = dict(hydrogen, charges=[1, 0])
+    charged_molecules = [hydride, hydrogen_radical, hydrogen_ion]
+    charged_metric = PropMolFlowMoleculeMetric()
+    for molecule in charged_molecules:
+        charged_metric.update_step(
+            result={"samples": {"pred": [molecule]}}, batch=None, stage="sample"
+        )
+    assert charged_metric.compute_epoch(stage="sample")["close_shell_ratio"] == (
+        pytest.approx(1 / 3)
+    )
+    assert PropMolFlowMoleculeMetric()(charged_molecules)["close_shell_ratio"] == (
+        pytest.approx(1 / 3)
+    )
+
     streaming.reset()
     # Non-sample stages carry no molecules; the metric must stay untouched.
     streaming.update_step(result={"loss_dict": {}}, batch=None, stage="eval")
@@ -746,7 +771,7 @@ def test_cinn_dispatch_boundary_and_eager_equivalence(monkeypatch):
 
 
 def _build_deterministic_state(model, num_atoms_list):
-    batch = _build_batch(num_atoms_list)
+    batch = model._prepare_training_batch(_build_batch(num_atoms_list))
     rng = np.random.RandomState(0)
     num_nodes = batch["node_batch_idx"].shape[0]
     num_edges = batch["src"].shape[0]

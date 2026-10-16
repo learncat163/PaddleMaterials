@@ -176,7 +176,6 @@ class GVPConv(nn.Layer):
         n_cp_feats: int,
         n_message_gvps: int,
         n_update_gvps: int,
-        rbf_dmax: float,
         rbf_dim: int,
         edge_feat_size: int,
         message_norm: Union[float, str],
@@ -186,11 +185,7 @@ class GVPConv(nn.Layer):
     ):
         super().__init__()
 
-        self.scalar_size = scalar_size
         self.edge_feat_size = edge_feat_size
-        self.rbf_dmax = rbf_dmax
-        self.rbf_dim = rbf_dim
-        self.dropout_rate = dropout
         self.message_norm = message_norm
 
         if isinstance(message_norm, str) and message_norm not in ["mean", "sum"]:
@@ -241,9 +236,9 @@ class GVPConv(nn.Layer):
             )
         self.node_update = nn.LayerList(update_gvps)
 
-        self.dropout = GVPDropout(self.dropout_rate)
-        self.message_layer_norm = GVPLayerNorm(self.scalar_size)
-        self.update_layer_norm = GVPLayerNorm(self.scalar_size)
+        self.dropout = GVPDropout(dropout)
+        self.message_layer_norm = GVPLayerNorm(scalar_size)
+        self.update_layer_norm = GVPLayerNorm(scalar_size)
 
         if self.message_norm == "mean":
             self.agg_func = scatter_mean

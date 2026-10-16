@@ -408,7 +408,7 @@ class PropMolFlowDataset(_QM9FeaturizedSplit):
         num_atoms = int(node_end - node_start)
 
         structure_array = {
-            "num_atoms": num_atoms,
+            "num_atoms": np.array([num_atoms], dtype="int64"),
             "positions": positions,
             "atom_types": _one_hot(
                 self.atom_types[node_start:node_end], len(self.atom_map)
@@ -419,7 +419,11 @@ class PropMolFlowDataset(_QM9FeaturizedSplit):
             "bond_types": _one_hot(self.bond_types[edge_start:edge_end], N_BOND_TYPES),
         }
 
-        sample = {"structure_array": structure_array}
+        sample = {
+            "structure_array": {
+                key: ConcatData(value) for key, value in structure_array.items()
+            }
+        }
         if self.conditioning.get("enabled", False):
             property_value = float(self.property_values[idx])
             if self.conditioning.get("normalize", False):

@@ -144,6 +144,8 @@ python structure_generation/train.py -c structure_generation/configs/propmolflow
 
 You can replace `model_name` with other model names from the Results table.
 The generated molecules are saved to `Sampler.output_dir`.
+When upgrading previously downloaded PropMolFlow packages, remove their cached
+ZIPs and extracted directories under `~/.paddlemat/weights/` before sampling.
 
 ```python
 from ppmat.sampler import MolecularSampler

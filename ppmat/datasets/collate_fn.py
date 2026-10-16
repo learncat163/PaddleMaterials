@@ -91,59 +91,6 @@ class DefaultCollator(object):
         )
 
 
-class PropMolFlowCollator:
-    """Collate PropMolFlow molecule samples into a batched complete graph.
-
-    Each sample provides per-atom features, upper-triangle bond features and
-    ``num_atoms``. The complete graph edge indices (upper triangle first),
-    batch indices and the upper-triangle edge mask are built here.
-    """
-
-    NODE_FEATS = ("positions", "atom_types", "atom_charges")
-    EDGE_FEATS = ("bond_types",)
-
-    def __call__(self, batch: List[Any]) -> Any:
-        from ppmat.models.propmolflow.propmolflow import build_batched_complete_graph
-
-        num_atoms = np.array(
-            [sample["structure_array"]["num_atoms"] for sample in batch], dtype="int64"
-        )
-        graph = build_batched_complete_graph(num_atoms)
-
-        result = {
-            "structure_array": {"num_atoms": paddle.to_tensor(num_atoms)},
-            "src": paddle.to_tensor(graph["src"], dtype="int64"),
-            "dst": paddle.to_tensor(graph["dst"], dtype="int64"),
-            "upper_edge_mask": paddle.to_tensor(graph["upper_edge_mask"]),
-            "node_batch_idx": paddle.to_tensor(graph["node_batch_idx"], dtype="int64"),
-            "edge_batch_idx": paddle.to_tensor(graph["edge_batch_idx"], dtype="int64"),
-            "batch_size": len(batch),
-        }
-
-        for key in self.NODE_FEATS:
-            result[key] = paddle.to_tensor(
-                np.concatenate(
-                    [sample["structure_array"][key] for sample in batch], axis=0
-                )
-            )
-        for key in self.EDGE_FEATS:
-            result[key] = paddle.to_tensor(
-                np.concatenate(
-                    [
-                        np.concatenate([sample["structure_array"][key]] * 2, axis=0)
-                        for sample in batch
-                    ],
-                    axis=0,
-                )
-            )
-
-        if "prop" in batch[0]:
-            result["prop"] = paddle.to_tensor(
-                np.array([sample["prop"] for sample in batch], dtype="float32")
-            )
-        return result
-
-
 class RadiusGraphCollator:
     """Collate PGL radius graphs and offset their edge-based triplet indices."""
 

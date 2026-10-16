@@ -380,7 +380,6 @@ class CTMCVectorField(RuntimeMixin, nn.Layer):
         self.rbf_dim = rbf_dim
         self.convs_per_update = convs_per_update
         self.n_recycles = n_recycles
-        self.n_position_update_gvps = n_position_update_gvps
         self.separate_mol_updaters = separate_mol_updaters
         self.interpolant_scheduler = interpolant_scheduler
         self.feature_names = feature_names
@@ -434,7 +433,6 @@ class CTMCVectorField(RuntimeMixin, nn.Layer):
                     n_message_gvps=n_message_gvps,
                     n_update_gvps=n_update_gvps,
                     message_norm=message_norm,
-                    rbf_dmax=rbf_dmax,
                     rbf_dim=rbf_dim,
                 )
             )
@@ -971,6 +969,41 @@ class PropMolFlow(RuntimeMixin, nn.Layer):
             use_amp=use_amp, world_size=world_size
         )
 
+    def _prepare_training_batch(self, batch: dict) -> dict:
+        structure_array = batch["structure_array"]
+        place = next(iter(self.parameters())).place
+        num_atoms = paddle.to_tensor(
+            structure_array["num_atoms"], dtype="int64", place=place
+        ).reshape([-1])
+        num_atoms_np = num_atoms.numpy()
+        graph = build_batched_complete_graph(num_atoms_np)
+        prepared = {
+            key: paddle.to_tensor(value, place=place) for key, value in graph.items()
+        }
+        prepared["structure_array"] = {"num_atoms": num_atoms}
+        prepared["batch_size"] = len(num_atoms_np)
+        for key in ("positions", "atom_types", "atom_charges"):
+            prepared[key] = paddle.to_tensor(
+                structure_array[key], dtype="float32", place=place
+            )
+        upper_bonds = paddle.to_tensor(
+            structure_array["bond_types"], dtype="float32", place=place
+        )
+        bond_parts = []
+        offset = 0
+        for n in num_atoms_np:
+            n_edges = int(n * (n - 1) // 2)
+            bonds = upper_bonds[offset : offset + n_edges]
+            bond_parts.extend((bonds, bonds))
+            offset += n_edges
+        prepared["bond_types"] = paddle.concat(bond_parts, axis=0)
+        prepared["prop"] = paddle.to_tensor(batch["prop"], dtype="float32", place=place)
+        if "prior_positions" in batch:
+            prepared["prior_positions"] = paddle.to_tensor(
+                batch["prior_positions"], dtype="float32", place=place
+            )
+        return prepared
+
     def _sample_prior_positions(self, batch: dict) -> paddle.Tensor:
         """Sample and align the position prior of every molecule."""
         place = batch["positions"].place
@@ -1011,6 +1044,7 @@ class PropMolFlow(RuntimeMixin, nn.Layer):
         endpoints rather than per-attribute labels, so ``compute_metric_func_dict``
         does not apply to this model.
         """
+        batch = self._prepare_training_batch(batch)
         batch_size = batch["batch_size"]
         node_batch_idx = batch["node_batch_idx"]
         upper_edge_mask = batch["upper_edge_mask"]

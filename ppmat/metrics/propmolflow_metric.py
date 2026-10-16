@@ -104,6 +104,8 @@ class PropMolFlowMoleculeMetric(StreamingMetricBase):
     ``atom_stable`` and ``mol_stable``. The streaming ``update_step`` consumes
     the ``MolecularSampler`` result contract (``result["samples"]["pred"]``);
     the one-shot ``__call__`` shares the same ingest implementation.
+    ``close_shell_ratio`` is the even-electron-count proxy, corrected for
+    formal charge; it does not establish the absence of unpaired electrons.
     """
 
     def __init__(self):
@@ -136,10 +138,11 @@ class PropMolFlowMoleculeMetric(StreamingMetricBase):
 
                 atoms = rdkit_mol.GetAtoms()
                 total_charge = sum(atom.GetFormalCharge() for atom in atoms)
-                total_valence = sum(
+                valence_electrons = sum(
                     VALENCE_ELECTRONS.get(atom.GetSymbol(), 0) for atom in atoms
                 )
-                if total_valence % 2 == 0:
+                electron_count = valence_electrons - total_charge
+                if electron_count % 2 == 0:
                     self._n_close_shell += 1
 
                 molecule_stable = total_charge == 0
