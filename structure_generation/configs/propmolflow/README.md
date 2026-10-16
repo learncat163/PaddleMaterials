@@ -102,18 +102,18 @@ perceived labels, split statistics and sampling distribution used here differ
 from that pipeline; these reference results must be re-evaluated rather than
 treated as numerical equivalence guarantees for the new data pipeline.
 
-| Model Name | Dataset | Property | Property Handling | Distribution | RDKit Valid | Valid & Unique | Config | Checkpoint / Log |
-| --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| propmolflow_qm9_alpha_sum | qm9 | alpha | sum | in-distribution | 0.9844 | 0.9844 | [propmolflow_qm9_alpha_sum.yaml](propmolflow_qm9_alpha_sum.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_alpha_sum.zip) |
-| propmolflow_qm9_Cv_sum | qm9 | Cv | sum | in-distribution | 0.9844 | 0.9844 | [propmolflow_qm9_Cv_sum.yaml](propmolflow_qm9_Cv_sum.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_Cv_sum.zip) |
-| propmolflow_qm9_gap_concatenate_sum | qm9 | gap | concatenate_sum | in-distribution | 1.0000 | 1.0000 | [propmolflow_qm9_gap_concatenate_sum.yaml](propmolflow_qm9_gap_concatenate_sum.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_gap_concatenate_sum.zip) |
-| propmolflow_qm9_homo_concatenate | qm9 | homo | concatenate | in-distribution | 1.0000 | 1.0000 | [propmolflow_qm9_homo_concatenate.yaml](propmolflow_qm9_homo_concatenate.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_homo_concatenate.zip) |
-| propmolflow_qm9_lumo_concatenate_sum | qm9 | lumo | concatenate_sum | in-distribution | 0.9688 | 0.9688 | [propmolflow_qm9_lumo_concatenate_sum.yaml](propmolflow_qm9_lumo_concatenate_sum.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_lumo_concatenate_sum.zip) |
-| propmolflow_qm9_mu_multiply | qm9 | mu | multiply | in-distribution | 0.9844 | 0.9844 | [propmolflow_qm9_mu_multiply.yaml](propmolflow_qm9_mu_multiply.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_mu_multiply.zip) |
-| propmolflow_qm9_gap_concatenate_ood | qm9 | gap | concatenate | out-of-distribution | 0.9688 | 0.9688 | [propmolflow_qm9_gap_concatenate_ood.yaml](propmolflow_qm9_gap_concatenate_ood.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_gap_concatenate_ood.zip) |
-| propmolflow_qm9_homo_concatenate_sum_ood | qm9 | homo | concatenate_sum | out-of-distribution | 1.0000 | 1.0000 | [propmolflow_qm9_homo_concatenate_sum_ood.yaml](propmolflow_qm9_homo_concatenate_sum_ood.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_homo_concatenate_sum_ood.zip) |
-| propmolflow_qm9_lumo_concatenate_multiply_ood | qm9 | lumo | concatenate_multiply | out-of-distribution | 1.0000 | 1.0000 | [propmolflow_qm9_lumo_concatenate_multiply_ood.yaml](propmolflow_qm9_lumo_concatenate_multiply_ood.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_lumo_concatenate_multiply_ood.zip) |
-| propmolflow_qm9_mu_sum_ood | qm9 | mu | sum | out-of-distribution | 0.9844 | 0.9844 | [propmolflow_qm9_mu_sum_ood.yaml](propmolflow_qm9_mu_sum_ood.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerial/checkpoints/structure_generation/propmolflow/propmolflow_qm9_mu_sum_ood.zip) |
+| Model | Dataset | Property | Property Handling | Distribution | RDKit Valid | Valid & Unique | GPUs | Training Time | Config | Checkpoint / Log |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| propmolflow_qm9_alpha_sum | qm9 | alpha | sum | in-distribution | 0.9844 | 0.9844 | - | - | [propmolflow_qm9_alpha_sum.yaml](propmolflow_qm9_alpha_sum.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/propmolflow/propmolflow_qm9_alpha_sum.zip) |
+| propmolflow_qm9_Cv_sum | qm9 | Cv | sum | in-distribution | 0.9844 | 0.9844 | - | - | [propmolflow_qm9_Cv_sum.yaml](propmolflow_qm9_Cv_sum.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/propmolflow/propmolflow_qm9_Cv_sum.zip) |
+| propmolflow_qm9_gap_concatenate_sum | qm9 | gap | concatenate_sum | in-distribution | 1.0000 | 1.0000 | - | - | [propmolflow_qm9_gap_concatenate_sum.yaml](propmolflow_qm9_gap_concatenate_sum.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/propmolflow/propmolflow_qm9_gap_concatenate_sum.zip) |
+| propmolflow_qm9_homo_concatenate | qm9 | homo | concatenate | in-distribution | 1.0000 | 1.0000 | - | - | [propmolflow_qm9_homo_concatenate.yaml](propmolflow_qm9_homo_concatenate.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/propmolflow/propmolflow_qm9_homo_concatenate.zip) |
+| propmolflow_qm9_lumo_concatenate_sum | qm9 | lumo | concatenate_sum | in-distribution | 0.9688 | 0.9688 | - | - | [propmolflow_qm9_lumo_concatenate_sum.yaml](propmolflow_qm9_lumo_concatenate_sum.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/propmolflow/propmolflow_qm9_lumo_concatenate_sum.zip) |
+| propmolflow_qm9_mu_multiply | qm9 | mu | multiply | in-distribution | 0.9844 | 0.9844 | - | - | [propmolflow_qm9_mu_multiply.yaml](propmolflow_qm9_mu_multiply.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/propmolflow/propmolflow_qm9_mu_multiply.zip) |
+| propmolflow_qm9_gap_concatenate_ood | qm9 | gap | concatenate | out-of-distribution | 0.9688 | 0.9688 | - | - | [propmolflow_qm9_gap_concatenate_ood.yaml](propmolflow_qm9_gap_concatenate_ood.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/propmolflow/propmolflow_qm9_gap_concatenate_ood.zip) |
+| propmolflow_qm9_homo_concatenate_sum_ood | qm9 | homo | concatenate_sum | out-of-distribution | 1.0000 | 1.0000 | - | - | [propmolflow_qm9_homo_concatenate_sum_ood.yaml](propmolflow_qm9_homo_concatenate_sum_ood.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/propmolflow/propmolflow_qm9_homo_concatenate_sum_ood.zip) |
+| propmolflow_qm9_lumo_concatenate_multiply_ood | qm9 | lumo | concatenate_multiply | out-of-distribution | 1.0000 | 1.0000 | - | - | [propmolflow_qm9_lumo_concatenate_multiply_ood.yaml](propmolflow_qm9_lumo_concatenate_multiply_ood.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/propmolflow/propmolflow_qm9_lumo_concatenate_multiply_ood.zip) |
+| propmolflow_qm9_mu_sum_ood | qm9 | mu | sum | out-of-distribution | 0.9844 | 0.9844 | - | - | [propmolflow_qm9_mu_sum_ood.yaml](propmolflow_qm9_mu_sum_ood.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/propmolflow/propmolflow_qm9_mu_sum_ood.zip) |
 
 ---
 
@@ -121,11 +121,10 @@ treated as numerical equivalence guarantees for the new data pipeline.
 
 ### Training
 ```bash
-# single-gpu training
-python structure_generation/train.py -c structure_generation/configs/propmolflow/propmolflow_qm9_alpha_sum.yaml
-
 # multi-gpu training (example with 4 GPUs)
 python -m paddle.distributed.launch --gpus="0,1,2,3" structure_generation/train.py -c structure_generation/configs/propmolflow/propmolflow_qm9_alpha_sum.yaml
+# single-gpu training
+python structure_generation/train.py -c structure_generation/configs/propmolflow/propmolflow_qm9_alpha_sum.yaml
 ```
 
 ### Validation
@@ -142,6 +141,10 @@ python structure_generation/train.py -c structure_generation/configs/propmolflow
 ```
 
 ### Sample
+
+You can replace `model_name` with other model names from the Results table.
+The generated molecules are saved to `Sampler.output_dir`.
+
 ```python
 from ppmat.sampler import MolecularSampler
 
@@ -162,20 +165,11 @@ results = sampler.sample_by_dataloader()
 sampler.model.save_samples(results["pred"], sampler.output_dir)
 ```
 
-Out-of-distribution sampling with a single target value:
-```python
-    config_overrides=[
-        "Sampler.data.dataset.__init_params__.mode=out_of_distribution",
-        "Sampler.data.dataset.__init_params__.property_value=93.3",
-    ],
-```
-
-Sampling with a fixed number of atoms:
-```python
-    config_overrides=[
-        "Sampler.data.dataset.__init_params__.n_atoms=18",
-    ],
-```
+To sample out-of-distribution molecules at a single target value, add
+`Sampler.data.dataset.__init_params__.mode=out_of_distribution` and
+`Sampler.data.dataset.__init_params__.property_value=93.3` to
+`config_overrides`. To use a fixed number of atoms, add
+`Sampler.data.dataset.__init_params__.n_atoms=18`.
 
 `num_inference_steps` must be at least 2. An explicit `normalization_source`
 must point to an existing CSV; a missing path raises an error instead of
