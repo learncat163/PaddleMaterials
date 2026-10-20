@@ -16,8 +16,11 @@
 
 import json
 
+import numpy as np
 import paddle
 import pytest
+from cinn_workflow_harness import gpu_cinn_or_skip
+from cinn_workflow_harness import requires_gpu_cinn
 from pymatgen.core import Lattice
 from pymatgen.core import Structure
 
@@ -362,6 +365,61 @@ class TestMultiStructureAndGeneration:
         out = small_model._run_qformer(qt, emb.unsqueeze(0), mask.unsqueeze(0), None)
         proj = small_model.llm_proj(out.last_hidden_state[:, : qt.shape[1], :])
         assert proj.dtype == emb.dtype
+
+
+def test_cinn_chat_dispatch_preserves_eager_output(
+    chat_model, si_structure, monkeypatch
+):
+    keys = tuple(chat_model.state_dict())
+    expected = chat_model.chat(si_structure, "a b", max_new_tokens=4)
+    recorded = []
+
+    def run_runtime(owner, name, function, *args, **kwargs):
+        recorded.append(name)
+        return function(*args, **kwargs)
+
+    monkeypatch.setattr(type(chat_model.llm_model.model), "_run_runtime", run_runtime)
+    try:
+        chat_model.set_execution_backend("cinn")
+        assert chat_model.execution_backend == "cinn"
+        assert chat_model.llm_model.model.execution_backend == "cinn"
+        assert chat_model.chat(si_structure, "a b", max_new_tokens=4) == expected
+        assert recorded and set(recorded) == {"forward"}
+        assert tuple(chat_model.state_dict()) == keys
+    finally:
+        chat_model.set_execution_backend("eager")
+
+
+@requires_gpu_cinn
+def test_gpu_cinn_chat_matches_eager(chat_model, si_structure):
+    gpu_cinn_or_skip()
+    chat_model.to(paddle.get_device())
+    owner = chat_model.llm_model.model
+    observed = []
+
+    def collect_hidden(layer, inputs, output):
+        observed.append(output[0].numpy().copy())
+
+    hook = owner.register_forward_post_hook(collect_hidden)
+    try:
+        keys = tuple(chat_model.state_dict())
+        chat_model.set_execution_backend("eager")
+        expected = chat_model.chat(si_structure, "a b", max_new_tokens=4)
+        eager_hidden = list(observed)
+        observed.clear()
+        chat_model.set_execution_backend("cinn")
+        actual = chat_model.chat(si_structure, "a b", max_new_tokens=4)
+        assert actual == expected
+        assert len(observed) == len(eager_hidden)
+        for compiled, eager in zip(observed, eager_hidden):
+            np.testing.assert_allclose(compiled, eager, atol=2e-5, rtol=2e-5)
+        assert ("cinn", "eval", "forward") in owner._runtime_cache
+        assert tuple(chat_model.state_dict()) == keys
+    finally:
+        hook.remove()
+        chat_model.set_execution_backend("eager")
+        chat_model.to("cpu")
+        paddle.set_device("cpu")
 
 
 if __name__ == "__main__":

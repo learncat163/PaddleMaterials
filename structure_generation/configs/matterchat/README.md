@@ -171,3 +171,33 @@ print(model.chat(struct, 'what is the chemical formula of this material?'))
   year={2023}
 }
 ```
+
+## CINN inference
+
+MatterChat defaults to eager execution. The top-level model delegates backend
+selection to its existing Mistral backbone, which owns the shared runtime and
+its cache. CINN compiles that backbone's numerical forward through SOT; CHGNet,
+Q-Former, the language head and the generation loop stay eager. Checkpoint keys
+and shapes are unchanged. Training is outside this migrated dialogue workflow.
+
+After loading the model on a CUDA device, select the backend before calling the
+existing chat entry:
+
+```python
+import paddle
+
+paddle.set_flags({"FLAGS_enable_fuse_parallel_matmul_pass": False})
+model.set_execution_backend("cinn")
+model.validate_execution_backend(use_amp=False, world_size=1)
+answer = model.chat(structure, prompt, max_new_tokens=4)
+```
+
+The full 7B FP32 model on a 32 GB GPU needs the public flag shown above before
+the first CINN call. The default pass combines parallel matrix multiplications
+and materializes large concatenated weights; the measured default configuration
+ran out of device memory. This flag changes compiler optimization, not model
+weights or precision. Use the same flag setting in both benchmark modes.
+
+The GPU integration test covers greedy chat with the autoregressive KV cache.
+The default CINN option is `full_graph=False`; AMP and distributed CINN are not
+supported by the shared execution backend.

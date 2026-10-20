@@ -1,11 +1,11 @@
 # Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
-#
+
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-#
+
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
+
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -16,12 +16,17 @@
 
 import math
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Union
+from typing import List
+from typing import Optional
+from typing import Tuple
+from typing import Union
 
 import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
+from ppmat.models.common.runtime import RuntimeMixin
+from ppmat.models.common.runtime import runtime_boundary
 from ppmat.models.matterchat.mistral.configuration_mistral import MistralConfig
 from ppmat.models.matterchat.utils.activations import get_activation
 from ppmat.models.matterchat.utils.weight_init import default_init_weights
@@ -32,11 +37,11 @@ class _SubscriptableOutput:
     """Base class for model outputs that support tuple-like indexing."""
 
     def __getitem__(self, index):
-        fields = [f for f in self.__dataclass_fields__ if not f.startswith('_')]
+        fields = [f for f in self.__dataclass_fields__ if not f.startswith("_")]
         return getattr(self, fields[index])
 
     def __len__(self):
-        return len([f for f in self.__dataclass_fields__ if not f.startswith('_')])
+        return len([f for f in self.__dataclass_fields__ if not f.startswith("_")])
 
 
 @dataclass
@@ -157,7 +162,10 @@ class MistralRotaryEmbedding(nn.Layer):
             .expand([position_ids.shape[0], -1, 1])
         )
         position_ids_expanded = position_ids[:, None, :].cast(paddle.float32)
-        freqs = (inv_freq_expanded.cast(paddle.float32) @ position_ids_expanded.cast(paddle.float32)).transpose([0, 2, 1])
+        freqs = (
+            inv_freq_expanded.cast(paddle.float32)
+            @ position_ids_expanded.cast(paddle.float32)
+        ).transpose([0, 2, 1])
         emb = paddle.concat((freqs, freqs), axis=-1)
         cos = emb.cos()
         sin = emb.sin()
@@ -184,13 +192,21 @@ class MistralMLP(nn.Layer):
         super().__init__()
         self.hidden_size = config.hidden_size
         self.intermediate_size = config.intermediate_size
-        self.gate_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-        self.up_proj = nn.Linear(self.hidden_size, self.intermediate_size, bias_attr=False)
-        self.down_proj = nn.Linear(self.intermediate_size, self.hidden_size, bias_attr=False)
+        self.gate_proj = nn.Linear(
+            self.hidden_size, self.intermediate_size, bias_attr=False
+        )
+        self.up_proj = nn.Linear(
+            self.hidden_size, self.intermediate_size, bias_attr=False
+        )
+        self.down_proj = nn.Linear(
+            self.intermediate_size, self.hidden_size, bias_attr=False
+        )
         self.act_fn = get_activation(config.hidden_act)
 
     def forward(self, hidden_state):
-        return self.down_proj(self.act_fn(self.gate_proj(hidden_state)) * self.up_proj(hidden_state))
+        return self.down_proj(
+            self.act_fn(self.gate_proj(hidden_state)) * self.up_proj(hidden_state)
+        )
 
 
 def repeat_kv(hidden_states: paddle.Tensor, n_rep: int) -> paddle.Tensor:
@@ -210,7 +226,8 @@ class MistralAttention(nn.Layer):
         self.layer_idx = layer_idx
         if layer_idx is None:
             logger.warning(
-                f"Instantiating {self.__class__.__name__} without passing a `layer_idx` is not recommended."
+                f"Instantiating {self.__class__.__name__} without passing a "
+                "`layer_idx` is not recommended."
             )
 
         self.attention_dropout = config.attention_dropout
@@ -225,10 +242,13 @@ class MistralAttention(nn.Layer):
 
         if (self.head_dim * self.num_heads) != self.hidden_size:
             raise ValueError(
-                f"hidden_size must be divisible by num_heads (got `hidden_size`: {self.hidden_size}"
+                "hidden_size must be divisible by num_heads "
+                f"(got `hidden_size`: {self.hidden_size}"
                 f" and `num_heads`: {self.num_heads})."
             )
-        self.q_proj = nn.Linear(self.hidden_size, self.num_heads * self.head_dim, bias_attr=False)
+        self.q_proj = nn.Linear(
+            self.hidden_size, self.num_heads * self.head_dim, bias_attr=False
+        )
         self.k_proj = nn.Linear(
             self.hidden_size, self.num_key_value_heads * self.head_dim, bias_attr=False
         )
@@ -259,7 +279,9 @@ class MistralAttention(nn.Layer):
         key_states = self.k_proj(hidden_states)
         value_states = self.v_proj(hidden_states)
 
-        query_states = query_states.reshape([bsz, q_len, self.num_heads, self.head_dim]).transpose([0, 2, 1, 3])
+        query_states = query_states.reshape(
+            [bsz, q_len, self.num_heads, self.head_dim]
+        ).transpose([0, 2, 1, 3])
         key_states = key_states.reshape(
             [bsz, q_len, self.num_key_value_heads, self.head_dim]
         ).transpose([0, 2, 1, 3])
@@ -268,7 +290,9 @@ class MistralAttention(nn.Layer):
         ).transpose([0, 2, 1, 3])
 
         cos, sin = self.rotary_emb(value_states, position_ids)
-        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
+        query_states, key_states = apply_rotary_pos_emb(
+            query_states, key_states, cos, sin
+        )
 
         if past_key_value is not None:
             cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
@@ -280,20 +304,23 @@ class MistralAttention(nn.Layer):
         value_states = repeat_kv(value_states, self.num_key_value_groups)
 
         # softmax in fp32 for numerical stability, then cast back
-        attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) / math.sqrt(
-            self.head_dim
-        )
+        attn_weights = paddle.matmul(
+            query_states, key_states.transpose([0, 1, 3, 2])
+        ) / math.sqrt(self.head_dim)
 
         if attention_mask is not None:
             causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
             attn_weights = attn_weights + causal_mask
 
-        attn_weights = F.softmax(attn_weights, axis=-1, dtype=paddle.float32).cast(query_states.dtype)
+        attn_weights = F.softmax(attn_weights, axis=-1, dtype=paddle.float32).cast(
+            query_states.dtype
+        )
         attn_output = paddle.matmul(attn_weights, value_states)
 
         if attn_output.shape != [bsz, self.num_heads, q_len, self.head_dim]:
             raise ValueError(
-                f"`attn_output` should be of size {[bsz, self.num_heads, q_len, self.head_dim]}, but is"
+                "`attn_output` should be of size "
+                f"{[bsz, self.num_heads, q_len, self.head_dim]}, but is"
                 f" {attn_output.shape}"
             )
 
@@ -349,7 +376,9 @@ class MistralSdpaAttention(MistralAttention):
         ).transpose([0, 2, 1, 3])
 
         cos, sin = self.rotary_emb(value_states, position_ids)
-        query_states, key_states = apply_rotary_pos_emb(query_states, key_states, cos, sin)
+        query_states, key_states = apply_rotary_pos_emb(
+            query_states, key_states, cos, sin
+        )
 
         if past_key_value is not None:
             cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}
@@ -374,10 +403,12 @@ class MistralSdpaAttention(MistralAttention):
                 enable_gqa=False,
             )
         else:
-            attn_weights = paddle.matmul(query_states, key_states.transpose([0, 1, 3, 2])) / math.sqrt(
-                self.head_dim
+            attn_weights = paddle.matmul(
+                query_states, key_states.transpose([0, 1, 3, 2])
+            ) / math.sqrt(self.head_dim)
+            attn_weights = F.softmax(attn_weights, axis=-1, dtype=paddle.float32).cast(
+                query_states.dtype
             )
-            attn_weights = F.softmax(attn_weights, axis=-1, dtype=paddle.float32).cast(query_states.dtype)
             attn_output = paddle.matmul(attn_weights, value_states)
 
         attn_output = attn_output.transpose([0, 2, 1, 3])
@@ -402,8 +433,12 @@ class MistralDecoderLayer(nn.Layer):
         )
         self.self_attn = attn_cls(config=config, layer_idx=layer_idx)
         self.mlp = MistralMLP(config)
-        self.input_layernorm = MistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
-        self.post_attention_layernorm = MistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
+        self.input_layernorm = MistralRMSNorm(
+            config.hidden_size, eps=config.rms_norm_eps
+        )
+        self.post_attention_layernorm = MistralRMSNorm(
+            config.hidden_size, eps=config.rms_norm_eps
+        )
 
     def forward(
         self,
@@ -466,9 +501,7 @@ def _apply_repetition_penalty(logits, gen_ids, penalty):
         return logits
     unique_ids = paddle.unique(gen_ids)
     gathered = logits[:, unique_ids]
-    penalized = paddle.where(
-        gathered > 0, gathered / penalty, gathered * penalty
-    )
+    penalized = paddle.where(gathered > 0, gathered / penalty, gathered * penalty)
     logits = logits.clone()
     logits[:, unique_ids] = penalized
     return logits
@@ -515,23 +548,34 @@ def _create_causal_mask(
             if len(attention_mask.shape) == 2:
                 mask_length = attention_mask.shape[-1]
                 attention_mask_float = attention_mask.cast(dtype)
-                padding_mask = causal_mask[:, :, :, :mask_length] + attention_mask_float[:, None, None, :]
-                padding_mask = padding_mask == 0
-                causal_mask[:, :, :, :mask_length] = causal_mask[:, :, :, :mask_length].masked_fill(
-                    padding_mask, min_dtype
+                padding_mask = (
+                    causal_mask[:, :, :, :mask_length]
+                    + attention_mask_float[:, None, None, :]
                 )
+                padding_mask = padding_mask == 0
+                causal_mask[:, :, :, :mask_length] = causal_mask[
+                    :, :, :, :mask_length
+                ].masked_fill(padding_mask, min_dtype)
 
     return causal_mask
 
 
-class MistralModel(MistralPreTrainedModel):
-    def __init__(self, config: MistralConfig):
+class MistralModel(RuntimeMixin, MistralPreTrainedModel):
+    def __init__(
+        self, config: MistralConfig, execution_backend="eager", runtime_options=None
+    ):
         super().__init__(config)
+        self._init_runtime(execution_backend, runtime_options)
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
-        self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size, padding_idx=self.padding_idx)
+        self.embed_tokens = nn.Embedding(
+            config.vocab_size, config.hidden_size, padding_idx=self.padding_idx
+        )
         self.layers = nn.LayerList(
-            [MistralDecoderLayer(config, layer_idx) for layer_idx in range(config.num_hidden_layers)]
+            [
+                MistralDecoderLayer(config, layer_idx)
+                for layer_idx in range(config.num_hidden_layers)
+            ]
         )
         self.norm = MistralRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.init_weights()
@@ -542,6 +586,7 @@ class MistralModel(MistralPreTrainedModel):
     def set_input_embeddings(self, value):
         self.embed_tokens = value
 
+    @runtime_boundary("forward")
     def forward(
         self,
         input_ids: paddle.Tensor = None,
@@ -555,16 +600,25 @@ class MistralModel(MistralPreTrainedModel):
         return_dict: Optional[bool] = None,
         cache_position: Optional[paddle.Tensor] = None,
     ) -> Union[Tuple, BaseModelOutputWithPast]:
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
+        )
         output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
         )
         use_cache = use_cache if use_cache is not None else self.config.use_cache
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         if (input_ids is None) == (inputs_embeds is None):
             raise ValueError(
-                "You cannot specify both input_ids and inputs_embeds at the same time, and must specify either one"
+                "You cannot specify both input_ids and inputs_embeds at the same "
+                "time, and must specify either one"
             )
 
         if inputs_embeds is None:
@@ -579,7 +633,9 @@ class MistralModel(MistralPreTrainedModel):
             return_legacy_cache = True
 
         if cache_position is None:
-            past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
+            past_seen_tokens = (
+                past_key_values.get_seq_length() if past_key_values is not None else 0
+            )
             cache_position = paddle.arange(
                 past_seen_tokens, past_seen_tokens + inputs_embeds.shape[1]
             )
@@ -629,7 +685,9 @@ class MistralModel(MistralPreTrainedModel):
 
         if not return_dict:
             return tuple(
-                v for v in [hidden_states, next_cache, all_hidden_states, all_self_attns] if v is not None
+                v
+                for v in [hidden_states, next_cache, all_hidden_states, all_self_attns]
+                if v is not None
             )
         return BaseModelOutputWithPast(
             last_hidden_state=hidden_states,
@@ -679,11 +737,19 @@ class MistralForCausalLM(MistralPreTrainedModel):
         return_dict: Optional[bool] = None,
         cache_position: Optional[paddle.Tensor] = None,
     ) -> Union[Tuple, CausalLMOutputWithPast]:
-        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
-        output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        output_attentions = (
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
         )
-        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        output_hidden_states = (
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
+        )
+        return_dict = (
+            return_dict if return_dict is not None else self.config.use_return_dict
+        )
 
         outputs = self.model(
             input_ids=input_ids,
@@ -715,7 +781,9 @@ class MistralForCausalLM(MistralPreTrainedModel):
             output = (logits,) + outputs[1:]
             return (loss,) + output if loss is not None else output
 
-        past_kv = outputs.past_key_values if hasattr(outputs, "past_key_values") else None
+        past_kv = (
+            outputs.past_key_values if hasattr(outputs, "past_key_values") else None
+        )
         hidden = outputs.hidden_states if hasattr(outputs, "hidden_states") else None
         attns = outputs.attentions if hasattr(outputs, "attentions") else None
 
@@ -853,7 +921,8 @@ class MistralForCausalLM(MistralPreTrainedModel):
                     ids = paddle.unique(beam_tokens[bi])
                     gathered = logits[bi, ids]
                     penalized = paddle.where(
-                        gathered > 0, gathered / repetition_penalty,
+                        gathered > 0,
+                        gathered / repetition_penalty,
                         gathered * repetition_penalty,
                     )
                     logits[bi] = logits[bi].clone()
@@ -868,7 +937,9 @@ class MistralForCausalLM(MistralPreTrainedModel):
 
             n_select = num_beams + len(finished_hypos)
             flat_scores = candidate_scores.reshape([-1])
-            topk_scores, topk_indices = paddle.topk(flat_scores, min(n_select, flat_scores.shape[0]))
+            topk_scores, topk_indices = paddle.topk(
+                flat_scores, min(n_select, flat_scores.shape[0])
+            )
 
             beam_indices = topk_indices // vocab_size
             token_indices = topk_indices % vocab_size
@@ -883,13 +954,13 @@ class MistralForCausalLM(MistralPreTrainedModel):
                 sc = topk_scores[i].item()
 
                 if ti == eos_token_id:
-                    seq = paddle.concat([beam_tokens[bi], token_indices[i:i + 1]])
+                    seq = paddle.concat([beam_tokens[bi], token_indices[i : i + 1]])
                     length = seq.shape[0]
                     lp = ((5.0 + length) / (5.0 + 1.0)) ** length_penalty
                     finished_hypos.append((sc / lp, seq))
                     continue
 
-                new_seq = paddle.concat([beam_tokens[bi], token_indices[i:i + 1]])
+                new_seq = paddle.concat([beam_tokens[bi], token_indices[i : i + 1]])
                 new_tokens_list.append(new_seq)
                 new_scores_list.append(sc)
                 new_beam_map.append(bi)
@@ -950,9 +1021,7 @@ class MistralForCausalLM(MistralPreTrainedModel):
         seq_len = hidden.shape[1]
 
         if attention_mask is None:
-            attention_mask = paddle.ones(
-                [batch_size, seq_len], dtype=paddle.int64
-            )
+            attention_mask = paddle.ones([batch_size, seq_len], dtype=paddle.int64)
 
         _suppress_token_id = getattr(self.config, "pad_token_id", None)
 
@@ -989,14 +1058,10 @@ class MistralForCausalLM(MistralPreTrainedModel):
             logits[:, _suppress_token_id] = float("-inf")
 
         if repetition_penalty != 1.0:
-            logits = _apply_repetition_penalty(
-                logits, None, repetition_penalty
-            )
+            logits = _apply_repetition_penalty(logits, None, repetition_penalty)
 
         if do_sample:
-            next_tokens = paddle.multinomial(
-                F.softmax(logits, axis=-1), num_samples=1
-            )
+            next_tokens = paddle.multinomial(F.softmax(logits, axis=-1), num_samples=1)
         else:
             next_tokens = paddle.argmax(logits, axis=-1, keepdim=True)
 
@@ -1045,9 +1110,7 @@ class MistralForCausalLM(MistralPreTrainedModel):
                 next_tokens = paddle.argmax(logits, axis=-1, keepdim=True)
 
             generated.append(next_tokens)
-            gen_ids_tensor = paddle.concat(
-                [gen_ids_tensor, next_tokens.reshape([-1])]
-            )
+            gen_ids_tensor = paddle.concat([gen_ids_tensor, next_tokens.reshape([-1])])
 
             if next_tokens.reshape([-1])[0].item() == eos_token_id:
                 break

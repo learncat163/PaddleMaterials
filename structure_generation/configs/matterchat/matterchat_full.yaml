@@ -29,3 +29,5 @@ Model:
     llm_tokenizer: null
     llm_model: null
     tokenizer_path: ""
+    execution_backend: eager
+    runtime_options: null

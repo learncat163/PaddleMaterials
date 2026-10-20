@@ -1,11 +1,11 @@
 # Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
-#
+
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-#
+
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
+
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,12 +17,13 @@
 import paddle
 import paddle.nn as nn
 
+from ppmat.models.common.runtime import RuntimeMixin
 from ppmat.models.matterchat.mistral.configuration_mistral import MistralConfig
 from ppmat.models.matterchat.mistral.modeling_mistral import MistralForCausalLM
 from ppmat.models.matterchat.q_former.q_former_base import Blip2Base
 
 
-class Blip2MistralInstruct(Blip2Base):
+class Blip2MistralInstruct(RuntimeMixin, Blip2Base):
     def __init__(
         self,
         num_query_token=32,
@@ -34,6 +35,8 @@ class Blip2MistralInstruct(Blip2Base):
         llm_model=None,
         tokenizer_path=None,
         llm_config=None,
+        execution_backend="eager",
+        runtime_options=None,
     ):
         super().__init__()
 
@@ -71,6 +74,8 @@ class Blip2MistralInstruct(Blip2Base):
             else MistralForCausalLM(self._build_llm_config(llm_config))
         )
 
+        self.set_execution_backend(execution_backend)
+        self.set_runtime_options(runtime_options or {})
         for param in self.llm_model.parameters():
             param.stop_gradient = True
 
@@ -87,6 +92,21 @@ class Blip2MistralInstruct(Blip2Base):
             self.prompt_length = prompt_tokens.attention_mask.sum(1).item()
         else:
             self.prompt_length = 0
+
+    @property
+    def execution_backend(self):
+        return self.llm_model.model.execution_backend
+
+    def set_execution_backend(self, backend):
+        self.llm_model.model.set_execution_backend(backend)
+
+    def set_runtime_options(self, runtime_options):
+        self.llm_model.model.set_runtime_options(runtime_options)
+
+    def validate_execution_backend(self, *, use_amp=False, world_size=1):
+        self.llm_model.model.validate_execution_backend(
+            use_amp=use_amp, world_size=world_size
+        )
 
     @staticmethod
     def _build_llm_config(llm_config):
