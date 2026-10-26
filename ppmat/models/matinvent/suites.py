@@ -25,6 +25,8 @@ def build_backbone(backbone_cfg: dict):
     """Build one backbone instance for MatInvent sampling and fine-tuning."""
     from ppmat.models import build_model
 
+    if backbone_cfg["__class_name__"] == "DiffCSP":
+        backbone_cfg = {**backbone_cfg, "__class_name__": "MatinventDiffCSP"}
     return build_model(backbone_cfg)
 
 
@@ -76,4 +78,7 @@ class ModelSuite:
             num_batches=self.sample_cfg["num_batches"],
             num_inference_steps=self.sample_cfg["num_inference_steps"],
             build_structure_cfg=self.build_structure_cfg,
+            atom_count_distribution=self.sample_cfg.get(
+                "atom_count_distribution", "ALEX_MP_20"
+            ),
         )

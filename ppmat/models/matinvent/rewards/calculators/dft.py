@@ -23,18 +23,17 @@ from ppmat.models.matinvent.rewards.calculators import Calculator
 class DFTCalc(Calculator):
     """Write structures as CIFs for an external DFT run and read values back.
 
-    Results must be placed at ``{root_dir}/{label}.txt``, one float per structure.
+    Results belong in the exported batch directory, one float per structure.
     """
 
     def calc(self, samples, label="tmp"):
         struc_list = samples[0]
-        cif_dir = os.path.join(self.root_dir, label)
-        os.makedirs(cif_dir, exist_ok=True)
+        cif_dir = self.external_result_dir(struc_list, label)
         for i, struc in enumerate(struc_list):
             cif_path = os.path.abspath(os.path.join(cif_dir, f"{i}.cif"))
             CifWriter(struc).write_file(cif_path)
 
-        out_path = os.path.abspath(os.path.join(self.root_dir, f"{label}.txt"))
+        out_path = os.path.abspath(os.path.join(cif_dir, "results.txt"))
         if not os.path.isfile(out_path):
             raise FileNotFoundError(
                 f"DFT results are missing: {out_path}. CIF files for the external DFT "
@@ -42,7 +41,7 @@ class DFTCalc(Calculator):
                 f"{out_path} and rerun."
             )
         results = np.loadtxt(out_path, dtype=float, ndmin=1)
-        if results.shape[0] != len(struc_list):
+        if results.shape != (len(struc_list),):
             raise ValueError(
                 f"{out_path} holds {results.shape[0]} values, "
                 f"expected {len(struc_list)}"

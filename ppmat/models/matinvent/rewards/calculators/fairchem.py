@@ -24,7 +24,7 @@ _TASKS = ("bulk_modulus", "heat_capacity")
 class FairChem(Calculator):
     """Read externally computed bulk modulus / heat capacity values.
 
-    Results must be at ``{root_dir}/{label}.txt``, one float per structure.
+    Results belong in the content-addressed batch directory.
     """
 
     def calc(self, samples, label="tmp"):
@@ -34,7 +34,8 @@ class FairChem(Calculator):
                 f"expected one of {_TASKS}"
             )
 
-        out_path = os.path.abspath(os.path.join(self.root_dir, f"{label}.txt"))
+        directory = self.external_result_dir(samples[0], label)
+        out_path = os.path.abspath(os.path.join(directory, "results.txt"))
         if not os.path.isfile(out_path):
             raise FileNotFoundError(
                 f"FairChem results are missing: {out_path}. Run the external ML "
@@ -42,7 +43,7 @@ class FairChem(Calculator):
                 f"{out_path} before rerunning."
             )
         results = np.loadtxt(out_path, dtype=float, ndmin=1)
-        if results.shape[0] != len(samples[0]):
+        if results.shape != (len(samples[0]),):
             raise ValueError(
                 f"{out_path} holds {results.shape[0]} values, "
                 f"expected {len(samples[0])}"

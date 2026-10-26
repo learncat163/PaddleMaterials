@@ -54,6 +54,14 @@ class Reward:
         self.threshold = reward_threshold
         self.reduce = reduce
         self._cache = {}
+        names = [cfg["name"] for cfg in prop_cfg]
+        if not names or len(set(names)) != len(names):
+            raise ValueError("Reward property names must be nonempty and unique")
+        if any(
+            not name or name in (".", "..") or os.path.basename(name) != name
+            for name in names
+        ):
+            raise ValueError("Reward property names must be directory basenames")
         os.makedirs(root_dir, exist_ok=True)
 
     def calc_props(self, samples: Tuple[List[Structure], str], label: str = "tmp"):
@@ -75,12 +83,12 @@ class Reward:
                         "in the config"
                     )
                 calc = CALCULATOR_REGISTRY[cls_name](
-                    root_dir=self.root_dir, **calculator_cfg
+                    root_dir=os.path.join(self.root_dir, cfg["name"]), **calculator_cfg
                 )
                 self._cache[idx] = calc
             raw = np.asarray(calc.calc(samples, label), dtype=float)
             values[cfg["name"]] = np.nan_to_num(raw, nan=0.0).astype(float)
-            failed_current = np.isnan(raw)
+            failed_current = ~np.isfinite(raw)
             failed = failed_current if failed is None else (failed | failed_current)
         return values, failed
 

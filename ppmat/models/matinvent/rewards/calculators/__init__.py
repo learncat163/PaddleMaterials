@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import hashlib
+import json
 import os
 
 
@@ -28,3 +30,14 @@ class Calculator:
 
     def calc(self, samples, label="tmp"):
         raise NotImplementedError
+
+    def external_result_dir(self, structures, label):
+        payload = json.dumps(
+            [structure.as_dict() for structure in structures],
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        fingerprint = hashlib.sha256(payload).hexdigest()
+        directory = os.path.join(self.root_dir, label, fingerprint)
+        os.makedirs(directory, exist_ok=True)
+        return directory

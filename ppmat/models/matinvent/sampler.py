@@ -63,17 +63,19 @@ class BaseSampler:
         num_batches: int,
         num_inference_steps: int,
         build_structure_cfg: dict,
+        atom_count_distribution: str = _ATOM_COUNT_DISTRIBUTION,
     ):
         self.batch_size = batch_size
         self.num_batches = num_batches
         self.num_inference_steps = num_inference_steps
         self.build_structure_cfg = build_structure_cfg
+        self.atom_count_distribution = atom_count_distribution
 
     def generate(self, model) -> List[Structure]:
         raise NotImplementedError
 
     def _num_atoms(self, batch_size: int):
-        distribution = NUM_ATOMS_DISTRIBUTIONS[_ATOM_COUNT_DISTRIBUTION]
+        distribution = NUM_ATOMS_DISTRIBUTIONS[self.atom_count_distribution]
         counts = np.random.choice(
             list(distribution.keys()),
             size=batch_size,

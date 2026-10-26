@@ -177,9 +177,17 @@ def run_rl_training(
     os.makedirs(output_dir, exist_ok=True)
 
     model_name = rl_cfg["pretrained_model_name"]
-    package_dir = _download_package(model_name)
-    if backbone_cfg is None:
-        backbone_cfg = _read_backbone_cfg(model_name, package_dir)
+    pretrained_model_path = rl_cfg.get("pretrained_model_path")
+    if pretrained_model_path is None:
+        package_dir = _download_package(model_name)
+        if backbone_cfg is None:
+            backbone_cfg = _read_backbone_cfg(model_name, package_dir)
+    else:
+        package_dir = os.path.expanduser(pretrained_model_path)
+        if backbone_cfg is None:
+            raise ValueError(
+                "backbone_cfg is required when rl_cfg.pretrained_model_path is set"
+            )
 
     model_suite = ModelSuite(
         model_name=model_type,
@@ -214,6 +222,9 @@ def run_rl_training(
             "buff": div_cfg["buff"],
             "method": div_cfg["method"],
         },
+        anchor_cfg=rl_cfg.get("anchor_cfg"),
+        early_stop_cfg=rl_cfg.get("early_stop_cfg"),
+        qualification_cfg=rl_cfg.get("qualification_cfg"),
     )
     logger.info(f"Start MatInvent RL fine-tuning on {model_type}")
     mat_invent.run_rl()

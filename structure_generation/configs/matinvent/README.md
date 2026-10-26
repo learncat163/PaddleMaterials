@@ -6,96 +6,60 @@
 
 MatInvent is a general and efficient reinforcement learning workflow that optimizes diffusion models for goal-directed crystal generation. MatInvent enables robust optimization for inverse material design tasks with single or multiple target properties. Compatible with diverse diffusion model architectures and property constraints, MatInvent could offer broad applicability in materials discovery.
 
+![MatInvent RL Pipeline](../../docs/matinvent_RL_pipeline.png)
+
 ---
 
 ## Model Description
 
 ### Overview
-MatInvent wraps a pretrained crystal diffusion backbone and optimizes it with reward-weighted fine-tuning. Each iteration alternates three phases:
-- **Sample**: the backbone generates a batch of crystal structures.
-- **Score**: property calculators evaluate each structure and a scalar reward is computed from the multi-property profile.
-- **Fine-tune**: the generator is updated with a reward-weighted diffusion loss plus a KL regularizer that keeps it close to the pretrained prior.
+MatInvent adapts pretrained crystal diffusion models for goal-directed materials generation through reinforcement learning. Each round generates crystal structures, evaluates their properties, and fine-tunes the generator using the resulting rewards. The implementation supports MatterGen and DiffCSP backbones.
 
-After each iteration, high-reward structures are stored in a replay buffer and in a long-term memory used for diversity filtering. Two backbones are supported, both driven through the `MatinventRL` adapter:
+| Backbone | Generation task | Config |
+| --- | --- | --- |
+| MatterGen | Joint generation of atom types, coordinates, and lattice | [matinvent_mattergen.yaml](matinvent_mattergen.yaml) |
+| DiffCSP | Coordinate and lattice generation with fixed atom types | [matinvent_diffcsp.yaml](matinvent_diffcsp.yaml) |
+| DiffCSP | Joint generation of atom types, coordinates, and lattice | [matinvent_diffcsp_joint.yaml](matinvent_diffcsp_joint.yaml) |
 
-| Backbone | Config |
-| --- | --- |
-| MatterGen | `matinvent_mattergen.yaml` |
-| DiffCSP | `matinvent_diffcsp.yaml` |
-
-The RL agent and the KL prior both start from the registered weight package named by `Model.__init_params__.rl_cfg.pretrained_model_name`, so the RL loop and the released checkpoint share a single source of weights and backbone architecture. Rewards come from the calculators selected in `rl_cfg.reward_cfg.prop_cfg`:
-- **PyMatGen**: `density`, `hhi`, `price`, `abundance`, `log_abundance`, `mcia`, `num_atoms`, `num_elements`, `volume`
-- **DFTCalc**: any task name, read from `{root_dir}/{label}.txt` written by an external DFT run
-- **FairChem**: `bulk_modulus`, `heat_capacity`, read from precomputed external values
+The MatterGen and conditional DiffCSP configurations optimize density. The joint DiffCSP configuration optimizes the Herfindahl-Hirschman Index (HHI) for supply risk, with relaxation, stability, novelty, and uniqueness screening. Reward properties and targets are configured under `Model.__init_params__.rl_cfg.reward_cfg`.
 
 ### Method
-
-#### 1) Reward-weighted fine-tuning
-For a sampled structure with reward $r$, the advantage is the raw reward and the generator minimizes
+For a generated structure with reward $r$, fine-tuning minimizes the reward-weighted diffusion objective with regularization toward a frozen pretrained prior:
 
 $$
-\mathcal{L} = r\,\mathcal{L}_{\text{diff}} + \sigma\,(1.1 - r)\,\mathrm{KL},
+\mathcal{L} = r\,\mathcal{L}_{\mathrm{diff}} + \sigma\,(1.1-r)\,\mathcal{L}_{\mathrm{prior}}.
 $$
 
-where $\mathcal{L}_{\text{diff}}$ is the weighted sum of the coordinate, lattice and atom-type diffusion losses and $\sigma$ is `rl_cfg.finetune_cfg.sigma`.
+Here, $\mathcal{L}_{\mathrm{diff}}$ combines the coordinate, lattice, and, for joint generation, atom-type denoising losses. $\mathcal{L}_{\mathrm{prior}}$ measures the mean squared difference between the agent and prior predictions; $\sigma$ controls its weight.
 
-#### 2) KL regularization to the prior
-The KL term is the mean squared difference between the agent and the frozen prior predictions, which keeps the fine-tuned model from drifting away from the pretrained one.
-
-#### 3) Replay buffer and diversity filter
-Fine-tuning batches are ranked by reward and truncated to `rl_cfg.topk_ratio`. High-reward structures are kept in a replay buffer (best structure per composition) and appended to a long-term memory; the diversity filter down-weights structures whose composition or element combination is already over-represented.
+Structures are ranked by reward before fine-tuning. A replay buffer retains high-reward structures, while a composition-based diversity filter reduces rewards for repeatedly generated compositions. The agent and frozen prior are initialized from the same pretrained backbone.
 
 ---
 
 ## Dataset Description
 
-No pre-labeled training set is required: rewards are computed **on-the-fly** by the property calculators, so both shipped configs run directly on a fresh checkout.
+RL training uses generated structures and property rewards rather than a fixed labeled training split. The standard configurations draw atom counts from the Alex-MP-20 distribution, with 1 to 20 atoms per structure. The joint DiffCSP configuration uses the MP-20 atom-count distribution and limits sampled structures to 16 atoms.
 
-Sampled atom counts are drawn from the same empirical distribution the task `Sample.data` uses (`NumAtomsCrystalDataset` with `dist_name: ALEX_MP_20`, 1..20 atoms per structure), and every sample is filtered before scoring:
+| Data | Usage | Source |
+| --- | --- | --- |
+| Generated crystals | Online reward evaluation and fine-tuning | Current diffusion model |
+| Pretrained backbones | Agent and frozen-prior initialization | Registered MatInvent packages; original checkpoints are available on [Hugging Face](https://huggingface.co/jwchen25/MatInvent) |
+| MP-20 validation structures | Joint DiffCSP validation probe | [MP-20](https://paddle-org.bj.bcebos.com/paddlematerial/datasets/mp_20/mp_20.zip) |
+| MP2020-corrected reference database | Joint DiffCSP stability and novelty screening | [reference_MP2020correction.gz](https://huggingface.co/jwchen25/MatInvent/blob/main/reference_MP2020correction.gz) |
 
-| Check | Criterion |
-| --- | --- |
-| Geometry | minimum interatomic distance 0.5 A, volume > 0.1 A^3 |
-| Cell size | largest lattice parameter < 25 A |
-
-The RL-side dataset (`RLDataset` / `create_rl_dataloader`) lives in `ppmat/models/matinvent/dataset.py`, because its samples carry the RL reward and feed the backbones' `num_atoms` / `atom_types` conventions.
-
-#### Pretrained weights
-The released packages are registered in `MODEL_REGISTRY` and downloaded automatically:
-
-| Model name | Backbone |
-| --- | --- |
-| `matinvent_mattergen_mp20` | MatterGen |
-| `matinvent_diffcsp_mp20` | DiffCSP |
-
-Each package follows the standard layout, so `build_model_from_name` resolves it without extra arguments:
-
-```
-<model_name>.zip
-└── <model_name>/
-    ├── <model_name>.yaml
-    └── checkpoints/
-        └── best.pdparams
-```
-
-Novelty and stability of generated structures are assessed against a reference convex-hull dataset (`reference_MP2020correction.gz`) from [Hugging Face (jwchen25/MatInvent)](https://huggingface.co/jwchen25/MatInvent); it is only needed for post-hoc evaluation and is not used by the RL loop.
+For joint DiffCSP training, place the reference archive at `data/matinvent/reference_MP2020correction.gz` and the MP-20 validation file at `data/mp_20/val.csv`, or update `qualification_cfg.reference_path` and `early_stop_cfg.probe_cfg.data_path` under `Model.__init_params__.rl_cfg`. Relaxation uses the registered `mattersim_5M` model.
 
 ---
 
 ## Results
 
-Both configs were validated end-to-end on the released weights with the RL loop shortened to three iterations (GPU):
+| Model | Dataset | Full RL Evaluation | GPUs | Training Time | Config | Checkpoint / Log |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| matinvent_mattergen_mp20 | Generated crystals | Not evaluated | - | - | [matinvent_mattergen.yaml](matinvent_mattergen.yaml) | [pretrained checkpoint](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/MatInvert/matinvent_mattergen_mp20.zip) |
+| matinvent_diffcsp_mp20 | Generated crystals | Not evaluated | - | - | [matinvent_diffcsp.yaml](matinvent_diffcsp.yaml) | Local registry package |
+| matinvent_diffcsp_mp20_joint | Generated crystals | Not evaluated | - | - | [matinvent_diffcsp_joint.yaml](matinvent_diffcsp_joint.yaml) | Local registry package |
 
-| Backbone | Iteration | `density mean` | `reward mean` | `crystal_num` | `div_ratio` |
-| --- | --- | --- | --- | --- | --- |
-| MatterGen | 0 | 2.160 | 0.216 | 2 | 1.0 |
-| MatterGen | 1 | 2.786 | 0.279 | 4 | 1.0 |
-| MatterGen | 2 | 1.620 | 0.162 | 6 | 1.0 |
-| DiffCSP | 0 | 11.602 | 1.000 | 1 | 1.0 |
-| DiffCSP | 1 | 8.790 | 0.879 | 2 | 1.0 |
-| DiffCSP | 2 | 8.445 | 0.844 | 3 | 1.0 |
-
-`sample.py` on the resulting checkpoints writes 4 CIF files for MatterGen (`--mode=by_dataloader`) and 1 CIF file for DiffCSP (`--mode=by_chemical_formula`). These numbers come from a three-iteration smoke run, not from the full 50-iteration schedule used for the paper; quantitative comparisons with the reference implementation are reported in the [paper](https://arxiv.org/abs/2511.03112). `rl_cfg.finetune_cfg.sigma` and `rl_cfg.finetune_cfg.optimizer_cfg.lr` follow the reference implementation (`sigma=0.025`, `lr=1e-5` for MatterGen and `1e-4` for DiffCSP).
+The checkpoints initialize the pretrained backbones; they do not represent completed RL runs. Full-run generation quality and training times have not been established. The DiffCSP packages currently use the local model server configured in `MODEL_REGISTRY`.
 
 ---
 
@@ -106,24 +70,18 @@ Both configs were validated end-to-end on the released weights with the RL loop 
 # MatterGen backbone
 python structure_generation/train.py -c structure_generation/configs/matinvent/matinvent_mattergen.yaml
 
-# DiffCSP backbone
+# DiffCSP backbone with fixed atom types
 python structure_generation/train.py -c structure_generation/configs/matinvent/matinvent_diffcsp.yaml
 
-# The unified entry drives the RL loop through MatinventRL.before_train; any rl_cfg key
-# can be overridden on the command line, which is convenient for a short smoke run.
-python structure_generation/train.py -c structure_generation/configs/matinvent/matinvent_diffcsp.yaml Model.__init_params__.rl_cfg.rl_epoch=2 Model.__init_params__.rl_cfg.save_freq=1
+# Joint DiffCSP generation; prepare the reference database and validation data first
+python structure_generation/train.py -c structure_generation/configs/matinvent/matinvent_diffcsp_joint.yaml
 ```
 
 ### Validation
-```bash
-# The RL run reports its own metrics (reward, property means, crystal_num, div_ratio,
-# cost) on stdout and in run.log at every iteration.
-```
+The RL loop reports rewards, property means, and retained structure counts after each round. Joint DiffCSP additionally evaluates the MP-20 probe configured under `Model.__init_params__.rl_cfg.early_stop_cfg`. The configurations do not define a standalone validation split for the unified trainer.
 
 ### Testing
-```bash
-# RL fine-tuning is the task itself; the shipped configs do not define a test split.
-```
+The configurations do not define a test split. Use the sampling commands below to generate structures from a pretrained or fine-tuned checkpoint.
 
 ### Sample
 ```bash
@@ -132,13 +90,13 @@ python structure_generation/train.py -c structure_generation/configs/matinvent/m
 # Mode 2: Use a custom configuration file and checkpoint.
 # Results are saved to the folder specified by --output_path (default: results).
 
-# Mode 1: pre-trained model
+# Mode 1: pre-trained MatterGen backbone
 python structure_generation/sample.py --model_name='matinvent_mattergen_mp20' --output_path='result_matinvent_mattergen/' --mode='by_dataloader'
 
-# Mode 2: custom config + checkpoint produced by the RL run
+# Mode 2: MatterGen checkpoint produced by an RL run
 python structure_generation/sample.py --config_path='structure_generation/configs/matinvent/matinvent_mattergen.yaml' --checkpoint_path='<run_dir>/models/final/model.pdparams' --output_path='result_matinvent_mattergen/' --mode='by_dataloader'
 
-# DiffCSP backbone: the chemical formula provides the atom types
+# Mode 2: conditional DiffCSP checkpoint; the formula supplies the atom types
 python structure_generation/sample.py --config_path='structure_generation/configs/matinvent/matinvent_diffcsp.yaml' --checkpoint_path='<run_dir>/models/final/model.pdparams' --output_path='result_matinvent_diffcsp/' --mode='by_chemical_formula' --chemical_formula='LiMnO2'
 ```
 

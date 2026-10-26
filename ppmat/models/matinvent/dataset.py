@@ -18,17 +18,40 @@ Samples carry the RL ``reward`` and feed the backbones' ``num_atoms`` /
 ``atom_types`` conventions, so they stay under the model directory.
 """
 
+import itertools
 import os
+from functools import lru_cache
 from typing import List
 
 import numpy as np
 import paddle
 import paddle.io as io
+import smact
 from pymatgen.core.structure import Structure
+from smact.screening import pauling_test
 
 from ppmat.datasets.collate_fn import DefaultCollator
 from ppmat.datasets.custom_data_type import ConcatNumpyWarper
 from ppmat.utils import logger as ppmat_logger
+
+
+@lru_cache(maxsize=None)
+def _is_valid_composition(composition):
+    symbols, counts = zip(*composition)
+    if len(symbols) == 1 or all(symbol in smact.metals for symbol in symbols):
+        return True
+    elements = smact.element_dictionary(symbols)
+    electronegativities = [elements[symbol].pauling_eneg for symbol in symbols]
+    oxidation_states = [elements[symbol].oxidation_states for symbol in symbols]
+    for states in itertools.product(*oxidation_states):
+        if sum(state * count for state, count in zip(states, counts)) != 0:
+            continue
+        try:
+            if pauling_test(states, electronegativities):
+                return True
+        except TypeError:
+            return True
+    return False
 
 
 def is_valid_structure(
@@ -37,20 +60,17 @@ def is_valid_structure(
     max_lattice_param: float = 25.0,
     min_interatomic_dist: float = 0.5,
 ) -> bool:
-    """Geometric and cell-size validity of one sampled structure.
-
-    The reference SMACT composition check is omitted: its cost explodes with the
-    many distinct elements DiffCSP random atom types routinely produce.
-    """
-    if struc is None or struc.num_sites == 0 or struc.volume <= min_volume:
+    """Apply the reference geometric, cell-size and SMACT validity checks."""
+    if struc is None or struc.num_sites == 0 or struc.volume < min_volume:
         return False
-    if max(struc.lattice.abc) > max_lattice_param:
+    if max(struc.lattice.abc) >= max_lattice_param:
         return False
     dmat = struc.distance_matrix.copy()
     np.fill_diagonal(dmat, np.inf)
     if dmat.min() < min_interatomic_dist:
         return False
-    return True
+    composition = tuple(sorted(struc.composition.get_el_amt_dict().items()))
+    return _is_valid_composition(composition)
 
 
 def save_structures(structures: List[Structure], save_dir: str, filename: str) -> str:

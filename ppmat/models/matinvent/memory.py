@@ -128,9 +128,17 @@ class ReplayBuffer:
         self.reward_cutoff = reward_cutoff
         self.buffer = pd.DataFrame(columns=["struc", "comp", "reward"])
 
-    def extend(self, strucs: List[Structure], rewards: np.ndarray):
+    def extend(
+        self,
+        strucs: List[Structure],
+        rewards: np.ndarray,
+        scoring_structures: Optional[List[Structure]] = None,
+    ):
+        scoring = strucs if scoring_structures is None else scoring_structures
+        if len(strucs) != len(scoring) or len(strucs) != len(rewards):
+            raise ValueError("Replay training, scoring and rewards must align")
         df = pd.DataFrame.from_dict(
-            {"struc": strucs, "comp": _reduced_formulas(strucs), "reward": rewards}
+            {"struc": strucs, "comp": _reduced_formulas(scoring), "reward": rewards}
         )
         merged = pd.concat([self.buffer, df]) if len(self.buffer) > 0 else df
         self.buffer = (
