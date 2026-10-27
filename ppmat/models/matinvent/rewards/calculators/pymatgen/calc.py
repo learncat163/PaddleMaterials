@@ -19,9 +19,9 @@ from pymatgen.analysis.cost import CostAnalyzer
 from pymatgen.analysis.cost import CostDBElements
 from pymatgen.analysis.hhi import HHIModel
 from pymatgen.analysis.interfaces.substrate_analyzer import SubstrateAnalyzer
-from pymatgen.core.structure import Structure
 from pymatgen.symmetry.analyzer import SpacegroupAnalyzer
 
+from ppmat.datasets.build_structure import BuildStructure
 from ppmat.models.matinvent.rewards.calculators import Calculator
 from ppmat.utils import logger
 
@@ -109,7 +109,9 @@ class PyMatGen(Calculator):
             raise ValueError(
                 "The 'mcia' task requires substrate_path, a path to a substrate CIF"
             )
-        return Structure.from_file(self.substrate_path)
+        return BuildStructure.build_one(
+            self.substrate_path, "cif_file", niggli=False, canocial=False
+        )
 
     def calc(self, samples, label="tmp"):
         struc_list = samples[0]

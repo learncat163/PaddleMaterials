@@ -44,20 +44,22 @@ class MatInvent:
 
     has_atom_diffusion = False
     has_type_diffusion = False
-    anchor_cfg = None
     early_stop_cfg = None
     anchor_batch = None
     probe_batch = None
     anchor_loss_weight = 0.0
     anchor_every_n_steps = 1
     probe_initial = None
-    probe_history = []
     stop_requested = False
 
     def __init__(
         self,
         rl_epoch: int,
-        model_suite,
+        agent,
+        prior,
+        sampler,
+        sample_cfg,
+        finetune_cfg,
         reward: Reward,
         topk_ratio: float,
         save_dir: str,
@@ -72,7 +74,7 @@ class MatInvent:
     ):
         if not 0.0 < topk_ratio <= 1.0:
             raise ValueError(f"topk_ratio must be in (0.0, 1.0], but got {topk_ratio}")
-        batch_size = model_suite.finetune_cfg["batch_size"]
+        batch_size = finetune_cfg["batch_size"]
         topk_num = int(batch_size * topk_ratio)
         if topk_num < 1:
             raise ValueError(
@@ -82,15 +84,14 @@ class MatInvent:
             )
         self.topk_num = topk_num
         self.rl_epoch = rl_epoch
-        self.model_suite = model_suite
         self.reward = reward
         self.save_dir = save_dir
         self.save_freq = save_freq
         self.step = 0
         self.cost = 0
-        self.sample_cfg = OmegaConf.create(model_suite.sample_cfg)
-        self.finetune_cfg = OmegaConf.create(model_suite.finetune_cfg)
-        self.sampler = model_suite.get_sampler()
+        self.sample_cfg = OmegaConf.create(sample_cfg)
+        self.finetune_cfg = OmegaConf.create(finetune_cfg)
+        self.sampler = sampler
         self.ltm = LongTimeMem()
         self.models_dir = os.path.join(save_dir, "models")
         self.sample_dir = os.path.join(save_dir, "samples")
@@ -104,13 +105,17 @@ class MatInvent:
             from ppmat.models.matinvent.qualification import PopulationQualifier
 
             self.qualifier = PopulationQualifier(**qualification_cfg)
-        self.load_model()
+        self.agent = agent
+        self.prior = prior
+        for param in self.prior.parameters():
+            param.stop_gradient = True
+        self.agent.train()
+        self.prior.eval()
         # Branch on the diffusion head, not on the backbone name.
         self.has_atom_diffusion = hasattr(self.agent, "atom_scheduler")
         self.has_type_diffusion = bool(
             getattr(self.agent, "pred_type", False)
         ) and not (self.has_atom_diffusion)
-        self.anchor_cfg = anchor_cfg
         self.early_stop_cfg = early_stop_cfg
         if anchor_cfg is not None and anchor_cfg.get("enabled", False):
             if int(anchor_cfg.get("every_n_steps", 1)) <= 0:
@@ -124,20 +129,19 @@ class MatInvent:
         self.anchor_loss_weight = 0.0
         self.anchor_every_n_steps = 1
         self.probe_initial = None
-        self.probe_history = []
         self.stop_requested = False
         self.hhi_best = float("inf")
         self.hhi_bad_rounds = 0
         self.last_hhi = None
         self.last_valid_ratio = None
         self.last_div_ratio = None
-        if self.anchor_cfg is not None and self.anchor_cfg.get("enabled", False):
-            self.anchor_batch = self._build_mp20_batch(self.anchor_cfg, "Anchor batch")
-            self.anchor_loss_weight = float(self.anchor_cfg.get("loss_weight", 0.5))
-            self.anchor_every_n_steps = int(self.anchor_cfg.get("every_n_steps", 1))
+        if anchor_cfg is not None and anchor_cfg.get("enabled", False):
+            self.anchor_batch = self._build_mp20_batch(anchor_cfg, "Anchor batch")
+            self.anchor_loss_weight = float(anchor_cfg.get("loss_weight", 0.5))
+            self.anchor_every_n_steps = int(anchor_cfg.get("every_n_steps", 1))
         probe_cfg = (self.early_stop_cfg or {}).get("probe_cfg")
-        if probe_cfg is None and self.anchor_cfg is not None:
-            probe_cfg = self.anchor_cfg.get("probe_cfg")
+        if probe_cfg is None and anchor_cfg is not None:
+            probe_cfg = anchor_cfg.get("probe_cfg")
         if probe_cfg is not None or self.anchor_batch is not None:
             self.probe_batch = (
                 self._build_mp20_batch(probe_cfg, "Probe batch")
@@ -147,25 +151,9 @@ class MatInvent:
             self.probe_initial = self._probe_anchor()
             logger.info(f"Anchor probe initial: {self.probe_initial}")
 
-    def load_model(self):
-        self.agent = self.model_suite.load_model()
-        self.prior = self.model_suite.load_model()
-        for param in self.prior.parameters():
-            param.stop_gradient = True
-        self.agent.train()
-        self.prior.eval()
-
     def _save_model(self, model, ckpt_dir: str):
         os.makedirs(ckpt_dir, exist_ok=True)
         paddle.save(model.state_dict(), os.path.join(ckpt_dir, "model.pdparams"))
-
-    @staticmethod
-    def _to_tensor(value):
-        if isinstance(value, np.ndarray):
-            return paddle.to_tensor(value)
-        if isinstance(value, dict):
-            return {key: MatInvent._to_tensor(item) for key, item in value.items()}
-        return value
 
     def _build_mp20_batch(self, cfg, label):
         from ppmat.datasets.collate_fn import DefaultCollator
@@ -181,7 +169,12 @@ class MatInvent:
             raise ValueError("anchor_cfg.num_samples must select at least one sample")
         batch = DefaultCollator()([dataset[i] for i in range(num_samples)])
         logger.info(f"{label}: {num_samples} MP20 samples")
-        return self._to_tensor(batch)
+        return paddle.utils.map_structure(
+            lambda value: paddle.to_tensor(value)
+            if isinstance(value, np.ndarray)
+            else value,
+            batch,
+        )
 
     def _probe_anchor(self):
         if self.probe_batch is None:
@@ -229,7 +222,6 @@ class MatInvent:
             probe_only or (self.step + 1) % probe_every == 0
         ):
             probe = self._probe_anchor()
-            self.probe_history.append({"loop": self.step, **probe})
             logger.info(f"Anchor probe loop {self.step}: {probe}")
             for key, ratio_key in (
                 ("loss", "max_loss_ratio"),

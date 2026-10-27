@@ -39,7 +39,7 @@ Model:
       finetune_cfg:
         batch_size: 16
         epochs: 3
-        timesteps: 1000
+        timesteps: ${Global.num_train_timesteps}
         accum_steps: 50
         sigma: 0.025
         optimizer_cfg:
@@ -114,16 +114,16 @@ Model:
             beta_schedule: squaredcos_cap_v2
             beta_clip_min: 1.0e-4
             beta_clip_max: 0.9999
-            num_train_timesteps: 1000
+            num_train_timesteps: ${Global.num_train_timesteps}
             clip_sample: false
         coord_noise_scheduler_cfg:
           __class_name__: MatinventSdeVeScheduler
           __init_params__:
-            num_train_timesteps: 1000
+            num_train_timesteps: ${Global.num_train_timesteps}
             sigma_min: 0.005
             sigma_max: 0.5
             snr: 5.0e-06
-        num_train_timesteps: 1000
+        num_train_timesteps: ${Global.num_train_timesteps}
         time_dim: 256
         lattice_loss_weight: 1
         coord_loss_weight: 1
@@ -144,4 +144,5 @@ Sample:
         batch_size: 16
   build_structure_cfg: ${Model.__init_params__.build_structure_cfg}
   model_sample_params:
+    atom_count_distribution: MP_20
     num_inference_steps: ${Global.num_inference_steps}

@@ -136,6 +136,7 @@ MODEL_REGISTRY = {
     "matinvent_diffcsp_mp20": "http://127.0.0.1/models/matinvent_diffcsp_mp20.zip",
     # "matinvent_diffcsp_mp20": "https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/MatInvert/matinvent_diffcsp_mp20.zip",
     "matinvent_diffcsp_mp20_joint": "http://127.0.0.1/models/matinvent_diffcsp_mp20_joint.zip",
+    # "matinvent_diffcsp_mp20_joint": "https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/structure_generation/MatInvert/matinvent_diffcsp_mp20_joint.zip",
     "sfin_haadf_enhance": "https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/spectrum_enhancement/sfin/sfin_haadf_enhance.zip",
     "sfin_haadf_detect": "https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/spectrum_enhancement/sfin/sfin_haadf_detect.zip",
     "sfin_bf_enhance": "https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/spectrum_enhancement/sfin/sfin_bf_enhance.zip",

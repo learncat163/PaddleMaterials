@@ -29,7 +29,6 @@ from functools import lru_cache
 import lmdb
 import numpy as np
 from ase import units
-from ase.calculators.calculator import Calculator
 from ase.calculators.calculator import all_changes
 from ase.filters import ExpCellFilter
 from ase.optimize import FIRE
@@ -43,6 +42,7 @@ from pymatgen.entries.computed_entries import ComputedStructureEntry
 from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.io.vasp.sets import MPRelaxSet
 
+from ppmat.calculator.ase import ASECalculator
 from ppmat.models.matinvent.dataset import is_valid_structure
 from ppmat.predictor.potential_predictor import PotentialPredictor
 from ppmat.utils import download
@@ -176,29 +176,29 @@ class _Reference:
         return PhaseDiagram(entries)
 
 
-class _MatterSimCalculator(Calculator):
-    implemented_properties = ["energy", "free_energy", "forces", "stress"]
+class _MatterSimCalculator(ASECalculator):
+    """Adapt MatterSim units and refresh geometry for the shared ASE calculator."""
 
     def __init__(self, predictor):
-        super().__init__()
-        self.predictor = predictor
+        super().__init__(predictor)
+        self.implemented_properties = ["energy", "free_energy", "forces", "stress"]
 
     def calculate(self, atoms=None, properties=None, system_changes=all_changes):
-        super().calculate(atoms, properties, system_changes)
-        structure = AseAtomsAdaptor.get_structure(atoms)
-        graph = self.predictor.graph_converter(structure).tensor()
-        prediction = self.predictor._run_model(graph)
-        energy = float(np.asarray(prediction["energy"]).item()) * len(atoms)
-        forces = np.asarray(prediction["force"])
-        stress = np.asarray(prediction["stress"]) * units.GPa
-        if not all(np.isfinite(value).all() for value in (energy, forces, stress)):
+        atoms.info["graph"] = self.predictor.graph_converter(
+            AseAtomsAdaptor.get_structure(atoms)
+        )
+        try:
+            super().calculate(atoms, properties, system_changes)
+        finally:
+            atoms.info.pop("graph", None)
+            if self.atoms is not None:
+                self.atoms.info.pop("graph", None)
+        self.results["energy"] *= len(atoms)
+        self.results["free_energy"] = self.results["energy"]
+        self.results["stress"] *= units.GPa
+        if not all(np.isfinite(value).all() for value in self.results.values()):
+            self.results.clear()
             raise FloatingPointError("Nonfinite MatterSim relaxation prediction")
-        self.results = {
-            "energy": energy,
-            "free_energy": energy,
-            "forces": forces,
-            "stress": stress,
-        }
 
 
 def _relax_population(structures, predictor_cfg, fmax, max_steps):

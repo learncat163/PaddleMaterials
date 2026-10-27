@@ -32,11 +32,16 @@ import numpy as np
 import paddle
 import pandas as pd
 import pytest
+from ase import units
 from omegaconf import OmegaConf
+from paddle.framework import core
 from pymatgen.core.structure import Lattice
 from pymatgen.core.structure import Structure
 from pymatgen.entries.computed_entries import ComputedStructureEntry
+from pymatgen.io.ase import AseAtomsAdaptor
 
+from ppmat.calculator.ase import ASECalculator
+from ppmat.datasets import build_dataloader
 from ppmat.datasets.build_structure import BuildStructure
 from ppmat.models import MODEL_REGISTRY
 from ppmat.models import build_model
@@ -45,13 +50,16 @@ from ppmat.models.matinvent.dataset import RLDataset
 from ppmat.models.matinvent.dataset import create_rl_dataloader
 from ppmat.models.matinvent.diffcsp import MatinventDiffCSP
 from ppmat.models.matinvent.mattergen import MatinventMatterGen
+from ppmat.models.matinvent.qualification import _MatterSimCalculator
 from ppmat.models.matinvent.rewards.reward import CALCULATOR_REGISTRY
 from ppmat.models.matinvent.rewards.reward import Reward
 from ppmat.models.matinvent.rl_finetune import MatinventRL
 from ppmat.models.matinvent.rl_loop import MatInvent
-from ppmat.models.matinvent.sampler import DiffCSPSampler
+from ppmat.models.matinvent.sampler import MatInventSampler
+from ppmat.predictor.potential_predictor import PotentialPredictor
 from ppmat.schedulers import scheduling_matinvent
 from ppmat.schedulers.scheduling_sde_ve import d_log_p_wrapped_normal
+from ppmat.trainer.base_trainer import BaseTrainer
 from ppmat.utils import download
 from ppmat.utils import save_load
 from ppmat.utils.execution import configure_execution_backend
@@ -225,6 +233,7 @@ class _FakeTrainer:
 
     def __init__(self, output_dir):
         self.output_dir = str(output_dir)
+        self.resume_from_checkpoint = None
 
 
 def _patched_rl_environment(monkeypatch, tmp_path, model_type, execution):
@@ -516,14 +525,24 @@ class TestModelPackage:
         save_load.load_pretrain(model, str(package_dir), weights_name=_WEIGHTS_NAME)
         model.eval()
 
-        num_atoms = paddle.to_tensor([2], dtype="int64")
-        atom_types = paddle.to_tensor([14, 14], dtype="int64")
-        result = model.sample(
-            {"structure_array": {"num_atoms": num_atoms, "atom_types": atom_types}},
+        sampler = MatInventSampler(
+            model_type="diffcsp",
+            batch_size=1,
+            num_batches=2,
             num_inference_steps=2,
+            build_structure_cfg={"format": "array", "niggli": False, "canocial": False},
         )
-
-        assert len(result["result"]) == 1
+        np.random.seed(_DISPATCH_SEED)
+        structures = sampler.generate(model)
+        assert len(structures) == 2
+        assert all(np.isfinite(s.lattice.matrix).all() for s in structures)
+        assert all(np.isfinite(s.frac_coords).all() for s in structures)
+        for error_type in (RuntimeError, IndexError):
+            with mock.patch.object(
+                model, "sample", side_effect=error_type("sample failed")
+            ):
+                with pytest.raises(error_type, match="sample failed"):
+                    sampler.generate(model)
 
 
 class TestMatterGenBackbone:
@@ -573,6 +592,57 @@ class TestDataFlow:
         np.testing.assert_allclose(predictions[0], predictions[1], atol=1e-6)
         for graph in graphs:
             assert float(graph.edge_feat["bond_dist"].max()) <= converter.cutoff
+
+        prim_enabled = core._is_eager_prim_enabled()
+        core.set_prim_eager_enabled(True)
+        try:
+            model.force_key = "force"
+            model.stress_key = "stress"
+            predictor = PotentialPredictor.__new__(PotentialPredictor)
+            predictor.config = {
+                "Global": {"label_names": ["energy", "force"]},
+                "Model": {"__class_name__": "M3GNet"},
+            }
+            predictor.model = model
+            predictor.graph_converter_fn = converter
+            predictor.post_transforms = None
+            predictor.eval_with_no_grad = False
+            calculator = _MatterSimCalculator(predictor)
+            assert isinstance(calculator, ASECalculator)
+            atoms = AseAtomsAdaptor.get_atoms(structure)
+            atoms.calc = calculator
+            for displacement, scale in ((0.0, 1.0), (0.15, 1.02)):
+                atoms.positions[1, 0] += displacement
+                atoms.set_cell(atoms.cell * scale, scale_atoms=True)
+                current = AseAtomsAdaptor.get_structure(atoms)
+                reference = predictor._run_model(converter(current).tensor())
+                np.testing.assert_allclose(
+                    atoms.get_potential_energy(),
+                    float(reference["energy"].item()) * len(atoms),
+                    atol=1e-6,
+                )
+                np.testing.assert_allclose(
+                    atoms.get_forces(), reference["force"], atol=1e-6
+                )
+                np.testing.assert_allclose(
+                    atoms.get_stress(voigt=False),
+                    reference["stress"] * units.GPa,
+                    atol=1e-6,
+                )
+                assert atoms.get_potential_energy(
+                    force_consistent=True
+                ) == pytest.approx(atoms.get_potential_energy())
+                assert "graph" not in atoms.info
+                assert "graph" not in calculator.atoms.info
+            nonfinite = {key: value.copy() for key, value in reference.items()}
+            nonfinite["force"][0, 0] = np.nan
+            atoms.positions[0, 0] += 0.1
+            with mock.patch.object(model, "predict", return_value=nonfinite):
+                for _ in range(2):
+                    with pytest.raises(FloatingPointError, match="Nonfinite MatterSim"):
+                        atoms.get_forces()
+        finally:
+            core.set_prim_eager_enabled(prim_enabled)
 
     def test_rl_score_target_and_descending_schedule(self):
         backbone = _make_backbone("diffcsp")
@@ -640,7 +710,58 @@ class TestDataFlow:
         assert bool(paddle.isfinite(loss).all())
 
     def test_dataset_to_forward_loss(self):
-        backbone = build_model(_load_config("diffcsp")["Model"]).backbone()
+        joint_config = OmegaConf.load(
+            _CONFIG_ROOT / "matinvent" / "matinvent_diffcsp_joint.yaml"
+        )
+        joint_config.Global.num_train_timesteps = 32
+        resolved = OmegaConf.to_container(joint_config, resolve=True)
+        params = resolved["Model"]["__init_params__"]
+        backbone_params = params["backbone_cfg"]["__init_params__"]
+        assert params["rl_cfg"]["finetune_cfg"]["timesteps"] == 32
+        assert backbone_params["num_train_timesteps"] == 32
+        for key in ("lattice_noise_scheduler_cfg", "coord_noise_scheduler_cfg"):
+            assert backbone_params[key]["__init_params__"]["num_train_timesteps"] == 32
+        sampler = MatInventSampler(
+            model_type="diffcsp",
+            batch_size=4096,
+            num_batches=1,
+            num_inference_steps=2,
+            build_structure_cfg=params["build_structure_cfg"],
+            atom_count_distribution=params["rl_cfg"]["sample_cfg"][
+                "atom_count_distribution"
+            ],
+        )
+        np.random.seed(_DISPATCH_SEED)
+        backbone = _make_backbone("diffcsp")
+        with mock.patch.object(
+            backbone, "sample", return_value={"result": []}
+        ) as sample:
+            sampler.generate(backbone)
+        counts = sample.call_args.args[0]["structure_array"]["num_atoms"].numpy()
+        assert counts.min() == 1
+        assert counts.max() == 20
+        assert (
+            resolved["Sample"]["model_sample_params"]["atom_count_distribution"]
+            == sampler.atom_count_distribution
+        )
+        public_batch = next(iter(build_dataloader(resolved["Sample"]["data"])))
+        original_counts = public_batch["structure_array"]["num_atoms"].clone()
+        adapter = _make_adapter("diffcsp")
+        with mock.patch.object(
+            adapter.backbone(), "sample", return_value={"result": []}
+        ) as sample:
+            adapter.sample(public_batch, **resolved["Sample"]["model_sample_params"])
+            sampled_counts = sample.call_args.args[0]["structure_array"]["num_atoms"]
+            assert sampled_counts.shape == original_counts.shape
+            assert bool(((sampled_counts >= 1) & (sampled_counts <= 20)).all())
+            assert "atom_count_distribution" not in sample.call_args.kwargs
+            np.testing.assert_array_equal(
+                public_batch["structure_array"]["num_atoms"], original_counts
+            )
+            explicit = {"structure_array": {"num_atoms": paddle.to_tensor([4])}}
+            adapter.sample(explicit, **resolved["Sample"]["model_sample_params"])
+            assert sample.call_args.args[0] is explicit
+            assert sample.call_args.args[0]["structure_array"]["num_atoms"].item() == 4
         structures = [
             _make_structure(["Si", "Si"], [[0.0, 0.0, 0.0], [0.25, 0.25, 0.25]]),
             _make_structure(
@@ -682,6 +803,17 @@ class TestRewardScoring:
                 "calculator": {"__class_name__": "PyMatGen", "task": "density"},
             },
             {
+                "name": "mcia",
+                "target": "descending",
+                "minv": 0,
+                "maxv": 100,
+                "calculator": {
+                    "__class_name__": "PyMatGen",
+                    "task": "mcia",
+                    "substrate_path": str(_CONFIG_ROOT / "matinvent/substrates/Si.cif"),
+                },
+            },
+            {
                 "name": "energy",
                 "target": "descending",
                 "minv": 0,
@@ -697,6 +829,7 @@ class TestRewardScoring:
         np.savetxt(energy_path, [1.23])
         _, values, failed = reward.scoring((structures, "valid"), label="batch")
         assert not failed.any()
+        assert np.isfinite(values["mcia"]).all() and values["mcia"][0] > 0
         np.testing.assert_allclose(values["energy"], [1.23])
         np.testing.assert_allclose(values["density"], [float(structures[0].density)])
         np.testing.assert_allclose(np.loadtxt(energy_path), 1.23)
@@ -921,7 +1054,7 @@ class TestRLTraining:
             ["Na", "Cl", "Cl"], [[0, 0, 0], [0.3, 0.4, 0.2], [0.7, 0.7, 0.6]]
         )
         monkeypatch.setattr(
-            "ppmat.models.matinvent.sampler.DiffCSPSampler.generate",
+            "ppmat.models.matinvent.sampler.MatInventSampler.generate",
             lambda self, model: structures + [invalid],
         )
         if mode == "qualification":
@@ -975,7 +1108,7 @@ class TestRLTraining:
             unstable = _make_structure(["Mg", "O"], [[0, 0, 0], [0.3, 0.4, 0.2]])
             candidates.append(unstable)
             monkeypatch.setattr(
-                "ppmat.models.matinvent.sampler.DiffCSPSampler.generate",
+                "ppmat.models.matinvent.sampler.MatInventSampler.generate",
                 lambda self, model: candidates + [invalid],
             )
 
@@ -1088,6 +1221,21 @@ class TestRLTraining:
             assert scored.volume == pytest.approx(relaxed.volume, rel=1e-6)
         assert memory["comp"].tolist() == ["SiO"] * len(memory)
 
+    def test_trainer_rejects_unsupported_rl_resume(self, tmp_path):
+        config = _load_config("diffcsp")
+        config["Trainer"]["output_dir"] = str(tmp_path / "output")
+        config["Trainer"]["resume_from_checkpoint"] = str(tmp_path / "checkpoint")
+        config["Model"]["__init_params__"]["backbone_cfg"] = _tiny_backbone_cfg(
+            "diffcsp"
+        )
+        model = build_model(config["Model"])
+        trainer = BaseTrainer(config["Trainer"], model, train_dataloader=[None])
+        with mock.patch("ppmat.models.matinvent.rl_finetune.run_rl_training") as run_rl:
+            with pytest.raises(ValueError, match="does not support.*resume"):
+                trainer.train()
+            run_rl.assert_not_called()
+        assert not (tmp_path / "output" / "models").exists()
+
     def test_before_train_applies_execution_backend(self, monkeypatch, tmp_path):
         config = _patched_rl_environment(monkeypatch, tmp_path, "diffcsp", "cinn")
 
@@ -1186,13 +1334,13 @@ def test_gpu_cinn_rl_loop_matches_eager(monkeypatch):
     """Gated real-compile check: eager and cinn loops stay numerically close."""
     _gate_gpu_cinn_rl_loop()
 
-    generate = DiffCSPSampler.generate
+    generate = MatInventSampler.generate
 
     def generate_training_structure(sampler, model):
         generate(sampler, model)
         return [_make_structure(["Na", "Cl"], [[0, 0, 0], [0.3, 0.4, 0.2]])]
 
-    monkeypatch.setattr(DiffCSPSampler, "generate", generate_training_structure)
+    monkeypatch.setattr(MatInventSampler, "generate", generate_training_structure)
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         final_states = {}

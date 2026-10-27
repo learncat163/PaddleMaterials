@@ -14,17 +14,20 @@
 
 import os
 
+import paddle
 import paddle.nn as nn
 from omegaconf import OmegaConf
 
 from ppmat.models.common.runtime import RuntimeMixin
 from ppmat.models.common.runtime import check_backend
+from ppmat.models.matinvent.dataset import _sample_mp20_num_atoms
 from ppmat.models.matinvent.rewards.reward import Reward
 from ppmat.models.matinvent.rl_loop import MatInvent
-from ppmat.models.matinvent.suites import ModelSuite
-from ppmat.models.matinvent.suites import build_backbone
+from ppmat.models.matinvent.sampler import MatInventSampler
 from ppmat.utils import logger
+from ppmat.utils import save_load
 from ppmat.utils.execution import DEFAULT_EXECUTION_BACKEND
+from ppmat.utils.execution import configure_execution_backend
 
 
 class MatinventRL(RuntimeMixin, nn.Layer):
@@ -69,7 +72,7 @@ class MatinventRL(RuntimeMixin, nn.Layer):
             cfg = self.backbone_cfg
             if cfg is None:
                 cfg = resolve_backbone_cfg(self.rl_cfg["pretrained_model_name"])
-            self._backbone = build_backbone(cfg)
+            self._backbone = _build_backbone(cfg)
             self._backbone.set_execution_backend(self.requested_execution_backend)
             self._backbone.set_runtime_options(self.requested_runtime_options)
         return self._backbone
@@ -89,7 +92,20 @@ class MatinventRL(RuntimeMixin, nn.Layer):
             use_amp=use_amp, world_size=world_size
         )
 
-    def sample(self, data, **sample_params):
+    def sample(self, data, atom_count_distribution=None, **sample_params):
+        """Draw optional dataloader atom counts; preserve explicit compositions."""
+        if atom_count_distribution not in (None, "MP_20"):
+            raise ValueError("MatInvent atom_count_distribution must be 'MP_20'")
+        if atom_count_distribution == "MP_20" and "id" in data:
+            structure_array = data["structure_array"]
+            counts = _sample_mp20_num_atoms(len(structure_array["num_atoms"]))
+            data = {
+                **data,
+                "structure_array": {
+                    **structure_array,
+                    "num_atoms": paddle.to_tensor(counts, dtype="int64"),
+                },
+            }
         sample_params.setdefault("num_inference_steps", self.num_inference_steps)
         return self.backbone().sample(data, **sample_params)
 
@@ -113,6 +129,11 @@ class MatinventRL(RuntimeMixin, nn.Layer):
 
     def before_train(self, trainer):
         """Run the MatInvent RL loop from the unified training entry."""
+        if trainer.resume_from_checkpoint is not None:
+            raise ValueError(
+                "MatInvent RL does not support Trainer.resume_from_checkpoint: "
+                "checkpoints contain sampling weights without RL training state."
+            )
         run_rl_training(
             model_type=self.model_type,
             rl_cfg=self.rl_cfg,
@@ -130,6 +151,28 @@ class MatinventRL(RuntimeMixin, nn.Layer):
             "backend": backend,
             "__init_params__": self.requested_runtime_options.get(backend, {}),
         }
+
+
+def _build_backbone(backbone_cfg):
+    from ppmat.models import build_model
+
+    if backbone_cfg["__class_name__"] == "DiffCSP":
+        backbone_cfg = {**backbone_cfg, "__class_name__": "MatinventDiffCSP"}
+    return build_model(backbone_cfg)
+
+
+def _load_backbone(backbone_cfg, package_dir, execution_config):
+    model = _build_backbone(backbone_cfg)
+    save_load.load_pretrain(model, package_dir, weights_name="best.pdparams")
+    execution_config = execution_config or {}
+    configure_execution_backend(
+        model,
+        execution_config.get("backend"),
+        init_params=execution_config.get("__init_params__"),
+        owner="MatInvent",
+    )
+    model.eval()
+    return model
 
 
 def _download_package(model_name):
@@ -189,14 +232,14 @@ def run_rl_training(
                 "backbone_cfg is required when rl_cfg.pretrained_model_path is set"
             )
 
-    model_suite = ModelSuite(
-        model_name=model_type,
-        backbone_cfg=backbone_cfg,
-        sample_cfg=rl_cfg["sample_cfg"],
-        finetune_cfg=rl_cfg["finetune_cfg"],
+    sample_cfg = rl_cfg["sample_cfg"]
+    sampler = MatInventSampler(
+        model_type=model_type,
+        batch_size=sample_cfg["batch_size"],
+        num_batches=sample_cfg["num_batches"],
+        num_inference_steps=sample_cfg["num_inference_steps"],
         build_structure_cfg=build_structure_cfg,
-        pretrained_model_path=package_dir,
-        execution_config=execution_config,
+        atom_count_distribution=sample_cfg.get("atom_count_distribution", "ALEX_MP_20"),
     )
     reward_cfg = rl_cfg["reward_cfg"]
     reward = Reward(
@@ -209,7 +252,11 @@ def run_rl_training(
     div_cfg = rl_cfg["div_filter_cfg"]
     mat_invent = MatInvent(
         rl_epoch=rl_cfg["rl_epoch"],
-        model_suite=model_suite,
+        agent=_load_backbone(backbone_cfg, package_dir, execution_config),
+        prior=_load_backbone(backbone_cfg, package_dir, execution_config),
+        sampler=sampler,
+        sample_cfg=sample_cfg,
+        finetune_cfg=rl_cfg["finetune_cfg"],
         reward=reward,
         topk_ratio=rl_cfg["topk_ratio"],
         save_dir=output_dir,

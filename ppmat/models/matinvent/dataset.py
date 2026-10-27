@@ -18,21 +18,51 @@ Samples carry the RL ``reward`` and feed the backbones' ``num_atoms`` /
 ``atom_types`` conventions, so they stay under the model directory.
 """
 
-import itertools
 import os
 from functools import lru_cache
 from typing import List
 
 import numpy as np
-import paddle
 import paddle.io as io
 import smact
 from pymatgen.core.structure import Structure
 from smact.screening import pauling_test
 
 from ppmat.datasets.collate_fn import DefaultCollator
-from ppmat.datasets.custom_data_type import ConcatNumpyWarper
+from ppmat.datasets.custom_data_type import ConcatData
 from ppmat.utils import logger as ppmat_logger
+
+_MP20_ATOM_COUNT_PROBABILITIES = (
+    0.0,
+    0.0021742334905660377,
+    0.021079009433962265,
+    0.019826061320754717,
+    0.15271226415094338,
+    0.047132959905660375,
+    0.08464770047169812,
+    0.021079009433962265,
+    0.07808814858490566,
+    0.03434551886792453,
+    0.0972877358490566,
+    0.013303360849056603,
+    0.09669811320754718,
+    0.02155807783018868,
+    0.06522700471698113,
+    0.014372051886792452,
+    0.06703272405660378,
+    0.00972877358490566,
+    0.053176591981132074,
+    0.010576356132075472,
+    0.08995430424528301,
+)
+
+
+def _sample_mp20_num_atoms(total_num):
+    return np.random.choice(
+        len(_MP20_ATOM_COUNT_PROBABILITIES),
+        size=total_num,
+        p=_MP20_ATOM_COUNT_PROBABILITIES,
+    )
 
 
 @lru_cache(maxsize=None)
@@ -43,9 +73,32 @@ def _is_valid_composition(composition):
     elements = smact.element_dictionary(symbols)
     electronegativities = [elements[symbol].pauling_eneg for symbol in symbols]
     oxidation_states = [elements[symbol].oxidation_states for symbol in symbols]
-    for states in itertools.product(*oxidation_states):
-        if sum(state * count for state, count in zip(states, counts)) != 0:
-            continue
+    known_electronegativities = all(value is not None for value in electronegativities)
+    reachable = [set() for _ in range(len(symbols) + 1)]
+    reachable[-1].add(0)
+    for index in range(len(symbols) - 1, -1, -1):
+        reachable[index] = {
+            state * counts[index] + charge
+            for state in oxidation_states[index]
+            for charge in reachable[index + 1]
+        }
+
+    def neutral_states(index, charge, states):
+        if index == len(symbols):
+            yield states
+            return
+        for state in oxidation_states[index]:
+            next_charge = charge + state * counts[index]
+            if -next_charge not in reachable[index + 1]:
+                continue
+            next_states = states + (state,)
+            if known_electronegativities and not pauling_test(
+                next_states, electronegativities[: index + 1]
+            ):
+                continue
+            yield from neutral_states(index + 1, next_charge, next_states)
+
+    for states in neutral_states(0, 0, ()):
         try:
             if pauling_test(states, electronegativities):
                 return True
@@ -105,8 +158,8 @@ class RLDataset(io.Dataset):
         frac = np.array([site.frac_coords for site in s.sites], dtype=np.float32)
         return {
             "structure_array": {
-                "frac_coords": ConcatNumpyWarper(frac),
-                "atom_types": ConcatNumpyWarper(
+                "frac_coords": ConcatData(frac),
+                "atom_types": ConcatData(
                     np.array([site.specie.Z for site in s.sites], dtype=np.int64)
                 ),
                 "lattice": s.lattice.matrix.astype(np.float32),
@@ -114,25 +167,6 @@ class RLDataset(io.Dataset):
                 "reward": np.float32(self.rewards[idx]),
             }
         }
-
-    @staticmethod
-    def collate_fn(batch):
-        """Collate RL samples onto Paddle tensors.
-
-        ``DefaultCollator`` yields numpy arrays, but ``repeat_interleave`` rejects
-        numpy ``repeats``.
-        """
-        return {
-            key: _to_tensor(value) for key, value in DefaultCollator()(batch).items()
-        }
-
-
-def _to_tensor(value):
-    if isinstance(value, np.ndarray):
-        return paddle.to_tensor(value)
-    if isinstance(value, dict):
-        return {key: _to_tensor(item) for key, item in value.items()}
-    return value
 
 
 def create_rl_dataloader(
@@ -147,7 +181,7 @@ def create_rl_dataloader(
         batch_size=batch_size,
         shuffle=shuffle,
         num_workers=num_workers,
-        collate_fn=RLDataset.collate_fn,
+        collate_fn=DefaultCollator(),
     )
     ppmat_logger.info(f"DataLoader: {len(dl.dataset)} samples, batch_size={batch_size}")
     return dl
