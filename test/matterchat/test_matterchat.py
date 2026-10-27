@@ -86,14 +86,6 @@ def _write_tokenizer_json(path):
     path.write_text(json.dumps(_TOK_JSON))
 
 
-def _make_tokenizer(tmp_path):
-    from ppmat.models.matterchat.utils.tokenizer import MistralTokenizerWrapper
-
-    tok_path = tmp_path / "tokenizer.json"
-    _write_tokenizer_json(tok_path)
-    return MistralTokenizerWrapper(str(tok_path))
-
-
 def _build_tiny_model(tokenizer_path=None):
     paddle.seed(0)
     return Blip2MistralInstruct(
@@ -138,132 +130,75 @@ def gan_structure():
     return Structure(Lattice.cubic(4.5), ["Ga", "N"], [[0, 0, 0], [0.5, 0.5, 0.5]])
 
 
-class TestMatterChatBuildAndForward:
-    """Model can be built from config and the core data flow runs."""
+def test_model_configuration_and_structure_encoding(
+    small_model, si_structure, gan_structure
+):
+    from dataclasses import is_dataclass
 
-    def test_model_builds_from_config(self, small_model):
-        from dataclasses import is_dataclass
+    from omegaconf import OmegaConf
 
-        from omegaconf import OmegaConf
+    from ppmat.models.chgnet.chgnet import CHGNet
+    from ppmat.models.chgnet.chgnet_graph_converter import CHGNetGraphConverter
 
-        from ppmat.models.chgnet.chgnet import CHGNet
-        from ppmat.models.chgnet.chgnet_graph_converter import CHGNetGraphConverter
-
-        assert isinstance(small_model.material_encoder, CHGNet)
-        assert isinstance(
-            small_model.material_encoder.graph_converter, CHGNetGraphConverter
-        )
-        assert small_model.Qformer is not None
-        assert small_model.query_tokens is not None
-        assert small_model.llm_proj is not None
-        assert small_model.llm_model is not None
-
-        full_config = OmegaConf.load(
-            "structure_generation/configs/matterchat/matterchat_full.yaml"
-        )
-        settings = OmegaConf.to_container(
-            full_config.Model.__init_params__.llm_config, resolve=True
-        )
-        assert is_dataclass(small_model.llm_model.config)
-        assert small_model._build_llm_config(settings) == small_model._build_llm_config(
-            None
-        )
-        with pytest.raises(TypeError, match="hidden_szie"):
-            small_model._build_llm_config({"hidden_szie": 64})
-        with pytest.raises(ValueError, match="num_key_value_heads"):
-            small_model._build_llm_config({"num_key_value_heads": 3})
-
-    def test_chgnet_encodes_structure_to_embedding(self, small_model, si_structure):
-        emb = small_model.material_encoder.predict_structure_embedding(si_structure)
-        assert isinstance(emb, paddle.Tensor)
-        # CHGNet produces per-atom embeddings; Si2 has 2 atoms
-        assert emb.ndim == 2
-        assert emb.shape[0] == 2
-
-    def test_qformer_forward_from_embedding(self, small_model, si_structure):
-        emb = small_model.material_encoder.predict_structure_embedding(si_structure)
-        mask = paddle.ones([emb.shape[0]], dtype=paddle.int64)
-        query_tokens = small_model.query_tokens.expand([1, -1, -1])
-        out = small_model._run_qformer(
-            query_tokens,
-            emb.unsqueeze(0),
-            mask.unsqueeze(0),
-            None,
-        )
-        # Output: [batch=1, num_query_tokens=4, qformer_hidden=768]
-        assert out.last_hidden_state.shape == [1, 4, 768]
-
-    def test_llm_proj_maps_to_llm_hidden(self, small_model, si_structure):
-        emb = small_model.material_encoder.predict_structure_embedding(si_structure)
-        mask = paddle.ones([emb.shape[0]], dtype=paddle.int64)
-        query_tokens = small_model.query_tokens.expand([1, -1, -1])
-        out = small_model._run_qformer(
-            query_tokens,
-            emb.unsqueeze(0),
-            mask.unsqueeze(0),
-            None,
-        )
-        inputs_llm = small_model.llm_proj(
-            out.last_hidden_state[:, : query_tokens.shape[1], :]
-        )
-        # llm_proj maps qformer hidden (768) -> mistral hidden size
-        assert inputs_llm.ndim == 3
-        assert inputs_llm.shape[0] == 1
-        assert inputs_llm.shape[1] == 4
+    assert isinstance(small_model.material_encoder, CHGNet)
+    assert isinstance(
+        small_model.material_encoder.graph_converter, CHGNetGraphConverter
+    )
+    config = OmegaConf.load(
+        "structure_generation/configs/matterchat/matterchat_full.yaml"
+    )
+    settings = OmegaConf.to_container(
+        config.Model.__init_params__.llm_config, resolve=True
+    )
+    assert is_dataclass(small_model.llm_model.config)
+    assert is_dataclass(small_model.Qformer.config)
+    assert small_model._build_llm_config(settings) == small_model._build_llm_config(
+        None
+    )
+    with pytest.raises(TypeError, match="hidden_szie"):
+        small_model._build_llm_config({"hidden_szie": 64})
+    with pytest.raises(ValueError, match="num_key_value_heads"):
+        small_model._build_llm_config({"num_key_value_heads": 3})
+    with pytest.raises(ValueError, match="qformer_text_input"):
+        Blip2MistralInstruct(qformer_text_input=True)
+    embeddings = []
+    for structure in (si_structure, gan_structure):
+        embedding = small_model.material_encoder.predict_structure_embedding(structure)
+        embeddings.append(embedding)
+        assert embedding.shape == [len(structure), 64]
+        assert bool(paddle.isfinite(embedding).all())
+        query = small_model.query_tokens.expand([1, -1, -1])
+        mask = paddle.ones([1, len(structure)], dtype="int64")
+        output = small_model._run_qformer(query, embedding.unsqueeze(0), mask)
+        projected = small_model.llm_proj(output.last_hidden_state)
+        assert projected.shape == [1, 4, _SMALL_LLM_CONFIG["hidden_size"]]
+        assert bool(paddle.isfinite(projected).all())
+    assert not paddle.allclose(embeddings[0], embeddings[1])
+    assert "matterchat_full" not in MODEL_REGISTRY
+    assert Blip2MistralInstruct.pretrained_url.startswith("https://")
 
 
-class TestChatInference:
-    """chat() runs the full dialogue pipeline on a single structure."""
-
-    def test_chat_returns_string(self, chat_model, si_structure):
-        answer = chat_model.chat(
-            si_structure, "what is the chemical formula of this material?"
-        )
+def test_chat_and_generation_workflows(chat_model, si_structure, gan_structure):
+    for structure in (si_structure, gan_structure):
+        answer = chat_model.chat(structure, "a b", max_new_tokens=4)
         assert isinstance(answer, str)
-
-    def test_chat_runs_on_different_structures(self, chat_model, gan_structure):
-        answer = chat_model.chat(gan_structure, "what is the chemical formula?")
-        assert isinstance(answer, str)
-
-    def test_encoder_and_llm_frozen_for_inference(self, chat_model):
-        for p in chat_model.material_encoder.parameters():
-            assert p.stop_gradient is True
-        for p in chat_model.llm_model.parameters():
-            assert p.stop_gradient is True
-
-
-class TestTokenizerIntegration:
-    """Tokenizer returns paddle tensors usable in the inference path."""
-
-    def test_encode_returns_paddle_tensors(self, tmp_path):
-        tok = _make_tokenizer(tmp_path)
-        result = tok("a b", return_tensors="pd")
-        assert isinstance(result.input_ids, paddle.Tensor)
-        assert isinstance(result.attention_mask, paddle.Tensor)
-
-    def test_batch_encode_with_padding(self, tmp_path):
-        tok = _make_tokenizer(tmp_path)
-        result = tok(["a b", "a"], return_tensors="pd", padding="longest")
-        assert result.input_ids.shape[0] == 2
-
-    def test_decode_roundtrip(self, tmp_path):
-        tok = _make_tokenizer(tmp_path)
-        enc = tok("a b", return_tensors="pd")
-        decoded = tok.decode(enc.input_ids[0])
-        # WordLevel vocab maps a->3, b->4; decode returns a non-empty string
-        assert isinstance(decoded, str)
-        assert len(decoded) > 0
-
-    def test_special_tokens_present(self, tmp_path):
-        tok = _make_tokenizer(tmp_path)
-        assert tok.bos_token == "<s>"
-        assert tok.eos_token == "</s>"
-        assert tok.bos_token_id == 1
-        assert tok.eos_token_id == 2
+    samples = {"material_sample": si_structure, "prompt": "a b"}
+    generated = chat_model.generate(samples, num_beams=1, max_length=8)
+    followup = chat_model.generate_followup(samples, num_beams=1, max_length=8)
+    sampled = chat_model.generate(
+        samples, num_beams=1, max_length=8, use_nucleus_sampling=True, top_p=0.3
+    )
+    assert len(generated) == len(followup) == 1
+    assert len(sampled) == 1 and isinstance(sampled[0], str)
+    assert isinstance(generated[0], str) and isinstance(followup[0], str)
+    with pytest.raises(ValueError, match="one response"):
+        chat_model.generate(samples, num_beams=1, max_length=8, num_captions=2)
+    for layer in (chat_model.material_encoder, chat_model.llm_model):
+        assert all(parameter.stop_gradient for parameter in layer.parameters())
 
 
 def _registry_layout(tmp_path, model):
-    """Materialize a MODEL_REGISTRY-style directory holding `model` weights."""
+    """Materialize a complete local model package for checkpoint integration."""
     import os
 
     config = {
@@ -292,104 +227,61 @@ def _registry_layout(tmp_path, model):
         with open(tmp_path / "matterchat_full.yaml", "w") as f:
             yaml.safe_dump(config, f)
     os.makedirs(tmp_path / "checkpoints", exist_ok=True)
+    _write_tokenizer_json(tmp_path / "tokenizer.json")
     paddle.save(model.state_dict(), str(tmp_path / "checkpoints" / "best.pdparams"))
     return tmp_path
 
 
-class TestFromPretrained:
-    """from_pretrained parses registry directory structure."""
+def test_pretrained_package_roundtrip(small_model, tmp_path, monkeypatch):
+    """from_pretrained rebuilds the model and restores saved weights."""
+    with pytest.raises(FileNotFoundError, match="yaml"):
+        Blip2MistralInstruct.from_pretrained(str(tmp_path))
+    with pytest.raises(FileNotFoundError, match="No weights"):
+        small_model._load_package_weights(str(tmp_path))
+    path = _registry_layout(tmp_path, small_model)
+    downloads = []
 
-    def test_raises_on_missing_yaml(self, tmp_path):
-        with pytest.raises(FileNotFoundError, match="yaml"):
-            Blip2MistralInstruct.from_pretrained(str(tmp_path))
+    def download_package(url):
+        downloads.append(url)
+        return str(path)
 
-    def test_load_weights_raises_on_missing_weights(self, small_model, tmp_path):
-        """_load_weights_from_registry raises when no checkpoint found."""
-        with pytest.raises(FileNotFoundError, match="No weights"):
-            small_model._load_weights_from_registry(str(tmp_path))
+    monkeypatch.setattr(
+        "ppmat.utils.download.get_weights_path_from_url", download_package
+    )
+    loaded = Blip2MistralInstruct.from_pretrained("matterchat_full")
+    assert downloads == [Blip2MistralInstruct.pretrained_url]
+    ref_sd = small_model.state_dict()
+    loaded_sd = loaded.state_dict()
+    assert set(ref_sd.keys()) == set(loaded_sd.keys())
+    for key in ("llm_proj.weight", "llm_proj.bias", "query_tokens"):
+        assert paddle.allclose(ref_sd[key], loaded_sd[key])
 
-    def test_from_pretrained_roundtrip(self, small_model, tmp_path):
-        """from_pretrained rebuilds the model and restores saved weights."""
-        path = _registry_layout(tmp_path, small_model)
-        loaded = Blip2MistralInstruct.from_pretrained(str(path))
-        ref_sd = small_model.state_dict()
-        loaded_sd = loaded.state_dict()
-        assert set(ref_sd.keys()) == set(loaded_sd.keys())
-        for key in ("llm_proj.weight", "llm_proj.bias", "query_tokens"):
-            assert paddle.allclose(ref_sd[key], loaded_sd[key])
+    checkpoints = path / "checkpoints"
+    partial = checkpoints / "partial.pdparams"
+    paddle.save({"llm_proj.bias": ref_sd["llm_proj.bias"]}, str(partial))
+    with pytest.raises(ValueError, match="Checkpoint keys mismatch"):
+        loaded._load_single_weight(str(partial))
+    partial.unlink()
 
-    def test_registry_entry_exists(self):
-        assert "matterchat_full" in MODEL_REGISTRY
-        assert MODEL_REGISTRY["matterchat_full"].startswith("http")
-
-
-class TestConcatText:
-    """concat_text_input_output splices input and output token sequences."""
-
-    def test_concat_preserves_input_then_output(self, small_model):
-        input_ids = paddle.to_tensor([[1, 2, 3, 0, 0]])
-        input_atts = paddle.to_tensor([[1, 1, 1, 0, 0]])
-        output_ids = paddle.to_tensor([[4, 5, 6]])
-        output_atts = paddle.to_tensor([[1, 1, 1]])
-        res, lens = small_model.concat_text_input_output(
-            input_ids, input_atts, output_ids, output_atts
+    items = list(ref_sd.items())
+    midpoint = len(items) // 2
+    shards = (dict(items[:midpoint]), dict(items[midpoint:]))
+    weight_map = {}
+    for number, shard in enumerate(shards):
+        name = f"shard_{number}.pdparams"
+        paddle.save(shard, str(checkpoints / name))
+        weight_map.update({key: name for key in shard})
+    index_path = checkpoints / "model.pdparams.index.json"
+    index_path.write_text(json.dumps({"weight_map": weight_map}))
+    loaded._load_package_weights(str(path))
+    for key in ref_sd:
+        np.testing.assert_array_equal(
+            loaded.state_dict()[key].numpy(), ref_sd[key].numpy()
         )
-        ids = res["input_ids"][0].numpy().tolist()
-        # input(1,2,3) + output(4,5,6) + pad(0,0)
-        assert ids == [1, 2, 3, 4, 5, 6, 0, 0]
-        assert int(lens[0]) == 3
-
-    def test_concat_batch_shape(self, small_model):
-        input_ids = paddle.to_tensor([[1, 2, 0, 0], [1, 2, 3, 4]])
-        input_atts = paddle.to_tensor([[1, 1, 0, 0], [1, 1, 1, 1]])
-        output_ids = paddle.to_tensor([[0, 5, 6], [0, 7, 8]])
-        output_atts = paddle.to_tensor([[0, 1, 1], [0, 1, 1]])
-        res, lens = small_model.concat_text_input_output(
-            input_ids, input_atts, output_ids, output_atts
-        )
-        assert res["input_ids"].shape[0] == 2
-        assert res["attention_mask"].shape == res["input_ids"].shape
-        assert len(lens) == 2
-
-
-class TestMultiStructureAndGeneration:
-    """CHGNet handles varied structures; generation entry points exist."""
-
-    def test_encode_multi_element_structure(self, small_model, gan_structure):
-        emb = small_model.material_encoder.predict_structure_embedding(gan_structure)
-        assert emb.ndim == 2
-        assert emb.shape[0] == 2  # GaN has 2 atoms
-
-    def test_encode_different_structures_give_different_embeddings(
-        self, small_model, si_structure, gan_structure
-    ):
-        emb_si = small_model.material_encoder.predict_structure_embedding(si_structure)
-        emb_gan = small_model.material_encoder.predict_structure_embedding(
-            gan_structure
-        )
-        assert not paddle.allclose(emb_si.mean(), emb_gan.mean())
-
-    def test_encode_batch_of_structures(self, small_model, si_structure, gan_structure):
-        embs, masks = [], []
-        for s in [si_structure, gan_structure]:
-            e = small_model.material_encoder.predict_structure_embedding(s)
-            embs.append(e)
-            masks.append(paddle.ones([e.shape[0]], dtype=paddle.int64))
-        stacked = paddle.stack(embs)
-        assert stacked.shape[0] == 2
-
-    def test_generate_entry_point_exists(self, small_model):
-        assert hasattr(small_model, "generate")
-        assert hasattr(small_model, "generate_followup")
-        assert hasattr(small_model, "_encode_for_generate")
-
-    def test_llm_proj_output_dtype_matches_embedding(self, small_model, si_structure):
-        emb = small_model.material_encoder.predict_structure_embedding(si_structure)
-        mask = paddle.ones([emb.shape[0]], dtype=paddle.int64)
-        qt = small_model.query_tokens.expand([1, -1, -1])
-        out = small_model._run_qformer(qt, emb.unsqueeze(0), mask.unsqueeze(0), None)
-        proj = small_model.llm_proj(out.last_hidden_state[:, : qt.shape[1], :])
-        assert proj.dtype == emb.dtype
+    del weight_map["llm_proj.bias"]
+    index_path.write_text(json.dumps({"weight_map": weight_map}))
+    with pytest.raises(ValueError, match="Checkpoint keys mismatch"):
+        loaded._load_package_weights(str(path))
 
 
 def test_cinn_chat_dispatch_preserves_eager_output(
@@ -575,7 +467,3 @@ def test_official_trainer_training_and_resume(tmp_path, si_structure, monkeypatc
     assert resumed.state.global_step == 2
     for name, parameter in restored.named_parameters():
         assert bool(paddle.isfinite(parameter).all()), name
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])

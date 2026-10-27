@@ -1,11 +1,11 @@
 # Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
-#
+
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-#
+
 #     http://www.apache.org/licenses/LICENSE-2.0
-#
+
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,7 +17,8 @@
 import contextlib
 import math
 from dataclasses import dataclass
-from typing import Optional, Tuple
+from typing import Optional
+from typing import Tuple
 
 import paddle
 import paddle.nn as nn
@@ -28,73 +29,43 @@ from ppmat.models.matterchat.utils.activations import get_activation as _get_act
 from ppmat.models.matterchat.utils.weight_init import default_init_weights
 
 
+@dataclass
 class BertConfig:
-    """Configuration for BERT-like Q-Former model."""
+    """Typed settings for the MatterChat Q-Former."""
 
-    def __init__(
-        self,
-        vocab_size=30522,
-        hidden_size=768,
-        num_hidden_layers=12,
-        num_attention_heads=12,
-        intermediate_size=3072,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.1,
-        attention_probs_dropout_prob=0.1,
-        max_position_embeddings=512,
-        type_vocab_size=2,
-        initializer_range=0.02,
-        layer_norm_eps=1e-12,
-        pad_token_id=0,
-        chunk_size_feed_forward=0,
-        add_cross_attention=False,
-        cross_attention_freq=2,
-        encoder_width=768,
-        query_length=32,
-        output_attentions=False,
-        output_hidden_states=False,
-        use_return_dict=True,
-        gradient_checkpointing=False,
-        **kwargs,
-    ):
-        self.vocab_size = vocab_size
-        self.hidden_size = hidden_size
-        self.num_hidden_layers = num_hidden_layers
-        self.num_attention_heads = num_attention_heads
-        self.intermediate_size = intermediate_size
-        self.hidden_act = hidden_act
-        self.hidden_dropout_prob = hidden_dropout_prob
-        self.attention_probs_dropout_prob = attention_probs_dropout_prob
-        self.max_position_embeddings = max_position_embeddings
-        self.type_vocab_size = type_vocab_size
-        self.initializer_range = initializer_range
-        self.layer_norm_eps = layer_norm_eps
-        self.pad_token_id = pad_token_id
-        self.chunk_size_feed_forward = chunk_size_feed_forward
-        self.add_cross_attention = add_cross_attention
-        self.cross_attention_freq = cross_attention_freq
-        self.encoder_width = encoder_width
-        self.query_length = query_length
-        self.output_attentions = output_attentions
-        self.output_hidden_states = output_hidden_states
-        self.use_return_dict = use_return_dict
-        self.gradient_checkpointing = gradient_checkpointing
-
-    @classmethod
-    def from_pretrained(cls, pretrained_model_name_or_path, **kwargs):
-        """Create config from pretrained model name. Returns default config."""
-        return cls(**kwargs)
+    vocab_size: int = 30522
+    hidden_size: int = 768
+    num_hidden_layers: int = 12
+    num_attention_heads: int = 12
+    intermediate_size: int = 3072
+    hidden_act: str = "gelu"
+    hidden_dropout_prob: float = 0.1
+    attention_probs_dropout_prob: float = 0.1
+    max_position_embeddings: int = 512
+    type_vocab_size: int = 2
+    initializer_range: float = 0.02
+    layer_norm_eps: float = 1e-12
+    pad_token_id: int = 0
+    chunk_size_feed_forward: int = 0
+    add_cross_attention: bool = False
+    cross_attention_freq: int = 2
+    encoder_width: int = 768
+    query_length: int = 32
+    output_attentions: bool = False
+    output_hidden_states: bool = False
+    use_return_dict: bool = True
+    gradient_checkpointing: bool = False
 
 
 class _SubscriptableOutput:
     """Base class for model outputs that support tuple-like indexing."""
 
     def __getitem__(self, index):
-        fields = [f for f in self.__dataclass_fields__ if not f.startswith('_')]
+        fields = [f for f in self.__dataclass_fields__ if not f.startswith("_")]
         return getattr(self, fields[index])
 
     def __len__(self):
-        return len([f for f in self.__dataclass_fields__ if not f.startswith('_')])
+        return len([f for f in self.__dataclass_fields__ if not f.startswith("_")])
 
 
 @dataclass
@@ -266,7 +237,10 @@ class BertSelfAttention(nn.Layer):
         return self.attention_map
 
     def transpose_for_scores(self, x):
-        new_x_shape = x.shape[:-1] + (self.num_attention_heads, self.attention_head_size)
+        new_x_shape = x.shape[:-1] + (
+            self.num_attention_heads,
+            self.attention_head_size,
+        )
         x = x.reshape(new_x_shape)
         return x.transpose([0, 2, 1, 3])
 
@@ -306,8 +280,12 @@ class BertSelfAttention(nn.Layer):
             or self.position_embedding_type == "relative_key_query"
         ):
             seq_length = hidden_states.shape[1]
-            position_ids_l = paddle.arange(seq_length, dtype=paddle.int64).reshape([-1, 1])
-            position_ids_r = paddle.arange(seq_length, dtype=paddle.int64).reshape([1, -1])
+            position_ids_l = paddle.arange(seq_length, dtype=paddle.int64).reshape(
+                [-1, 1]
+            )
+            position_ids_r = paddle.arange(seq_length, dtype=paddle.int64).reshape(
+                [1, -1]
+            )
             distance = position_ids_l - position_ids_r
             positional_embedding = self.distance_embedding(
                 distance + self.max_position_embeddings - 1
@@ -393,7 +371,9 @@ class BertAttention(nn.Layer):
         self.self.value = prune_linear_layer(self.self.value, index)
         self.output.dense = prune_linear_layer(self.output.dense, index, dim=1)
         self.self.num_attention_heads = self.self.num_attention_heads - len(heads)
-        self.self.all_head_size = self.self.attention_head_size * self.self.num_attention_heads
+        self.self.all_head_size = (
+            self.self.attention_head_size * self.self.num_attention_heads
+        )
         self.pruned_heads = self.pruned_heads.union(heads)
 
     def forward(
@@ -707,7 +687,9 @@ class BertPreTrainedModel(nn.Layer):
         if head_mask is not None:
             if isinstance(head_mask, paddle.Tensor):
                 if len(head_mask.shape) == 1:
-                    head_mask = head_mask.unsqueeze(0).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
+                    head_mask = (
+                        head_mask.unsqueeze(0).unsqueeze(0).unsqueeze(-1).unsqueeze(-1)
+                    )
                     head_mask = head_mask.expand([num_hidden_layers, -1, -1, -1, -1])
             return head_mask
         return [None] * num_hidden_layers
@@ -715,13 +697,19 @@ class BertPreTrainedModel(nn.Layer):
     def invert_attention_mask(self, encoder_attention_mask):
         if isinstance(encoder_attention_mask, paddle.Tensor):
             if len(encoder_attention_mask.shape) == 2:
-                encoder_extended_attention_mask = encoder_attention_mask[:, None, None, :]
+                encoder_extended_attention_mask = encoder_attention_mask[
+                    :, None, None, :
+                ]
             elif len(encoder_attention_mask.shape) == 3:
                 encoder_extended_attention_mask = encoder_attention_mask[:, None, :, :]
             else:
                 encoder_extended_attention_mask = encoder_attention_mask
-            encoder_extended_attention_mask = encoder_extended_attention_mask.cast(paddle.float32)
-            encoder_extended_attention_mask = (1.0 - encoder_extended_attention_mask) * paddle.finfo(paddle.float32).min
+            encoder_extended_attention_mask = encoder_extended_attention_mask.cast(
+                paddle.float32
+            )
+            encoder_extended_attention_mask = (
+                1.0 - encoder_extended_attention_mask
+            ) * paddle.finfo(paddle.float32).min
             return encoder_extended_attention_mask
         return encoder_attention_mask
 
@@ -785,7 +773,7 @@ class BertModel(BertPreTrainedModel):
                             ),
                             causal_mask,
                         ],
-                            axis=-1,
+                        axis=-1,
                     )
                 extended_attention_mask = (
                     causal_mask[:, None, :, :] * attention_mask[:, None, None, :]
@@ -798,7 +786,9 @@ class BertModel(BertPreTrainedModel):
             )
 
         extended_attention_mask = extended_attention_mask.cast(paddle.float32)
-        extended_attention_mask = (1.0 - extended_attention_mask) * paddle.finfo(paddle.float32).min
+        extended_attention_mask = (1.0 - extended_attention_mask) * paddle.finfo(
+            paddle.float32
+        ).min
         return extended_attention_mask
 
     def forward(
@@ -818,10 +808,14 @@ class BertModel(BertPreTrainedModel):
         is_decoder=False,
     ):
         output_attentions = (
-            output_attentions if output_attentions is not None else self.config.output_attentions
+            output_attentions
+            if output_attentions is not None
+            else self.config.output_attentions
         )
         output_hidden_states = (
-            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+            output_hidden_states
+            if output_hidden_states is not None
+            else self.config.output_hidden_states
         )
         return_dict = (
             return_dict if return_dict is not None else self.config.use_return_dict
@@ -850,7 +844,9 @@ class BertModel(BertPreTrainedModel):
         batch_size, seq_length = input_shape
 
         if attention_mask is None:
-            attention_mask = paddle.ones([batch_size, seq_length + past_key_values_length])
+            attention_mask = paddle.ones(
+                [batch_size, seq_length + past_key_values_length]
+            )
 
         if is_decoder:
             extended_attention_mask = self.get_extended_attention_mask(
@@ -866,7 +862,9 @@ class BertModel(BertPreTrainedModel):
 
         if encoder_hidden_states is not None:
             if isinstance(encoder_hidden_states, list):
-                encoder_batch_size, encoder_sequence_length, _ = encoder_hidden_states[0].shape
+                encoder_batch_size, encoder_sequence_length, _ = encoder_hidden_states[
+                    0
+                ].shape
             else:
                 (
                     encoder_batch_size,
@@ -925,7 +923,6 @@ class BertModel(BertPreTrainedModel):
 
 
 class BertLMHeadModel(BertPreTrainedModel):
-
     def __init__(self, config):
         super().__init__(config)
         self.bert = BertModel(config, add_pooling_layer=False)
@@ -1009,10 +1006,16 @@ class BertLMHeadModel(BertPreTrainedModel):
         return CausalLMOutputWithCrossAttentions(
             loss=lm_loss,
             logits=prediction_scores,
-            past_key_values=outputs.past_key_values if hasattr(outputs, "past_key_values") else None,
-            hidden_states=outputs.hidden_states if hasattr(outputs, "hidden_states") else None,
+            past_key_values=outputs.past_key_values
+            if hasattr(outputs, "past_key_values")
+            else None,
+            hidden_states=outputs.hidden_states
+            if hasattr(outputs, "hidden_states")
+            else None,
             attentions=outputs.attentions if hasattr(outputs, "attentions") else None,
-            cross_attentions=outputs.cross_attentions if hasattr(outputs, "cross_attentions") else None,
+            cross_attentions=outputs.cross_attentions
+            if hasattr(outputs, "cross_attentions")
+            else None,
         )
 
     def prepare_inputs_for_generation(
@@ -1041,14 +1044,14 @@ class BertLMHeadModel(BertPreTrainedModel):
         for layer_past in past:
             reordered_past += (
                 tuple(
-                    paddle.index_sample(past_state, beam_idx) for past_state in layer_past
+                    paddle.index_sample(past_state, beam_idx)
+                    for past_state in layer_past
                 ),
             )
         return reordered_past
 
 
 class BertForMaskedLM(BertPreTrainedModel):
-
     def __init__(self, config):
         super().__init__(config)
         self.bert = BertModel(config, add_pooling_layer=False)
@@ -1121,7 +1124,9 @@ class BertForMaskedLM(BertPreTrainedModel):
         return MaskedLMOutput(
             loss=masked_lm_loss,
             logits=prediction_scores,
-            hidden_states=outputs.hidden_states if hasattr(outputs, "hidden_states") else None,
+            hidden_states=outputs.hidden_states
+            if hasattr(outputs, "hidden_states")
+            else None,
             attentions=outputs.attentions if hasattr(outputs, "attentions") else None,
         )
 
@@ -1139,17 +1144,13 @@ class Blip2Base(nn.Layer):
     """Base class for Blip2 models."""
 
     @classmethod
-    def init_tokenizer(cls, truncation_side="right"):
-        """Initialize tokenizer. Returns None - tokenizer is managed externally."""
-        return None
-
-    @classmethod
     def init_Qformer(cls, num_query_token, vision_width, cross_attention_freq=2):
-        config = BertConfig()
-        config.encoder_width = vision_width
-        config.add_cross_attention = True
-        config.cross_attention_freq = cross_attention_freq
-        config.query_length = num_query_token
+        config = BertConfig(
+            encoder_width=vision_width,
+            add_cross_attention=True,
+            cross_attention_freq=cross_attention_freq,
+            query_length=num_query_token,
+        )
 
         Qformer = BertLMHeadModel(config)
 

@@ -100,7 +100,9 @@ attention dimensions raise errors instead of silently accepting unused options.
 Unused external configuration fields (`head_dim`, `sliding_window`,
 `tie_word_embeddings`, `num_labels`, `model_type`) are not supported; the previous
 implementation accepted them without applying them to the model. Attention is
-selected explicitly using `attn_implementation: eager` or `sdpa`.
+selected explicitly using `attn_implementation: eager` or `sdpa`. The published
+query-only Q-Former requires `qformer_text_input: false`; unsupported text-input
+Q-Former configurations raise an error before constructing model weights.
 
 ---
 
@@ -149,16 +151,29 @@ masks question tokens, the crystal prefix and padding.
 | matterchat_full | Crystal Q&A instruction data | Not recorded | Not recorded | [matterchat_full.yaml](matterchat_full.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/llm/MatterChat/matterchat_full.zip) |
 | MatterChat bridge training | Local crystal Q&A NPZ archives | 1 (smoke test) | Not benchmarked | [matterchat_train.yaml](matterchat_train.yaml) | Not published |
 
-Previously documented dialogue examples (greedy decoding, float32):
+Full-checkpoint dialogue examples rerun on 2026-10-27 (greedy decoding,
+float32, RTX 5090 D):
 
 | Crystal | Chemical Formula | Space Group | Stable | Band Gap |
 | --- | --- | --- | --- | --- |
-| Si | Si | Cmcm | No | 0.68795 |
-| GaN | GaN | P6_3mc | No | 1.68300 |
+| Si | Si | Cm | No | 0.00000 |
+| GaN | GaN | P6_3mc | No | 1.83095 |
 
 These examples are generated answers, not verified reference labels or benchmark
-accuracy measurements. Full-checkpoint dialogue quality has not been rerun after
-the current refactor.
+accuracy measurements. The examples use a two-atom Si cell (cubic lattice
+5.43 angstrom; fractional coordinates 0 and 0.25 on each axis) and a four-atom
+GaN hexagonal cell (a=3.189, c=5.185 angstrom).
+
+A full-size bridge smoke run used eight real training records and four separate
+validation records. All eight optimizer steps had finite gradients for all 257
+trainable tensors; frozen tensors were unchanged and standard checkpoints were
+saved. Training loss increased from 0.088473 to 0.124636, and validation loss
+increased from 0.138993 to 0.190809. This verifies the training path, but does
+not establish convergence or fine-tuning quality. A supplementary run of the
+same eight updates with learning rate `1e-6` reduced training loss to 0.079523
+and validation loss to 0.136412. This small diagnostic does not establish
+benchmark performance; use a suitable learning rate when fine-tuning
+an already-trained bridge.
 
 ---
 
@@ -178,17 +193,24 @@ python structure_generation/train.py \
 ```
 
 This configuration constructs the full-size model with random initialization.
-To fine-tune a released model, set `Trainer.pretrained_model_path` to the extracted
-checkpoint directory containing `best.pdparams`. Use the tokenizer from that same
-package. Sharded packages must first be exported to a native `best.pdparams`
-checkpoint with matching configuration; the Trainer's standard weight loader does
-not use MatterChat's inference-only sharded loader. Full-model training memory
+To fine-tune a published model, first download its package using
+`Blip2MistralInstruct.from_pretrained("matterchat_full")`, then set
+`Model.__init_params__.pretrained_package` to the extracted local package
+directory. This model-owned option resolves the package tokenizer and strictly
+loads either native or sharded weights before the existing Trainer starts.
+Leave `Trainer.pretrained_model_path` null for this path; the generic loader
+does not handle the published sharded package. For example, append
+`Model.__init_params__.pretrained_package=./matterchat_full` to the training
+command, using the actual extracted directory. For a conservative fine-tuning
+smoke run, also set `Optimizer.__init_params__.lr=1e-6`.
+Full-model training memory
 requirements are higher than inference even with a frozen LLM.
 
 The integration test uses a small LLM with real CHGNet-derived variable-length
 features and synthetic Q&A. It covers finite gradients, parameter updates,
 frozen weights, evaluation and independent model/optimizer checkpoint restoration.
-Full-size fine-tuning quality has not been established.
+The full-size real-data smoke result is reported above; fine-tuning quality
+has not been established.
 
 For resume, set `Trainer.resume_from_checkpoint` to a checkpoint prefix, such as
 `./output/run/checkpoints/latest`, without a file extension.
@@ -196,7 +218,7 @@ For resume, set `Trainer.resume_from_checkpoint` to a checkpoint prefix, such as
 ### Validation
 
 Evaluate answer-token loss on an independent validation archive. Provide the
-matching tokenizer and native checkpoint. The command supplies the optional
+matching tokenizer and model package. The command supplies the optional
 validation dataset block through standard configuration overrides.
 
 ```bash
@@ -204,7 +226,7 @@ python structure_generation/train.py \
   -c structure_generation/configs/matterchat/matterchat_train.yaml \
   Global.do_train=False Global.do_eval=True Global.do_test=False \
   Model.__init_params__.tokenizer_path=./data/matterchat/tokenizer.json \
-  Trainer.pretrained_model_path=./output/run/checkpoints/latest.pdparams \
+  Model.__init_params__.pretrained_package=./matterchat_full \
   Dataset.val.dataset.__class_name__=MatterChatDataset \
   Dataset.val.dataset.__init_params__.path=./data/matterchat/val.npz \
   Dataset.val.sampler.__class_name__=BatchSampler \
@@ -223,7 +245,7 @@ python structure_generation/train.py \
   -c structure_generation/configs/matterchat/matterchat_train.yaml \
   Global.do_train=False Global.do_eval=False Global.do_test=True \
   Model.__init_params__.tokenizer_path=./data/matterchat/tokenizer.json \
-  Trainer.pretrained_model_path=./output/run/checkpoints/latest.pdparams \
+  Model.__init_params__.pretrained_package=./matterchat_full \
   Dataset.test.dataset.__class_name__=MatterChatDataset \
   Dataset.test.dataset.__init_params__.path=./data/matterchat/test.npz \
   Dataset.test.sampler.__class_name__=BatchSampler \
@@ -241,47 +263,44 @@ custom model configuration, set `Model.__init_params__.tokenizer_path` to the
 matching tokenizer file before building the model.
 
 ```python
-# Mode 1: automatically download the registered checkpoint package.
+# Mode 1: automatically download the published checkpoint package.
 import paddle
 from pymatgen.core import Structure
 
 from ppmat.models import Blip2MistralInstruct
-from ppmat.models import MODEL_REGISTRY
-from ppmat.models import resolve_model_package_dir
-from ppmat.utils.download import get_weights_path_from_url
 
 paddle.set_device("gpu:0")
-model_name = "matterchat_full"
-extracted_path = get_weights_path_from_url(MODEL_REGISTRY[model_name])
-package_path = resolve_model_package_dir(model_name, extracted_path)
-model = Blip2MistralInstruct.from_pretrained(package_path)
+model = Blip2MistralInstruct.from_pretrained("matterchat_full")
 model.eval()
 structure = Structure.from_file("Si.cif")
 print(model.chat(structure, "what is the chemical formula of this material?"))
 ```
 
 ```python
-# Mode 2: custom YAML configuration and native checkpoint.
+# Mode 2: local package with a custom YAML and native checkpoint.
 import paddle
-from omegaconf import OmegaConf
 from pymatgen.core import Structure
 
-from ppmat.models import build_model
-from ppmat.utils import save_load
+from ppmat.models import Blip2MistralInstruct
 
 paddle.set_device("gpu:0")
-config_path = "structure_generation/configs/matterchat/matterchat_full.yaml"
-config = OmegaConf.load(config_path)
-config.Model.__init_params__.tokenizer_path = "./matterchat_full/tokenizer.json"
-model = build_model(OmegaConf.to_container(config.Model, resolve=True))
-save_load.load_pretrain(model, "./matterchat_full/checkpoints/best.pdparams")
+model = Blip2MistralInstruct.from_pretrained("./matterchat_full")
 model.eval()
 structure = Structure.from_file("Si.cif")
 print(model.chat(structure, "what is the chemical formula of this material?"))
 ```
 
-Mode 1 also supports the model's sharded checkpoint loader. Mode 2 requires a
-native `.pdparams` checkpoint matching the custom configuration.
+Mode 1 uses the model-owned download and sharded checkpoint loader.
+MatterChat is not registered with `build_model_from_name`: the generic loader
+cannot resolve its tokenizer and multi-file checkpoint. Use the model's own
+`from_pretrained` entry, with either `"matterchat_full"` or an explicit local
+package directory.
+
+For Mode 2, place your custom `matterchat_full.yaml` and matching `tokenizer.json`
+in `./matterchat_full`, with the native checkpoint at
+`./matterchat_full/checkpoints/best.pdparams`. The model-owned loader stages
+checkpoint arrays in host memory and copies one tensor at a time to the model,
+avoiding a second full checkpoint allocation on the GPU.
 
 MatterChat defaults to eager execution. The top-level model delegates backend
 selection to its existing Mistral backbone, which owns the shared runtime and
@@ -320,9 +339,15 @@ supported by the shared execution backend.
 
 ```
 @misc{matterchat2025,
-  title={MatterChat: A conversational crystal-material AI based on BLIP-2.},
-  author={PaddleMaterials Contributors},
-  year={2025}
+  title={MatterChat: A Multi-Modal LLM for Material Science},
+  author={Yingheng Tang and Wenbin Xu and Jie Cao and Weilu Gao and
+          Steve Farrell and Benjamin Erichson and Michael W. Mahoney and
+          Andy Nonaka and Zhi Yao},
+  year={2025},
+  eprint={2502.13107},
+  archivePrefix={arXiv},
+  primaryClass={cs.AI},
+  url={https://arxiv.org/abs/2502.13107}
 }
 @article{li2023blip,
   title={Blip-2: Bootstrapping language-image pre-training with frozen image encoders and large language models},

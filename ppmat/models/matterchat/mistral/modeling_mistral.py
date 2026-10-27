@@ -993,6 +993,20 @@ class MistralForCausalLM(MistralPreTrainedModel):
 
         return best_seq.unsqueeze(0)
 
+    @staticmethod
+    def _next_token(logits, do_sample, top_p):
+        if not do_sample:
+            return paddle.argmax(logits, axis=-1, keepdim=True)
+        probabilities = F.softmax(logits, axis=-1)
+        indices = paddle.argsort(probabilities, axis=-1, descending=True)
+        probabilities = paddle.take_along_axis(probabilities, indices, axis=-1)
+        previous_mass = paddle.cumsum(probabilities, axis=-1) - probabilities
+        probabilities = paddle.where(
+            previous_mass < top_p, probabilities, paddle.zeros_like(probabilities)
+        )
+        selected = paddle.multinomial(probabilities, num_samples=1)
+        return paddle.take_along_axis(indices, selected, axis=-1)
+
     def generate(
         self,
         input_ids=None,
@@ -1007,9 +1021,16 @@ class MistralForCausalLM(MistralPreTrainedModel):
         repetition_penalty=1.5,
         length_penalty=1.0,
         num_return_sequences=1,
-        **kwargs,
     ):
         """Autoregressive generation loop."""
+        if num_return_sequences != 1:
+            raise ValueError("MatterChat generates one response per call.")
+        if not 0 < top_p <= 1 or temperature <= 0 or repetition_penalty <= 0:
+            raise ValueError("Invalid generation probability or penalty settings.")
+        if num_beams < 1 or min_length < 0:
+            raise ValueError("num_beams must be positive and min_length nonnegative.")
+        if do_sample and num_beams != 1:
+            raise ValueError("Nucleus sampling requires num_beams=1.")
         if inputs_embeds is not None:
             hidden = inputs_embeds
         else:
@@ -1017,6 +1038,10 @@ class MistralForCausalLM(MistralPreTrainedModel):
 
         batch_size = hidden.shape[0]
         seq_len = hidden.shape[1]
+        if batch_size != 1:
+            raise ValueError("MatterChat generation accepts one crystal per call.")
+        if max_length <= seq_len or min_length > max_length - seq_len:
+            raise ValueError("Generation length must exceed the input and minimum.")
 
         if attention_mask is None:
             attention_mask = paddle.ones([batch_size, seq_len], dtype=paddle.int64)
@@ -1040,8 +1065,6 @@ class MistralForCausalLM(MistralPreTrainedModel):
         past_key_values = DynamicCache()
         cache_position = paddle.arange(seq_len)
 
-        _suppress_token_id = getattr(self.config, "pad_token_id", None)
-
         outputs = self.model(
             inputs_embeds=hidden,
             attention_mask=attention_mask,
@@ -1058,10 +1081,9 @@ class MistralForCausalLM(MistralPreTrainedModel):
         if repetition_penalty != 1.0:
             logits = _apply_repetition_penalty(logits, None, repetition_penalty)
 
-        if do_sample:
-            next_tokens = paddle.multinomial(F.softmax(logits, axis=-1), num_samples=1)
-        else:
-            next_tokens = paddle.argmax(logits, axis=-1, keepdim=True)
+        if min_length > 0:
+            logits[:, self.config.eos_token_id] = float("-inf")
+        next_tokens = self._next_token(logits, do_sample, top_p)
 
         generated = [next_tokens]
         gen_ids_tensor = next_tokens.reshape([-1])
@@ -1070,6 +1092,8 @@ class MistralForCausalLM(MistralPreTrainedModel):
         eos_token_id = getattr(self.config, "eos_token_id", 2)
 
         for step in range(1, max_new_tokens):
+            if next_tokens.reshape([-1])[0].item() == eos_token_id:
+                break
             attention_mask = paddle.concat(
                 [
                     attention_mask,
@@ -1100,12 +1124,9 @@ class MistralForCausalLM(MistralPreTrainedModel):
                     logits, gen_ids_tensor, repetition_penalty
                 )
 
-            if do_sample:
-                next_tokens = paddle.multinomial(
-                    F.softmax(logits, axis=-1), num_samples=1
-                )
-            else:
-                next_tokens = paddle.argmax(logits, axis=-1, keepdim=True)
+            if step < min_length:
+                logits[:, eos_token_id] = float("-inf")
+            next_tokens = self._next_token(logits, do_sample, top_p)
 
             generated.append(next_tokens)
             gen_ids_tensor = paddle.concat([gen_ids_tensor, next_tokens.reshape([-1])])

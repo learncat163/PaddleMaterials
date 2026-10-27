@@ -14,16 +14,25 @@
 
 """Complete MatterChat model: Blip2MistralInstruct."""
 
+import json
+import os
+
 import paddle
 import paddle.nn as nn
+from omegaconf import OmegaConf
 
 from ppmat.models.common.runtime import RuntimeMixin
 from ppmat.models.matterchat.mistral.configuration_mistral import MistralConfig
 from ppmat.models.matterchat.mistral.modeling_mistral import MistralForCausalLM
 from ppmat.models.matterchat.q_former.q_former_base import Blip2Base
+from ppmat.utils import download
+from ppmat.utils.model_package import resolve_model_package_dir
 
 
 class Blip2MistralInstruct(RuntimeMixin, Blip2Base):
+    pretrained_model_name = "matterchat_full"
+    pretrained_url = "https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/llm/MatterChat/matterchat_full.zip"  # noqa
+
     def __init__(
         self,
         num_query_token=32,
@@ -35,36 +44,39 @@ class Blip2MistralInstruct(RuntimeMixin, Blip2Base):
         llm_model=None,
         tokenizer_path=None,
         llm_config=None,
+        pretrained_package=None,
         execution_backend="eager",
         runtime_options=None,
     ):
         super().__init__()
+        if qformer_text_input:
+            raise ValueError(
+                "Only qformer_text_input=False is supported by MatterChat."
+            )
 
+        if (
+            pretrained_package is not None
+            and llm_tokenizer is None
+            and not tokenizer_path
+        ):
+            tokenizer_path = os.path.join(pretrained_package, "tokenizer.json")
         if llm_tokenizer is None and tokenizer_path is not None and tokenizer_path:
-            import os as _os
-
             from ppmat.models.matterchat.utils.tokenizer import MistralTokenizerWrapper
 
-            _resolved = _os.path.expanduser(tokenizer_path)
+            _resolved = os.path.expanduser(tokenizer_path)
             llm_tokenizer = MistralTokenizerWrapper(_resolved)
 
-        self.tokenizer = self.init_tokenizer(truncation_side="left")
         self.material_encoder = self.init_material_encoder()
         for param in self.material_encoder.parameters():
             param.stop_gradient = True
 
         self.Qformer, self.query_tokens = self.init_Qformer(num_query_token, 64)
 
-        self.qformer_text_input = qformer_text_input
-        if not qformer_text_input:
-            self.Qformer.bert.embeddings.word_embeddings = None
-            self.Qformer.bert.embeddings.position_embeddings = None
-            for layer in self.Qformer.bert.encoder.layer:
-                layer.output = None
-                layer.intermediate = None
-        else:
-            if llm_tokenizer is not None:
-                self.Qformer.resize_token_embeddings(len(llm_tokenizer))
+        self.Qformer.bert.embeddings.word_embeddings = None
+        self.Qformer.bert.embeddings.position_embeddings = None
+        for layer in self.Qformer.bert.encoder.layer:
+            layer.output = None
+            layer.intermediate = None
         self.Qformer.cls = None
 
         self.llm_tokenizer = llm_tokenizer
@@ -92,6 +104,8 @@ class Blip2MistralInstruct(RuntimeMixin, Blip2Base):
             self.prompt_length = prompt_tokens.attention_mask.sum(1).item()
         else:
             self.prompt_length = 0
+        if pretrained_package is not None:
+            self._load_package_weights(pretrained_package)
 
     @property
     def execution_backend(self):
@@ -115,45 +129,42 @@ class Blip2MistralInstruct(RuntimeMixin, Blip2Base):
 
     @classmethod
     def from_pretrained(cls, path):
-        """Load MatterChat from a MODEL_REGISTRY-style directory."""
-        import os as _os
-
-        from omegaconf import OmegaConf
+        """Load the published model name or an explicit local model package."""
+        if path == cls.pretrained_model_name:
+            extracted_path = download.get_weights_path_from_url(cls.pretrained_url)
+            path = resolve_model_package_dir(cls.pretrained_model_name, extracted_path)
 
         yaml_files = [
-            f for f in _os.listdir(path) if f.endswith(".yaml") or f.endswith(".yml")
+            f for f in os.listdir(path) if f.endswith(".yaml") or f.endswith(".yml")
         ]
         if not yaml_files:
             raise FileNotFoundError(f"No yaml config found in {path}")
-        config_path = _os.path.join(path, yaml_files[0])
+        if len(yaml_files) != 1:
+            raise ValueError(f"Expected exactly one model yaml config in {path}.")
+        config_path = os.path.join(path, yaml_files[0])
         config = OmegaConf.to_container(OmegaConf.load(config_path), resolve=True)
 
         init_params = config["Model"]["__init_params__"]
 
-        tokenizer_path = _os.path.join(path, "tokenizer.json")
-        if _os.path.exists(tokenizer_path):
+        tokenizer_path = os.path.join(path, "tokenizer.json")
+        if os.path.exists(tokenizer_path):
             init_params["tokenizer_path"] = tokenizer_path
 
-        model = cls(**init_params)
+        init_params["pretrained_package"] = path
+        return cls(**init_params)
 
-        model._load_weights_from_registry(path)
-
-        return model
-
-    def _load_weights_from_registry(self, weight_dir):
-        import os as _os
-
-        ckpt_dir = _os.path.join(weight_dir, "checkpoints")
-        if not _os.path.isdir(ckpt_dir):
+    def _load_package_weights(self, weight_dir):
+        ckpt_dir = os.path.join(weight_dir, "checkpoints")
+        if not os.path.isdir(ckpt_dir):
             ckpt_dir = weight_dir
 
-        index_path = _os.path.join(ckpt_dir, "model.pdparams.index.json")
-        if _os.path.exists(index_path):
+        index_path = os.path.join(ckpt_dir, "model.pdparams.index.json")
+        if os.path.exists(index_path):
             self._load_sharded_weights(ckpt_dir, index_path)
             return
 
-        best_path = _os.path.join(ckpt_dir, "best.pdparams")
-        if _os.path.exists(best_path):
+        best_path = os.path.join(ckpt_dir, "best.pdparams")
+        if os.path.exists(best_path):
             self._load_single_weight(best_path)
             return
 
@@ -163,63 +174,61 @@ class Blip2MistralInstruct(RuntimeMixin, Blip2Base):
         )
 
     def _load_sharded_weights(self, ckpt_dir, index_path):
-        import json as _json
-        import os as _os
-
         with open(index_path) as f:
-            idx = _json.load(f)
+            idx = json.load(f)
 
-        model_sd = self.state_dict()
+        model_sd = self._validate_checkpoint_keys(idx["weight_map"])
         shard_files = sorted(set(idx["weight_map"].values()))
         for shard_file in shard_files:
-            shard_path = _os.path.join(ckpt_dir, shard_file)
+            shard_path = os.path.join(ckpt_dir, shard_file)
             shard = paddle.load(shard_path, return_numpy=True)
             for key, val in shard.items():
-                if key in model_sd:
-                    w = paddle.to_tensor(val)
-                    target = model_sd[key]
-                    if w.dtype != target.dtype:
-                        w = w.cast(target.dtype)
-                    target.set_value(w)
+                if idx["weight_map"].get(key) != shard_file:
+                    raise ValueError(
+                        f"Unexpected checkpoint tensor {key} in {shard_file}."
+                    )
+                self._assign_checkpoint_tensor(key, val, model_sd[key])
+            expected_keys = {
+                key for key, name in idx["weight_map"].items() if name == shard_file
+            }
+            if set(shard) != expected_keys:
+                raise ValueError(f"Missing checkpoint tensors in {shard_file}.")
             del shard
 
     def _load_single_weight(self, weight_path):
-        state_dict = paddle.load(weight_path)
+        state_dict = paddle.load(weight_path, return_numpy=True)
         if "state_dict" in state_dict:
             state_dict = state_dict["state_dict"]
-        self.set_state_dict(state_dict)
+        model_sd = self._validate_checkpoint_keys(state_dict)
+        for key, value in state_dict.items():
+            self._assign_checkpoint_tensor(key, value, model_sd[key])
 
-    def _run_qformer(
-        self, query_tokens, material_embeds, material_atts, prompt_text=None
-    ):
-        """Run Q-Former with optional text input, shared by forward and generate."""
-        if self.qformer_text_input and prompt_text is not None:
-            text_input = self.tokenizer(
-                prompt_text,
-                padding="longest",
-                truncation=True,
-                max_length=self.max_txt_len,
-                return_tensors="pd",
+    @staticmethod
+    def _assign_checkpoint_tensor(key, value, target):
+        if list(value.shape) != list(target.shape):
+            raise ValueError(f"Checkpoint shape mismatch for {key}.")
+        target.set_value(
+            paddle.to_tensor(value, dtype=target.dtype, place=target.place)
+        )
+
+    def _validate_checkpoint_keys(self, checkpoint):
+        model_sd = self.state_dict()
+        missing = sorted(set(model_sd) - set(checkpoint))
+        unexpected = sorted(set(checkpoint) - set(model_sd))
+        if missing or unexpected:
+            raise ValueError(
+                f"Checkpoint keys mismatch: missing={missing}, unexpected={unexpected}."
             )
-            query_atts = paddle.ones(query_tokens.shape[:-1], dtype=paddle.int64)
-            qformer_atts = paddle.concat(
-                [query_atts, text_input.attention_mask], axis=1
-            )
-            return self.Qformer.bert(
-                text_input.input_ids,
-                attention_mask=qformer_atts,
-                query_embeds=query_tokens,
-                encoder_hidden_states=material_embeds,
-                encoder_attention_mask=material_atts,
-                return_dict=True,
-            )
-        else:
-            return self.Qformer.bert(
-                query_embeds=query_tokens,
-                encoder_hidden_states=material_embeds,
-                encoder_attention_mask=material_atts,
-                return_dict=True,
-            )
+        return model_sd
+
+    def _run_qformer(self, query_tokens, material_embeds, material_atts):
+        """Encode crystal features using the released query-only Q-Former."""
+        return self.Qformer.bert(
+            query_embeds=query_tokens,
+            encoder_hidden_states=material_embeds,
+            encoder_attention_mask=material_atts,
+            return_dict=True,
+        )
 
     def _encode_for_generate(self, samples):
         """Shared encoding pipeline for generate / generate_followup."""
@@ -234,9 +243,7 @@ class Blip2MistralInstruct(RuntimeMixin, Blip2Base):
         material_att = paddle.ones(material_embed.shape[:-1], dtype=paddle.int64)
 
         query_tokens = self.query_tokens.expand([1, -1, -1])
-        query_output = self._run_qformer(
-            query_tokens, material_embed, material_att, prompt
-        )
+        query_output = self._run_qformer(query_tokens, material_embed, material_att)
 
         inputs_llm = self.llm_proj(
             query_output.last_hidden_state[:, : query_tokens.shape[1], :]
@@ -313,10 +320,7 @@ class Blip2MistralInstruct(RuntimeMixin, Blip2Base):
         ).cast("int64")
         query_tokens = self.query_tokens.expand([material_embeds.shape[0], -1, -1])
 
-        text_list = samples.get("text_input", None)
-        query_output = self._run_qformer(
-            query_tokens, material_embeds, material_atts, text_list
-        )
+        query_output = self._run_qformer(query_tokens, material_embeds, material_atts)
 
         inputs_llm = self.llm_proj(
             query_output.last_hidden_state[:, : query_tokens.shape[1], :]
@@ -395,7 +399,7 @@ class Blip2MistralInstruct(RuntimeMixin, Blip2Base):
         )
         mask = paddle.ones(embed.shape[:-1], dtype=paddle.int64)
         qt = self.query_tokens.expand([1, -1, -1])
-        qo = self._run_qformer(qt, embed, mask, [prompt])
+        qo = self._run_qformer(qt, embed, mask)
         inputs_llm = self.llm_proj(qo.last_hidden_state[:, : qt.shape[1], :])
         atts_llm = paddle.ones(inputs_llm.shape[:-1], dtype=paddle.int64)
         self.llm_tokenizer.padding_side = "left"
@@ -449,6 +453,7 @@ class Blip2MistralInstruct(RuntimeMixin, Blip2Base):
             for o in outputs
         ]
 
+    @paddle.no_grad()
     def generate_followup(
         self,
         samples,
