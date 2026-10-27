@@ -6,11 +6,14 @@
 
 MatterChat is a multimodal large language model for crystal materials. It adopts the BLIP-2 architecture to bridge a crystal structure encoder (CHGNet) with a large language model (Mistral-7B-Instruct) via a Q-Former, enabling natural-language question answering about a given crystal structure. Given a CIF file and a text prompt, MatterChat answers questions such as the chemical formula, space group, stability, and band gap. It is an inference / dialogue model, not a structure generator: it does not produce new crystal structures, but reasons about an input structure through language.
 
+![MatterChat Overview](MatterChat_overview.png)
+
 ---
 
 ## Model Description
 
 ### Overview
+
 MatterChat follows the BLIP-2 three-module design, adapted from image-text to crystal-text:
 
 ```
@@ -22,6 +25,7 @@ CIF (pymatgen Structure)
 ```
 
 A crystal is represented by its unit cell:
+
 - atom types: $A = (a_1,\ldots,a_N)$
 - fractional coordinates: $X = (x_1,\ldots,x_N),\; x_i \in [0,1)^3$
 - lattice: $L \in \mathbb{R}^{3 \times 3}$
@@ -29,6 +33,7 @@ A crystal is represented by its unit cell:
 ### Method
 
 #### 1) CHGNet material encoder
+
 CHGNet encodes the crystal graph (atoms, bonds, angles) into per-atom embeddings of dimension 64. The crystal graph is constructed via a radius-based neighbor search with periodic boundary conditions:
 
 $$
@@ -53,8 +58,8 @@ execution fails. The framework's `return_atom_feas` refers to the penultimate
 features and is therefore not used for dialogue embeddings. The framework
 CHGNet source and its defaults are unchanged.
 
-
 #### 2) Q-Former (cross-attention bridge)
+
 A BERT-style transformer with cross-attention layers. A fixed set of learnable query tokens $Q \in \mathbb{R}^{N_q \times d}$ attend to the CHGNet embeddings $E \in \mathbb{R}^{N \times 64}$:
 
 $$
@@ -64,10 +69,11 @@ $$
 producing a compact material representation of shape $[N_q, 768]$ that is independent of the atom count $N$.
 
 #### 3) Projection + Mistral LLM
+
 A linear layer maps Q-Former outputs to the LLM hidden size (4096):
 
 $$
-Z = \text{llm\_proj}(Q') W + b, \qquad Z \in \mathbb{R}^{N_q \times 4096}
+Z = Q' W + b, \qquad Z \in \mathbb{R}^{N_q \times 4096}
 $$
 
 The projected embeddings $Z$ are concatenated with tokenized prompt embeddings $T$ and fed to Mistral-7B-Instruct, which generates the answer autoregressively:
@@ -84,41 +90,6 @@ LLM stay frozen. The dialogue pipeline supports inference and bridge training
 through the existing `BaseTrainer`. Training consumes precomputed frozen-CHGNet
 features; it does not implement the full original three-stage training procedure.
 
-
----
-
-## Data Format
-
-MatterChat is a dialogue model: each request pairs a crystal structure with a
-text question, and the model produces a text answer.
-
-- input: a pymatgen `Structure` (parsed from a CIF file) plus a prompt, e.g.
-  "what is the chemical formula of this material?"
-- output: a generated answer, e.g. "Si"
-
-No dataset download is required for inference.
-
----
-
-## Results
-
-| Model Name | Dataset | Config | Checkpoint / Log |
-| --- | --- | --- | --- |
-| matterchat_full | Crystal Q&A instruction data | [matterchat_full.yaml](matterchat_full.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/llm/MatterChat/matterchat_full.zip) |
-
-Dialogue test results (greedy decoding, float32):
-
-| Crystal | Chemical Formula | Space Group | Stable | Band Gap |
-| --- | --- | --- | --- | --- |
-| Si | Si | Cmcm | No | 0.68795 |
-| GaN | GaN | P6_3mc | No | 1.68300 |
-
----
-
-## Command
-
-### Model configuration
-
 Use the standard `Model.__class_name__` / `Model.__init_params__` configuration.
 Mistral settings are a YAML mapping under `Model.__init_params__.llm_config`;
 `MistralConfig` is an internal typed dataclass, not a separately registered model
@@ -131,12 +102,20 @@ Unused external configuration fields (`head_dim`, `sliding_window`,
 implementation accepted them without applying them to the model. Attention is
 selected explicitly using `attn_implementation: eager` or `sdpa`.
 
-### Bridge training
+---
 
-Use `structure_generation/train.py` with `matterchat_train.yaml`. This reuses
-`build_model`, `build_dataloader`, `DefaultCollator`, `build_optimizer` and
-`BaseTrainer`, including evaluation and checkpoint resume. CHGNet and Mistral
-remain frozen; Q-Former, query tokens and the projection are optimized.
+## Dataset Description
+
+MatterChat pairs a crystal structure with a question and generates a text answer.
+Inference accepts a pymatgen `Structure` and a prompt; no dataset download is
+required. Bridge training uses caller-provided frozen-CHGNet features and Q&A.
+
+| Dataset | Train | Val | Test |
+| --- | --- | --- | --- |
+| Local crystal Q&A NPZ archives | Caller-defined | Caller-defined | Caller-defined |
+
+No standard training split or downloadable training corpus is registered for this
+adapter. Prepare independent archives for training, validation and testing.
 
 Provide your own local NPZ file with these arrays (no pickle objects):
 
@@ -161,6 +140,36 @@ before Q-Former attention. Answers are tokenized without automatic special
 tokens, with EOS appended explicitly. The loss supervises every answer token and
 masks question tokens, the crystal prefix and padding.
 
+---
+
+## Results
+
+| Model | Dataset | GPUs | Training Time | Config | Checkpoint / Log |
+| --- | --- | --- | --- | --- | --- |
+| matterchat_full | Crystal Q&A instruction data | Not recorded | Not recorded | [matterchat_full.yaml](matterchat_full.yaml) | [checkpoint / log](https://paddle-org.bj.bcebos.com/paddlematerials/checkpoints/llm/MatterChat/matterchat_full.zip) |
+| MatterChat bridge training | Local crystal Q&A NPZ archives | 1 (smoke test) | Not benchmarked | [matterchat_train.yaml](matterchat_train.yaml) | Not published |
+
+Previously documented dialogue examples (greedy decoding, float32):
+
+| Crystal | Chemical Formula | Space Group | Stable | Band Gap |
+| --- | --- | --- | --- | --- |
+| Si | Si | Cmcm | No | 0.68795 |
+| GaN | GaN | P6_3mc | No | 1.68300 |
+
+These examples are generated answers, not verified reference labels or benchmark
+accuracy measurements. Full-checkpoint dialogue quality has not been rerun after
+the current refactor.
+
+---
+
+## Command
+
+### Training
+
+Use the existing training entry with `MatterChatDataset`, `DefaultCollator`, the
+optimizer factory and `BaseTrainer`. CHGNet and Mistral remain frozen; Q-Former,
+query tokens and the projection are optimized.
+
 ```bash
 python structure_generation/train.py \
   -c structure_generation/configs/matterchat/matterchat_train.yaml \
@@ -176,70 +185,139 @@ checkpoint with matching configuration; the Trainer's standard weight loader doe
 not use MatterChat's inference-only sharded loader. Full-model training memory
 requirements are higher than inference even with a frozen LLM.
 
-For validation, add a `Dataset.val` block with the same schema as `Dataset.train`,
-set its archive path and disable shuffle. For resume, set
-`Trainer.resume_from_checkpoint` to the saved checkpoint prefix, such as
-`./output/run/checkpoints/latest` (without a file extension).
-
 The integration test uses a small LLM with real CHGNet-derived variable-length
-features and synthetic Q&A. It verifies finite gradients, parameter updates,
-frozen weights, evaluation and independent model/optimizer checkpoint restoration;
-it does not establish full-size fine-tuning quality.
+features and synthetic Q&A. It covers finite gradients, parameter updates,
+frozen weights, evaluation and independent model/optimizer checkpoint restoration.
+Full-size fine-tuning quality has not been established.
 
-### Inference
+For resume, set `Trainer.resume_from_checkpoint` to a checkpoint prefix, such as
+`./output/run/checkpoints/latest`, without a file extension.
 
-MatterChat is a dialogue model, not a structure generator. It does **not** use
-`structure_generation/sample.py` (StructureSampler), which expects `model.sample()`
-and outputs CIF files. Instead, load the model and call `chat()`.
+### Validation
 
-#### Tokenizer
-
-The tokenizer is packaged inside the checkpoint zip as `tokenizer.json`
-(a HuggingFace-fast tokenizer in WordLevel format). `build_model_from_name`
-downloads and extracts the zip automatically; `Blip2MistralInstruct.from_pretrained`
-resolves `tokenizer.json` next to the yaml config and builds the wrapped
-`MistralTokenizerWrapper` from it. When you build the model from a custom
-config instead, pass the tokenizer file through `__init_params__.tokenizer_path`
-(leave `llm_tokenizer` null) - the Q-Former token embedding resize and the
-prompt tokenization depend on it.
+Evaluate answer-token loss on an independent validation archive. Provide the
+matching tokenizer and native checkpoint. The command supplies the optional
+validation dataset block through standard configuration overrides.
 
 ```bash
-# Mode 1: Use a pre-trained model (downloads automatically via MODEL_REGISTRY)
-python -c "
-from ppmat.models import build_model_from_name
-from pymatgen.io.cif import CifParser
-
-model, _ = build_model_from_name('matterchat_full')
-model.to('gpu').eval()
-
-struct = CifParser('Si.cif').get_structures()[0]
-print(model.chat(struct, 'what is the chemical formula of this material?'))
-# -> 'The chemical formula of this material is Si.'
-"
+python structure_generation/train.py \
+  -c structure_generation/configs/matterchat/matterchat_train.yaml \
+  Global.do_train=False Global.do_eval=True Global.do_test=False \
+  Model.__init_params__.tokenizer_path=./data/matterchat/tokenizer.json \
+  Trainer.pretrained_model_path=./output/run/checkpoints/latest.pdparams \
+  Dataset.val.dataset.__class_name__=MatterChatDataset \
+  Dataset.val.dataset.__init_params__.path=./data/matterchat/val.npz \
+  Dataset.val.sampler.__class_name__=BatchSampler \
+  Dataset.val.sampler.__init_params__.batch_size=2 \
+  Dataset.val.sampler.__init_params__.shuffle=False \
+  Dataset.val.sampler.__init_params__.drop_last=False
 ```
 
+### Testing
+
+Evaluate answer-token loss on a held-out test archive. This measures the language
+model training objective; it does not compute factual-answer accuracy.
+
 ```bash
-# Mode 2: Use a custom config file and checkpoint
-python -c "
+python structure_generation/train.py \
+  -c structure_generation/configs/matterchat/matterchat_train.yaml \
+  Global.do_train=False Global.do_eval=False Global.do_test=True \
+  Model.__init_params__.tokenizer_path=./data/matterchat/tokenizer.json \
+  Trainer.pretrained_model_path=./output/run/checkpoints/latest.pdparams \
+  Dataset.test.dataset.__class_name__=MatterChatDataset \
+  Dataset.test.dataset.__init_params__.path=./data/matterchat/test.npz \
+  Dataset.test.sampler.__class_name__=BatchSampler \
+  Dataset.test.sampler.__init_params__.batch_size=2 \
+  Dataset.test.sampler.__init_params__.shuffle=False \
+  Dataset.test.sampler.__init_params__.drop_last=False
+```
+
+### Sample
+
+Sampling produces dialogue text through `chat()`. The structure-generation
+`StructureSampler` entry is not used because this model does not generate CIFs.
+The tokenizer is supplied as `tokenizer.json` in the checkpoint package. For a
+custom model configuration, set `Model.__init_params__.tokenizer_path` to the
+matching tokenizer file before building the model.
+
+```python
+# Mode 1: automatically download the registered checkpoint package.
+import paddle
+from pymatgen.core import Structure
+
+from ppmat.models import Blip2MistralInstruct
+from ppmat.models import MODEL_REGISTRY
+from ppmat.models import resolve_model_package_dir
+from ppmat.utils.download import get_weights_path_from_url
+
+paddle.set_device("gpu:0")
+model_name = "matterchat_full"
+extracted_path = get_weights_path_from_url(MODEL_REGISTRY[model_name])
+package_path = resolve_model_package_dir(model_name, extracted_path)
+model = Blip2MistralInstruct.from_pretrained(package_path)
+model.eval()
+structure = Structure.from_file("Si.cif")
+print(model.chat(structure, "what is the chemical formula of this material?"))
+```
+
+```python
+# Mode 2: custom YAML configuration and native checkpoint.
+import paddle
 from omegaconf import OmegaConf
-from pymatgen.io.cif import CifParser
+from pymatgen.core import Structure
+
 from ppmat.models import build_model
 from ppmat.utils import save_load
 
-config = OmegaConf.to_container(OmegaConf.load('structure_generation/configs/matterchat/matterchat_full.yaml'), resolve=True)
-model = build_model(config['Model'])
-save_load.load_pretrain(model, './matterchat_full/')
-model.to('gpu').eval()
-
-struct = CifParser('Si.cif').get_structures()[0]
-print(model.chat(struct, 'what is the chemical formula of this material?'))
-"
+paddle.set_device("gpu:0")
+config_path = "structure_generation/configs/matterchat/matterchat_full.yaml"
+config = OmegaConf.load(config_path)
+config.Model.__init_params__.tokenizer_path = "./matterchat_full/tokenizer.json"
+model = build_model(OmegaConf.to_container(config.Model, resolve=True))
+save_load.load_pretrain(model, "./matterchat_full/checkpoints/best.pdparams")
+model.eval()
+structure = Structure.from_file("Si.cif")
+print(model.chat(structure, "what is the chemical formula of this material?"))
 ```
 
+Mode 1 also supports the model's sharded checkpoint loader. Mode 2 requires a
+native `.pdparams` checkpoint matching the custom configuration.
+
+MatterChat defaults to eager execution. The top-level model delegates backend
+selection to its existing Mistral backbone, which owns the shared runtime and
+its cache. CINN compiles that backbone's numerical forward through SOT; CHGNet,
+Q-Former, the language head and the generation loop stay eager. Checkpoint keys
+and shapes are unchanged. The training configuration uses eager execution;
+the CINN coverage below is for inference.
+
+After loading the model on a CUDA device, select the backend before calling the
+existing chat entry:
+
+```python
+import paddle
+
+paddle.set_flags({"FLAGS_enable_fuse_parallel_matmul_pass": False})
+model.set_execution_backend("cinn")
+model.validate_execution_backend(use_amp=False, world_size=1)
+answer = model.chat(
+    structure, "what is the chemical formula of this material?", max_new_tokens=4
+)
+```
+
+The full 7B FP32 model on a 32 GB GPU needs the public flag shown above before
+the first CINN call. The default pass combines parallel matrix multiplications
+and materializes large concatenated weights; the measured default configuration
+ran out of device memory. This flag changes compiler optimization, not model
+weights or precision. Use the same flag setting in both benchmark modes.
+
+The GPU integration test covers greedy chat with the autoregressive KV cache.
+The default CINN option is `full_graph=False`; AMP and distributed CINN are not
+supported by the shared execution backend.
 
 ---
 
 ## Citation
+
 ```
 @misc{matterchat2025,
   title={MatterChat: A conversational crystal-material AI based on BLIP-2.},
@@ -253,33 +331,3 @@ print(model.chat(struct, 'what is the chemical formula of this material?'))
   year={2023}
 }
 ```
-
-## CINN inference
-
-MatterChat defaults to eager execution. The top-level model delegates backend
-selection to its existing Mistral backbone, which owns the shared runtime and
-its cache. CINN compiles that backbone's numerical forward through SOT; CHGNet,
-Q-Former, the language head and the generation loop stay eager. Checkpoint keys
-and shapes are unchanged. The training configuration uses eager execution; the CINN coverage below is for inference.
-
-After loading the model on a CUDA device, select the backend before calling the
-existing chat entry:
-
-```python
-import paddle
-
-paddle.set_flags({"FLAGS_enable_fuse_parallel_matmul_pass": False})
-model.set_execution_backend("cinn")
-model.validate_execution_backend(use_amp=False, world_size=1)
-answer = model.chat(structure, prompt, max_new_tokens=4)
-```
-
-The full 7B FP32 model on a 32 GB GPU needs the public flag shown above before
-the first CINN call. The default pass combines parallel matrix multiplications
-and materializes large concatenated weights; the measured default configuration
-ran out of device memory. This flag changes compiler optimization, not model
-weights or precision. Use the same flag setting in both benchmark modes.
-
-The GPU integration test covers greedy chat with the autoregressive KV cache.
-The default CINN option is `full_graph=False`; AMP and distributed CINN are not
-supported by the shared execution backend.
