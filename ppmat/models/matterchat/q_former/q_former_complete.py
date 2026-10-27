@@ -111,9 +111,7 @@ class Blip2MistralInstruct(RuntimeMixin, Blip2Base):
     @staticmethod
     def _build_llm_config(llm_config):
         """Build the Mistral config; a dict selects a smaller custom LLM."""
-        if llm_config is None:
-            return MistralConfig()
-        return MistralConfig(**llm_config)
+        return MistralConfig(**({} if llm_config is None else llm_config))
 
     @classmethod
     def from_pretrained(cls, path):
@@ -265,7 +263,7 @@ class Blip2MistralInstruct(RuntimeMixin, Blip2Base):
                 paddle.concat(
                     [
                         input_ids[i][:this_input_len],
-                        output_ids[i][1:],
+                        output_ids[i],
                         input_ids[i][this_input_len:],
                     ]
                 )
@@ -275,7 +273,7 @@ class Blip2MistralInstruct(RuntimeMixin, Blip2Base):
                 paddle.concat(
                     [
                         input_atts[i][:this_input_len],
-                        output_atts[i][1:],
+                        output_atts[i],
                         input_atts[i][this_input_len:],
                     ]
                 )
@@ -286,9 +284,33 @@ class Blip2MistralInstruct(RuntimeMixin, Blip2Base):
             "attention_mask": paddle.stack(attention_mask_list),
         }, input_part_targets_len
 
-    def forward(self, samples, embedding_list, embedding_mask):
-        material_embeds = paddle.stack(embedding_list)
-        material_atts = paddle.stack(embedding_mask)
+    def forward(self, samples):
+        """Train the Q-Former bridge on packed frozen-encoder features and text."""
+        if self.llm_tokenizer is None:
+            raise ValueError("Training requires a tokenizer_path or llm_tokenizer.")
+        num_atoms = samples["num_atoms"].tolist()
+        embeddings = samples["material_embedding"]
+        embedding_list = paddle.split(embeddings, num_atoms, axis=0)
+        max_atoms = max(num_atoms)
+        material_embeds = paddle.stack(
+            [
+                paddle.concat(
+                    [
+                        embedding,
+                        paddle.zeros(
+                            [max_atoms - count, embedding.shape[1]],
+                            dtype=embedding.dtype,
+                        ),
+                    ],
+                    axis=0,
+                )
+                for embedding, count in zip(embedding_list, num_atoms)
+            ]
+        )
+        material_atts = (
+            paddle.arange(max_atoms).unsqueeze(0)
+            < paddle.to_tensor(num_atoms).unsqueeze(1)
+        ).cast("int64")
         query_tokens = self.query_tokens.expand([material_embeds.shape[0], -1, -1])
 
         text_list = samples.get("text_input", None)
@@ -330,6 +352,7 @@ class Blip2MistralInstruct(RuntimeMixin, Blip2Base):
             padding="longest",
             truncation=True,
             max_length=self.max_output_txt_len,
+            add_special_tokens=False,
         )
 
         llm_tokens, input_target_lengths = self.concat_text_input_output(
@@ -340,10 +363,10 @@ class Blip2MistralInstruct(RuntimeMixin, Blip2Base):
         )
 
         targets = llm_tokens["input_ids"].masked_fill(
-            llm_tokens["input_ids"] == self.llm_tokenizer.pad_token_id, -100
+            llm_tokens["attention_mask"] == 0, -100
         )
         for i, length in enumerate(input_target_lengths):
-            targets[i][:length] = -100
+            targets[i, :length] = -100
 
         empty_targets = paddle.ones(atts_llm.shape, dtype=paddle.int64).fill_(-100)
         targets = paddle.concat([empty_targets, targets], axis=1)
@@ -354,15 +377,15 @@ class Blip2MistralInstruct(RuntimeMixin, Blip2Base):
         )
         attention_mask = paddle.concat([atts_llm, llm_tokens["attention_mask"]], axis=1)
 
-        with self.maybe_autocast():
-            outputs = self.llm_model(
-                inputs_embeds=inputs_embeds,
-                attention_mask=attention_mask,
-                return_dict=True,
-                labels=targets,
-            )
+        outputs = self.llm_model(
+            inputs_embeds=inputs_embeds,
+            attention_mask=attention_mask,
+            return_dict=True,
+            labels=targets,
+            use_cache=False,
+        )
 
-        return {"loss": outputs.loss}
+        return {"loss_dict": {"loss": outputs.loss}, "pred_dict": {}}
 
     @paddle.no_grad()
     def chat(self, structure, prompt, max_new_tokens=64):

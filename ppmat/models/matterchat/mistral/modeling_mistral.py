@@ -428,9 +428,7 @@ class MistralDecoderLayer(nn.Layer):
     def __init__(self, config: MistralConfig, layer_idx: int):
         super().__init__()
         self.hidden_size = config.hidden_size
-        attn_cls = MISTRAL_ATTENTION_CLASSES.get(
-            getattr(config, "_attn_implementation", "eager"), MistralAttention
-        )
+        attn_cls = MISTRAL_ATTENTION_CLASSES[config.attn_implementation]
         self.self_attn = attn_cls(config=config, layer_idx=layer_idx)
         self.mlp = MistralMLP(config)
         self.input_layernorm = MistralRMSNorm(

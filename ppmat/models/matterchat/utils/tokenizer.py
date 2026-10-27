@@ -16,7 +16,9 @@
 
 import os
 from dataclasses import dataclass
-from typing import List, Optional, Union
+from typing import List
+from typing import Optional
+from typing import Union
 
 import numpy as np
 import paddle
@@ -32,7 +34,7 @@ class EncodingResult:
 
 
 class MistralTokenizerWrapper:
-    """Tokenizer wrapper providing LlamaTokenizer-compatible API for Blip2MistralInstruct."""
+    """Tokenizer API shared by MatterChat training and inference."""
 
     VOCAB_SIZE = 32768
     PAD_TOKEN_ID = 32768
@@ -61,6 +63,7 @@ class MistralTokenizerWrapper:
         padding: Union[bool, str] = False,
         truncation: bool = False,
         max_length: Optional[int] = None,
+        add_special_tokens: bool = True,
         **kwargs,
     ) -> EncodingResult:
         """Encode text to token IDs and attention mask."""
@@ -69,7 +72,9 @@ class MistralTokenizerWrapper:
             text = [text]
 
         if truncation and max_length is not None:
-            self._tokenizer.enable_truncation(max_length)
+            self._tokenizer.enable_truncation(
+                max_length, direction=self.truncation_side
+            )
         else:
             self._tokenizer.no_truncation()
 
@@ -84,7 +89,9 @@ class MistralTokenizerWrapper:
         else:
             self._tokenizer.no_padding()
 
-        encodings = self._tokenizer.encode_batch(text)
+        encodings = self._tokenizer.encode_batch(
+            text, add_special_tokens=add_special_tokens
+        )
 
         all_ids = []
         all_masks = []
@@ -114,7 +121,9 @@ class MistralTokenizerWrapper:
         # Filter out the added pad token (32768) which the base tokenizer doesn't know
         token_ids = [t for t in token_ids if t < self.VOCAB_SIZE]
 
-        return self._tokenizer.decode(token_ids, skip_special_tokens=skip_special_tokens)
+        return self._tokenizer.decode(
+            token_ids, skip_special_tokens=skip_special_tokens
+        )
 
     def batch_decode(
         self,
@@ -133,7 +142,9 @@ class MistralTokenizerWrapper:
                 token_ids = [int(seq)]
             token_ids = [t for t in token_ids if t < self.VOCAB_SIZE]
             results.append(
-                self._tokenizer.decode(token_ids, skip_special_tokens=skip_special_tokens)
+                self._tokenizer.decode(
+                    token_ids, skip_special_tokens=skip_special_tokens
+                )
             )
         return results
 

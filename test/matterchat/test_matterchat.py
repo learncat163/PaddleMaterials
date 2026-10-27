@@ -142,11 +142,36 @@ class TestMatterChatBuildAndForward:
     """Model can be built from config and the core data flow runs."""
 
     def test_model_builds_from_config(self, small_model):
-        assert small_model.material_encoder is not None
+        from dataclasses import is_dataclass
+
+        from omegaconf import OmegaConf
+
+        from ppmat.models.chgnet.chgnet import CHGNet
+        from ppmat.models.chgnet.chgnet_graph_converter import CHGNetGraphConverter
+
+        assert isinstance(small_model.material_encoder, CHGNet)
+        assert isinstance(
+            small_model.material_encoder.graph_converter, CHGNetGraphConverter
+        )
         assert small_model.Qformer is not None
         assert small_model.query_tokens is not None
         assert small_model.llm_proj is not None
         assert small_model.llm_model is not None
+
+        full_config = OmegaConf.load(
+            "structure_generation/configs/matterchat/matterchat_full.yaml"
+        )
+        settings = OmegaConf.to_container(
+            full_config.Model.__init_params__.llm_config, resolve=True
+        )
+        assert is_dataclass(small_model.llm_model.config)
+        assert small_model._build_llm_config(settings) == small_model._build_llm_config(
+            None
+        )
+        with pytest.raises(TypeError, match="hidden_szie"):
+            small_model._build_llm_config({"hidden_szie": 64})
+        with pytest.raises(ValueError, match="num_key_value_heads"):
+            small_model._build_llm_config({"num_key_value_heads": 3})
 
     def test_chgnet_encodes_structure_to_embedding(self, small_model, si_structure):
         emb = small_model.material_encoder.predict_structure_embedding(si_structure)
@@ -304,8 +329,8 @@ class TestConcatText:
     def test_concat_preserves_input_then_output(self, small_model):
         input_ids = paddle.to_tensor([[1, 2, 3, 0, 0]])
         input_atts = paddle.to_tensor([[1, 1, 1, 0, 0]])
-        output_ids = paddle.to_tensor([[0, 4, 5, 6]])
-        output_atts = paddle.to_tensor([[0, 1, 1, 1]])
+        output_ids = paddle.to_tensor([[4, 5, 6]])
+        output_atts = paddle.to_tensor([[1, 1, 1]])
         res, lens = small_model.concat_text_input_output(
             input_ids, input_atts, output_ids, output_atts
         )
@@ -420,6 +445,136 @@ def test_gpu_cinn_chat_matches_eager(chat_model, si_structure):
         chat_model.set_execution_backend("eager")
         chat_model.to("cpu")
         paddle.set_device("cpu")
+
+
+def test_official_trainer_training_and_resume(tmp_path, si_structure, monkeypatch):
+    from cinn_workflow_harness import assert_state_dict_close
+    from cinn_workflow_harness import trainer_config
+    from omegaconf import OmegaConf
+
+    from ppmat.datasets import build_dataloader
+    from ppmat.models import build_model
+    from ppmat.optimizer import build_optimizer
+    from ppmat.trainer import BaseTrainer
+
+    config = OmegaConf.load(
+        "structure_generation/configs/matterchat/matterchat_train.yaml"
+    )
+    tokenizer_path = tmp_path / "tokenizer.json"
+    _write_tokenizer_json(tokenizer_path)
+    config.Model.__init_params__.tokenizer_path = str(tokenizer_path)
+    llm_config = dict(_SMALL_LLM_CONFIG, vocab_size=32769)
+    config.Model.__init_params__.llm_config = llm_config
+    config.Model.__init_params__.num_query_token = 4
+    model_config = OmegaConf.to_container(config.Model, resolve=True)
+    paddle.seed(2026)
+    with paddle.utils.unique_name.guard():
+        model = build_model(model_config)
+    model.eval()
+    larger_structure = si_structure.copy()
+    larger_structure.make_supercell([2, 1, 1])
+    with paddle.no_grad():
+        features = [
+            model.material_encoder.predict_structure_embedding(structure).numpy()
+            for structure in (si_structure, larger_structure)
+        ]
+    data_path = tmp_path / "train.npz"
+    np.savez(
+        data_path,
+        material_embedding=np.concatenate(features),
+        num_atoms=np.array([len(feature) for feature in features]),
+        text_input=np.array(["a", "a b"]),
+        text=np.array(["b", "a b"]),
+    )
+    config.Dataset.train.dataset.__init_params__.path = str(data_path)
+    config.Dataset.train.sampler.__init_params__.shuffle = False
+    loader = build_dataloader(
+        OmegaConf.to_container(config.Dataset.train, resolve=True)
+    )
+    batch = next(iter(loader))
+    assert batch["num_atoms"].tolist() == [2, 4]
+    assert batch["material_embedding"].shape == [6, 64]
+    model.train()
+    captured_labels = []
+    llm_forward = model.llm_model.forward
+
+    def capture_labels(*args, **kwargs):
+        captured_labels.append(kwargs["labels"].numpy().copy())
+        return llm_forward(*args, **kwargs)
+
+    monkeypatch.setattr(model.llm_model, "forward", capture_labels)
+    loss = model(batch)["loss_dict"]["loss"]
+    monkeypatch.setattr(model.llm_model, "forward", llm_forward)
+    np.testing.assert_array_equal(
+        captured_labels[0],
+        [
+            [-100, -100, -100, -100, -100, 4, 2, -100, -100],
+            [-100, -100, -100, -100, -100, -100, 3, 4, 2],
+        ],
+    )
+    assert bool(paddle.isfinite(loss))
+    loss.backward()
+    for name, parameter in model.named_parameters():
+        if parameter.stop_gradient:
+            assert parameter.grad is None, name
+        else:
+            assert parameter.grad is not None, name
+            assert bool(paddle.isfinite(parameter.grad).all()), name
+    model.clear_gradients()
+    initial_projection = model.llm_proj.weight.numpy().copy()
+    frozen_embedding = model.llm_model.model.embed_tokens.weight.numpy().copy()
+    optimizer_config = OmegaConf.to_container(config.Optimizer, resolve=True)
+    optimizer, scheduler = build_optimizer(optimizer_config, model, 2, len(loader))
+    trainer = BaseTrainer(
+        trainer_config(tmp_path / "first", 1),
+        model,
+        train_dataloader=loader,
+        val_dataloader=loader,
+        optimizer=optimizer,
+        lr_scheduler=scheduler,
+        execution_config={"backend": "eager"},
+    )
+    with paddle.utils.unique_name.guard():
+        trainer.train()
+    assert trainer.state.global_step == 1
+    assert not np.array_equal(initial_projection, model.llm_proj.weight.numpy())
+    np.testing.assert_array_equal(
+        frozen_embedding, model.llm_model.model.embed_tokens.weight.numpy()
+    )
+    checkpoint = tmp_path / "first" / "checkpoints" / "latest"
+    for suffix in ("pdparams", "pdopt", "pdstates"):
+        assert checkpoint.with_suffix("." + suffix).is_file()
+    for name, parameter in model.named_parameters():
+        assert bool(paddle.isfinite(parameter).all()), name
+    expected_keys = tuple(model.state_dict())
+    with paddle.utils.unique_name.guard():
+        restored = build_model(model_config)
+    restored_optimizer, restored_scheduler = build_optimizer(
+        optimizer_config, restored, 2, len(loader)
+    )
+    resumed = BaseTrainer(
+        trainer_config(tmp_path / "resumed", 2),
+        restored,
+        train_dataloader=loader,
+        val_dataloader=loader,
+        optimizer=restored_optimizer,
+        lr_scheduler=restored_scheduler,
+        execution_config={"backend": "eager"},
+    )
+    # Zero epochs after restoration isolate checkpoint restoration from updates.
+    resumed.max_epochs = 1
+    with paddle.utils.unique_name.guard():
+        resumed.train(resume_from_checkpoint=str(checkpoint))
+    assert resumed.state.global_step == 1
+    assert tuple(restored.state_dict()) == expected_keys
+    assert_state_dict_close(restored.state_dict(), model.state_dict(), 0)
+    assert_state_dict_close(restored_optimizer.state_dict(), optimizer.state_dict(), 0)
+    resumed.max_epochs = 2
+    with paddle.utils.unique_name.guard():
+        resumed.train(resume_from_checkpoint=str(checkpoint))
+    assert resumed.state.global_step == 2
+    for name, parameter in restored.named_parameters():
+        assert bool(paddle.isfinite(parameter).all()), name
 
 
 if __name__ == "__main__":

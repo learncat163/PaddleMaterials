@@ -41,6 +41,19 @@ $$
 
 The encoder is frozen during all training stages.
 
+The material encoder subclasses the framework CHGNet and uses its
+`CHGNetGraphConverter`, basis functions, message-passing layers and graph
+execution. The MatterChat adapter retains the released checkpoint layout:
+9 radial/angular bases, 5/3 angstrom atom/bond cutoffs, cutoff coefficient 5,
+a two-layer 64-wide readout MLP and biased convolution output projections.
+Identity layers replace gated normalization only in this adapter, and readout
+normalization is disabled, matching the released dialogue weights. A scoped
+forward hook reads final atom-convolution features; it is removed even if graph
+execution fails. The framework's `return_atom_feas` refers to the penultimate
+features and is therefore not used for dialogue embeddings. The framework
+CHGNet source and its defaults are unchanged.
+
+
 #### 2) Q-Former (cross-attention bridge)
 A BERT-style transformer with cross-attention layers. A fixed set of learnable query tokens $Q \in \mathbb{R}^{N_q \times d}$ attend to the CHGNet embeddings $E \in \mathbb{R}^{N \times 64}$:
 
@@ -67,9 +80,9 @@ $$
 
 The released checkpoint corresponds to the BLIP-2 stage-2 product: the
 Q-Former and llm_proj are trained, while the CHGNet encoder and the Mistral
-LLM stay frozen. This repository migrates the inference (dialogue) pipeline
-only; the three-stage training procedure is out of scope and can be found in
-the original paper and repository.
+LLM stay frozen. The dialogue pipeline supports inference and bridge training
+through the existing `BaseTrainer`. Training consumes precomputed frozen-CHGNet
+features; it does not implement the full original three-stage training procedure.
 
 
 ---
@@ -103,6 +116,75 @@ Dialogue test results (greedy decoding, float32):
 ---
 
 ## Command
+
+### Model configuration
+
+Use the standard `Model.__class_name__` / `Model.__init_params__` configuration.
+Mistral settings are a YAML mapping under `Model.__init_params__.llm_config`;
+`MistralConfig` is an internal typed dataclass, not a separately registered model
+or an external framework configuration object. `matterchat_full.yaml` lists the
+released backbone dimensions explicitly. Omitted fields use the dataclass
+defaults, which describe the same architecture. Unknown fields and incompatible
+attention dimensions raise errors instead of silently accepting unused options.
+Unused external configuration fields (`head_dim`, `sliding_window`,
+`tie_word_embeddings`, `num_labels`, `model_type`) are not supported; the previous
+implementation accepted them without applying them to the model. Attention is
+selected explicitly using `attn_implementation: eager` or `sdpa`.
+
+### Bridge training
+
+Use `structure_generation/train.py` with `matterchat_train.yaml`. This reuses
+`build_model`, `build_dataloader`, `DefaultCollator`, `build_optimizer` and
+`BaseTrainer`, including evaluation and checkpoint resume. CHGNet and Mistral
+remain frozen; Q-Former, query tokens and the projection are optimized.
+
+Provide your own local NPZ file with these arrays (no pickle objects):
+
+| Array | Shape | Type | Meaning |
+| --- | --- | --- | --- |
+| `material_embedding` | `[sum(num_atoms), 64]` | float32 | Per-atom CHGNet embeddings concatenated in record order |
+| `num_atoms` | `[records]` | integer | Positive atom count for each record |
+| `text_input` | `[records]` | Unicode string | Questions |
+| `text` | `[records]` | Unicode string | Nonempty target answers without manually added BOS/EOS |
+
+Extract features with the same frozen CHGNet weights used for dialogue inference.
+Set the loaded model to `eval()` and call
+`model.material_encoder.predict_structure_embedding(structure)` under
+`paddle.no_grad()`. Concatenate those arrays with `numpy.concatenate`, and save
+all four fields using `numpy.savez`. This is a caller-provided dataset, so missing
+files raise an error rather than downloading an unrelated corpus. Split training
+and validation records before saving separate archives.
+
+`MatterChatDataset` returns plain dictionaries. `ConcatData` packs variable atom
+counts through `DefaultCollator`; the model pads features and masks padded atoms
+before Q-Former attention. Answers are tokenized without automatic special
+tokens, with EOS appended explicitly. The loss supervises every answer token and
+masks question tokens, the crystal prefix and padding.
+
+```bash
+python structure_generation/train.py \
+  -c structure_generation/configs/matterchat/matterchat_train.yaml \
+  Model.__init_params__.tokenizer_path=./data/matterchat/tokenizer.json \
+  Dataset.train.dataset.__init_params__.path=./data/matterchat/train.npz
+```
+
+This configuration constructs the full-size model with random initialization.
+To fine-tune a released model, set `Trainer.pretrained_model_path` to the extracted
+checkpoint directory containing `best.pdparams`. Use the tokenizer from that same
+package. Sharded packages must first be exported to a native `best.pdparams`
+checkpoint with matching configuration; the Trainer's standard weight loader does
+not use MatterChat's inference-only sharded loader. Full-model training memory
+requirements are higher than inference even with a frozen LLM.
+
+For validation, add a `Dataset.val` block with the same schema as `Dataset.train`,
+set its archive path and disable shuffle. For resume, set
+`Trainer.resume_from_checkpoint` to the saved checkpoint prefix, such as
+`./output/run/checkpoints/latest` (without a file extension).
+
+The integration test uses a small LLM with real CHGNet-derived variable-length
+features and synthetic Q&A. It verifies finite gradients, parameter updates,
+frozen weights, evaluation and independent model/optimizer checkpoint restoration;
+it does not establish full-size fine-tuning quality.
 
 ### Inference
 
@@ -178,7 +260,7 @@ MatterChat defaults to eager execution. The top-level model delegates backend
 selection to its existing Mistral backbone, which owns the shared runtime and
 its cache. CINN compiles that backbone's numerical forward through SOT; CHGNet,
 Q-Former, the language head and the generation loop stay eager. Checkpoint keys
-and shapes are unchanged. Training is outside this migrated dialogue workflow.
+and shapes are unchanged. The training configuration uses eager execution; the CINN coverage below is for inference.
 
 After loading the model on a CUDA device, select the backend before calling the
 existing chat entry:

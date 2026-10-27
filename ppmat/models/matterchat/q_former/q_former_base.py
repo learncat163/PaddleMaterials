@@ -23,7 +23,7 @@ import paddle
 import paddle.nn as nn
 import paddle.nn.functional as F
 
-from ppmat.models.matterchat.chgnet.model.model_embedding import CHGNet
+from ppmat.models.matterchat.material_encoder import MatterChatEncoder
 from ppmat.models.matterchat.utils.activations import get_activation as _get_activation
 from ppmat.models.matterchat.utils.weight_init import default_init_weights
 
@@ -1164,7 +1164,7 @@ class Blip2Base(nn.Layer):
 
     def init_material_encoder(self):
         """Initialize CHGNet material encoder without pretrained weights."""
-        return CHGNet()
+        return MatterChatEncoder()
 
     def maybe_autocast(self, dtype=paddle.float16):
         """Context manager for mixed precision."""
