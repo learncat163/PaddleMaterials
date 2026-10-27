@@ -1,4 +1,4 @@
-# Copyright (c) 2026 PaddlePaddle Authors. All Rights Reserved.
+# Copyright (c) 2025 PaddlePaddle Authors. All Rights Reserved.
 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,7 +25,6 @@ import pgl
 from ase import Atoms
 from p_tqdm import p_map
 from pymatgen.core.structure import Structure
-from pymatgen.io.ase import AseAtomsAdaptor
 from pymatgen.optimization.neighbors import find_points_in_spheres
 
 from .threebody_indices import compute_threebody as _compute_threebody
@@ -251,10 +250,7 @@ class M3GNetGraphConvertor:
             edge_features["num_triple_ij"] = n_triple_ij.astype("int64").reshape(-1, 1)
 
         graph = self.build_pgl_graph(
-            AseAtomsAdaptor.get_structure(atoms),
-            edge_indices,
-            to_jimages,
-            edge_features=edge_features,
+            structure, edge_indices, to_jimages, edge_features=edge_features
         )
 
         return graph

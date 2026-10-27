@@ -810,7 +810,10 @@ class TestRewardScoring:
                 "calculator": {
                     "__class_name__": "PyMatGen",
                     "task": "mcia",
-                    "substrate_path": str(_CONFIG_ROOT / "matinvent/substrates/Si.cif"),
+                    "substrate_path": str(
+                        _REPO_ROOT
+                        / "property_prediction/example_data/cifs/mp-18767-LiMnO2.cif"
+                    ),
                 },
             },
             {
